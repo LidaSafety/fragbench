@@ -2,7 +2,7 @@
 PROMPTSTEAL / APT28 Campaign — make_variation implementation.
 
 Generates deterministic variations of the APT28 LAMEHUG kill chain where
-Qwen2.5-Coder generates recon + doc-harvest commands at runtime targeting
+Qwen2.5-Coder generate recon + doc-harvest commands at runtime targeting
 Ukrainian government systems.
 
 Usage:
