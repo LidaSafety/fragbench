@@ -16,6 +16,13 @@ Examples:
 
     # Output JSON results to a file
     python run.py --model claude --judge --output results/run1.json
+
+    # Generate attack variations from a seed file (dry-run, no LLM)
+    python run.py --generate --seed-file seeds/promptsteal.json --num-variations 5 --dry-run
+
+    # Generate with LLM fragmentation + legitimization, write TOML to attacks/
+    python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 \\
+        --claude-key $ANTHROPIC_API_KEY
 """
 
 from __future__ import annotations
@@ -93,6 +100,31 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print prompts without calling any model APIs",
     )
+
+    # --- Dataset generation mode -------------------------------------------
+    p.add_argument(
+        "--generate",
+        action="store_true",
+        help="Run the dataset generation pipeline instead of evaluation",
+    )
+    p.add_argument(
+        "--seed-file",
+        default=None,
+        help="Path to a seed JSON file in seeds/ (required with --generate)",
+    )
+    p.add_argument(
+        "--num-variations",
+        type=int,
+        default=100,
+        help="Number of variations to generate (default: 100)",
+    )
+    p.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Base seed for generation (default: random). Use for reproducibility.",
+    )
+
     return p.parse_args()
 
 
@@ -244,8 +276,77 @@ def run_campaign(spec, runner, args) -> dict:
     }
 
 
+def run_generate(args) -> None:
+    """Dataset generation pipeline: seed file → vary → fragment → legitimize → TOML."""
+    import json as _json
+    import random as _random
+
+    from generator import VARIATION_REGISTRY, generate_toml, legitimize_fragment, make_fragments
+
+    if not args.seed_file:
+        print("ERROR: --seed-file <path> is required with --generate", file=sys.stderr)
+        sys.exit(1)
+
+    seed_path = Path(args.seed_file)
+    if not seed_path.exists():
+        print(f"ERROR: seed file not found: {seed_path}", file=sys.stderr)
+        sys.exit(1)
+
+    seed_data = _json.loads(seed_path.read_text())
+    campaign_id = seed_data["metadata"]["id"].lower()
+
+    if campaign_id not in VARIATION_REGISTRY:
+        available = ", ".join(VARIATION_REGISTRY)
+        print(f"ERROR: no variation class for '{campaign_id}'. Registered: {available}", file=sys.stderr)
+        sys.exit(1)
+
+    gen = VARIATION_REGISTRY[campaign_id](args.seed_file)
+    api_key = args.claude_key if not args.dry_run else None
+    base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
+
+    print(f"Generating {args.num_variations} variation(s) "
+          f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
+
+    final_frag_list: list[list[str]] = []
+    for i in range(args.num_variations):
+        seed = base_seed + i
+        var = gen.make_variation(seed)  # list[tuple[str, str]]
+
+        if args.dry_run:
+            print(f"\n  [variation {i}  seed={seed}]")
+            for step, tactic in var:
+                print(f"    ({tactic})  {step}")
+            continue
+
+        fragments = make_fragments(var, api_key=api_key)
+        legitimized = [legitimize_fragment(frag, api_key=api_key) for frag in fragments]
+        final_frag_list.append(legitimized)
+
+    if args.dry_run:
+        return
+
+    attacks_dir = Path(args.attacks_dir)
+    attacks_dir.mkdir(parents=True, exist_ok=True)
+
+    written: list[Path] = []
+    for i, frags in enumerate(final_frag_list):
+        seed = base_seed + i
+        toml_text = generate_toml(seed_data["metadata"], [frags], seed)
+        out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
+        out_path.write_text(toml_text)
+        written.append(out_path)
+
+    print(f"\nWrote {len(written)} TOML file(s) to {attacks_dir}/")
+    for p in written:
+        print(f"  {p.name}")
+
+
 def main() -> None:
     args = parse_args()
+
+    if args.generate:
+        run_generate(args)
+        return
 
     from harness import load_all_attacks
 
