@@ -13,6 +13,15 @@ This single-file implementation consolidates the functionality of the prior
 
 The goal is a maintainable, batteries-included client that can be dropped into any
 project without importing auxiliary helpers from this repository.
+
+
+The client is the orchestration layer sitting between the LLM and the MCP server:
+LLM (OpenRouter)          MCPOpenRouterClientV1          MCP Server (filesystem)─────────────────         ──────────────────────         ───────────────────────                   ◄────  formats messages, sends   ────►                          chat/completions request                   ────►  receives tool_calls                                  dispatches each call       ────►                                                     ◄────  returns JSON results                   ◄────  feeds results back as                          tool role messages                   ────►  next LLM call...                          (loop until no tool_calls)
+More specifically, the client is doing three things the LLM and server cannot do for themselves:
+Protocol translation — the LLM speaks OpenAI chat/completions JSON; the MCP server speaks MCP (JSON-RPC over SSE/stdio). The client translates between them, converting MCP tool schemas into OpenAI tools format and MCP results back into tool role messages.
+The agent loop — neither the LLM nor the server knows when to stop. The client drives the iterate-until-done loop: call LLM → if tool_calls present, dispatch them in parallel to the server → append results → call LLM again → repeat. This is process_query around line 1311.
+State management — the client holds the conversation history (messages), the active MCP sessions, the hook system, and the tool registry. The LLM is stateless; the server is stateless. All the "memory" of a turn lives in the client.
+So "sits between" is right, but it's less a passive proxy and more the active conductor — it's the only component that knows about both sides simultaneously.
 """
 
 from __future__ import annotations
