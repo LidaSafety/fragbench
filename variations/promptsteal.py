@@ -19,8 +19,10 @@ import random
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from variations.base import BaseVariation, MitreType
 
-class PromptStealVariation:
+
+class PromptStealVariation(BaseVariation):
     """
     Custom make_variation for PROMPTSTEAL / APT28 campaign.
 
@@ -31,6 +33,7 @@ class PromptStealVariation:
     def __init__(self, seed_file: str = "seeds/promptsteal.json"):
         with open(seed_file) as f:
             self.data = json.load(f)
+        self._validate_seed_tactics(self.data)
 
     def make_variation(self, seed: int) -> List[Tuple[str, str]]:
         """
@@ -51,7 +54,7 @@ class PromptStealVariation:
             stage_vars = self._resolve_variables(stage, rng, resolved_vars)
             prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
-            result.append((prompt, stage["mitre_tactic"]))
+            result.append((prompt, self._coerce_tactic(stage["mitre_tactic"])))
 
         return result
 
