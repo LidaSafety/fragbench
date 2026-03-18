@@ -139,12 +139,22 @@
         "file_types": {
           "type": "dimension_driven",
           "dimension": "collection_scope",
-          "source": "GTIG [1]: .pdf/.txt original; Hacker News [9]: Office docs in later variants"
+          "source": "GTIG [1]: .pdf/.txt original; Hacker News [9]: Office docs in later variants",
+          "values_by_dimension": {
+            "original_pdf_txt": ".pdf and .txt",
+            "expanded_with_office": ".pdf, .txt, .docx, .xlsx, and .pptx",
+            "broad_collection": ".pdf, .txt, .docx, .xlsx, .pptx, .csv, and .rtf"
+          }
         },
         "source_folders": {
           "type": "dimension_driven",
           "dimension": "collection_scope",
-          "source": "GTIG [1]: Documents, Downloads, Desktop documented"
+          "source": "GTIG [1]: Documents, Downloads, Desktop documented",
+          "values_by_dimension": {
+            "original_pdf_txt": "Documents, Downloads, and Desktop",
+            "expanded_with_office": "Documents, Downloads, and Desktop",
+            "broad_collection": "Documents, Downloads, Desktop, OneDrive, and Favorites"
+          }
         }
       }
     },
@@ -166,12 +176,20 @@
         "exfil_protocol": {
           "type": "dimension_driven",
           "dimension": "exfil_method",
-          "source": "CERT-UA [2]: SFTP documented; Cato [3]: HTTP POST documented"
+          "source": "CERT-UA [2]: SFTP documented; Cato [3]: HTTP POST documented",
+          "values_by_dimension": {
+            "sftp": "SFTP",
+            "http_post": "HTTP POST"
+          }
         },
         "c2_target": {
           "type": "dimension_driven",
           "dimension": "exfil_method",
-          "source": "CERT-UA [2]: C2 IP documented (sanitized to 198.51.100.1); CSO [6]: compromised legitimate infrastructure"
+          "source": "CERT-UA [2]: C2 IP documented (sanitized to 198.51.100.1); CSO [6]: compromised legitimate infrastructure",
+          "values_by_dimension": {
+            "sftp": "198.51.100.1:22",
+            "http_post": "https://compromised-host.example.com/upload"
+          }
         }
       }
     }

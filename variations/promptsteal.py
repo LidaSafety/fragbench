@@ -35,7 +35,15 @@ class PromptStealVariation(BaseVariation):
             self.data = json.load(f)
         self._validate_seed_tactics(self.data)
 
-    def make_variation(self, seed: int) -> List[Tuple[str, str]]:
+    def _select_dimensions(self, rng: random.Random) -> Dict[str, str]:
+        """Select one value per variation dimension using the seeded RNG."""
+        dimensions = self.data.get("variation_dimensions", {})
+        return {
+            name: rng.choice(dim["values"])
+            for name, dim in dimensions.items()
+        }
+
+    def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         """
         Generate one deterministic variation of the full PROMPTSTEAL kill chain.
 
@@ -43,15 +51,18 @@ class PromptStealVariation(BaseVariation):
             seed: Integer seed for deterministic randomness.
 
         Returns:
-            List of (prompt_text, mitre_tactic) tuples — one per attack stage.
+            List of (prompt_text, MitreType) tuples — one per attack stage.
         """
         rng = random.Random(seed)
+        dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
         resolved_vars: Dict[int, Dict[str, Any]] = {}
 
         result = []
         for stage in stages:
-            stage_vars = self._resolve_variables(stage, rng, resolved_vars)
+            stage_vars = self._resolve_variables(
+                stage, rng, resolved_vars, dimension_choices
+            )
             prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
             result.append((prompt, self._coerce_tactic(stage["mitre_tactic"])))
@@ -66,12 +77,15 @@ class PromptStealVariation(BaseVariation):
         resolved_variables — useful for debugging and JSON export.
         """
         rng = random.Random(seed)
+        dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
         resolved_vars: Dict[int, Dict[str, Any]] = {}
 
         result = []
         for stage in stages:
-            stage_vars = self._resolve_variables(stage, rng, resolved_vars)
+            stage_vars = self._resolve_variables(
+                stage, rng, resolved_vars, dimension_choices
+            )
             prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
             result.append({
@@ -82,6 +96,7 @@ class PromptStealVariation(BaseVariation):
                 "mitre_technique_name": stage["mitre_technique_name"],
                 "description": stage["description"],
                 "resolved_variables": dict(stage_vars),
+                "dimension_choices": dict(dimension_choices),
             })
 
         return result
@@ -91,6 +106,7 @@ class PromptStealVariation(BaseVariation):
         stage: dict,
         rng: random.Random,
         resolved_vars: Dict[int, Dict[str, Any]],
+        dimension_choices: Dict[str, str],
     ) -> Dict[str, Any]:
         """Resolve all variables for a stage, handling inheritance and types."""
         result = {}
@@ -121,6 +137,12 @@ class PromptStealVariation(BaseVariation):
 
             elif var_type == "filename":
                 result[var_name] = rng.choice(var_def["name_pool"])
+
+            elif var_type == "dimension_driven":
+                dimension = var_def["dimension"]
+                chosen_value = dimension_choices[dimension]
+                lookup = var_def["values_by_dimension"]
+                result[var_name] = lookup[chosen_value]
 
             elif var_type == "ipv4":
                 result[var_name] = (
