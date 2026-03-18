@@ -90,7 +90,7 @@ How staged data is sent to the attacker.
 
 | Value | Protocol | Evidence |
 |-------|----------|----------|
-| `sftp` | SFTP to dedicated server (144.126.202.227 documented) | CERT-UA [2], Hacker News [9] |
+| `sftp` | SFTP to dedicated server (real IP sanitized to `198.51.100.1`) | CERT-UA [2], Hacker News [9] |
 | `http_post` | HTTP POST to compromised legitimate infrastructure | Cato [3], CSO Online [6] |
 
 **Detection relevance:** SFTP creates distinct network signatures (encrypted SSH channels) vs HTTP POST which blends with normal web traffic.
