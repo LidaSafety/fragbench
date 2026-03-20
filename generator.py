@@ -24,6 +24,7 @@ import logging
 import sys
 
 from variations.vibe_extortion import VibeExtortionVariation
+from variations.yale_nhh_ransomware import YaleNHHRansomwareVariation
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ log = logging.getLogger(__name__)
 
 VARIATION_REGISTRY: dict[str, type] = {
     "vibe_extortion": VibeExtortionVariation,
+    "yale_nhh_ransomware": YaleNHHRansomwareVariation,
 }
 
 
