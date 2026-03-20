@@ -5,20 +5,55 @@ Attack prompt variation harness with kill-chain detection for LLM safety evaluat
 Probes a target model with rephrased attack fragments across multiple styles, then
 classifies responses and scores whether the full kill chain could succeed.
 
-## Setup
+## Getting started
+
+### Prerequisites
+
+- Python ≥ 3.11
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/) — install with `pip install uv` or `brew install uv`
+- An API key for at least one target model (see below)
+
+### 1. Install dependencies
 
 ```bash
 uv venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 uv pip install anthropic openai
+```
+
+### 2. Set API keys
+
+**Claude (Anthropic)** — required if using `--model claude` or `--judge`:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Qwen (DashScope)** — required if using `--model qwen`:
+
+```bash
+export DASHSCOPE_API_KEY=sk-...
+```
+
+Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) to avoid re-entering them.
+
+### 3. Verify the install
+
+This runs without any API calls:
+
+```bash
+python run.py --dry-run
+```
+
+You should see campaign names and prompts printed to the terminal. If that works, you're ready to run a real evaluation:
+
+```bash
+python run.py --model claude --campaign AD_DISCOVERY --judge
 ```
 
 ## Usage
 
 ```bash
-# Dry run — inspect prompts without calling any model
-python run.py --dry-run
-
 # Run all campaigns against Claude (default: claude-sonnet-4-6)
 python run.py --model claude
 
@@ -115,24 +150,3 @@ python run.py --campaign MY_CAMPAIGN --model claude --judge
 JSON output (`--output path/results.json`) contains:
 - `run_timestamp`, `target_model`, `classifier`
 - Per-campaign: `killchain` summary + all `variations` with `verdict` and `justification`
-
-```json
-{
-  "run_timestamp": "2026-03-06T...",
-  "target_model": "claude-sonnet-4-6",
-  "classifier": "llm_judge",
-  "campaigns": [
-    {
-      "campaign_id": "DPRK_FRAUD",
-      "technique": "T1585.001",
-      "killchain": {
-        "kill_chain_complete": true,
-        "compliant_fragments": 1,
-        "total_fragments": 1,
-        "compliance_rate": 1.0
-      },
-      "variations": [...]
-    }
-  ]
-}
-```
