@@ -17,12 +17,13 @@ Examples:
     # Output JSON results to a file
     python run.py --model claude --judge --output results/run1.json
 
-    # Generate attack variations from a seed file (dry-run, no LLM)
-    python run.py --generate --seed-file seeds/promptsteal.json --num-variations 5 --dry-run
+    # Generate variations → TOML (no LLM rewriting, preserves original prompts)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50
 
-    # Generate with LLM fragmentation + legitimization, write TOML to attacks/
-    python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 \\
-        --claude-key $ANTHROPIC_API_KEY
+    # Generate with optional LLM fragmentation and/or legitimization
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
 """
 
 from __future__ import annotations
@@ -124,6 +125,16 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=None,
         help="Base seed for generation (default: random). Use for reproducibility.",
+    )
+    p.add_argument(
+        "--fragment",
+        action="store_true",
+        help="Apply LLM fragmentation (split each step into sub-steps)",
+    )
+    p.add_argument(
+        "--legitimize",
+        action="store_true",
+        help="Apply LLM legitimization (reframe steps with cover stories)",
     )
 
     return p.parse_args()
@@ -278,7 +289,7 @@ def run_campaign(spec, runner, args) -> dict:
 
 
 def run_generate(args) -> None:
-    """Dataset generation pipeline: seed file → vary → fragment → legitimize → TOML."""
+    """Dataset generation pipeline: seed file → vary → [fragment] → [legitimize] → TOML."""
     import json as _json
     import random as _random
 
@@ -319,9 +330,12 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        fragments = make_fragments(var, api_key=api_key)
-        legitimized = [legitimize_fragment(frag, api_key=api_key) for frag in fragments]
-        final_frag_list.append(legitimized)
+        steps = [step for step, _ in var]
+        if args.fragment:
+            steps = make_fragments(var, api_key=api_key)
+        if args.legitimize:
+            steps = [legitimize_fragment(s, api_key=api_key) for s in steps]
+        final_frag_list.append(steps)
 
     if args.dry_run:
         return
