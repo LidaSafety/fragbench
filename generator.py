@@ -52,9 +52,9 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
-    "clickfix":       ClickFixVariation,
-    "scope_creep":    ScopeCreepVariation,
-    "vibe_extortion": VibeExtortionVariation,
+    "clickfix_via_ai_chat": ClickFixVariation,
+    "scope_creep":          ScopeCreepVariation,
+    "vibe_extortion":       VibeExtortionVariation,
 }
 
 
@@ -272,7 +272,7 @@ def generate_toml(
     Each fragment becomes one [[fragments]] block, and each variation string
     inside that fragment becomes one [[fragments.variations]] entry.
     """
-    campaign_id = f"{metadata['id']}_{seed}"
+    campaign_id = metadata['id']
     technique   = metadata.get("technique", "T0000")
     tech_name   = metadata.get("technique_name", "Generated")
     description = metadata.get("description", "Auto-generated attack scenario.")

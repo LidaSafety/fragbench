@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "id": "CLICKFIX",
+    "id": "CLICKFIX_VIA_AI_CHAT",
     "technique": "T1204.002",
     "technique_name": "User Execution: Malicious File",
     "description": "AMOS macOS Stealer distributed via weaponized AI chat sharing. Attackers create malicious troubleshooting conversations on trusted AI platforms (ChatGPT, Grok, Gemini, Copilot, DeepSeek), SEO-poison or malvertise the share links, then social-engineer victims into pasting a base64-encoded terminal one-liner that initiates a multi-stage AMOS deployment. AMOS harvests browser credentials, macOS Keychain, and crypto wallet data.",
