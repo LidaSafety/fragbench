@@ -113,6 +113,34 @@ The **kill chain is complete** when every fragment in a campaign has at least on
 compliant variation — meaning an adversary could complete the full attack sequence
 by rephrasing refused steps.
 
+## Generating datasets
+
+Instead of hand-authoring TOML files, you can generate attack variations programmatically from a seed JSON template.
+
+```bash
+# Preview without making any API calls
+python run.py --generate --seed-file seeds/vibe_extortion.json --dry-run
+
+# Generate 100 variations (uses Claude Haiku for fragmentation + legitimization)
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 100
+
+# Reproducible run with a fixed seed
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --seed 42
+```
+
+Each run writes one TOML file per variation to `attacks/generated_<campaign>_<seed>.toml`, ready to evaluate with `--campaign`.
+
+### Adding a new generatable campaign
+
+1. Create `seeds/<name>.json` with attack stage templates (see `seeds/vibe_extortion.json`)
+2. Implement `variations/<name>.py` subclassing `BaseVariation` (see `variations/vibe_extortion.py`)
+3. Register it in `generator.py`:
+
+   ```python
+   from variations.<name> import YourVariationClass
+   VARIATION_REGISTRY["<name>"] = YourVariationClass
+   ```
+
 ## Adding campaigns
 
 Create a new TOML file in `attacks/`:

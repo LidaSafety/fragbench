@@ -9,28 +9,34 @@ Pipeline:
         -> generate_toml(metadata, fragments, seed)         [write for evaluation harness]
 
 Adding a new attack type:
-    1. Add a class to variations/<name>.py following the PromptStealVariation interface:
+    1. Add a class to variations/<name>.py subclassing BaseVariation:
            __init__(self, seed_file)
            make_variation(self, seed: int) -> list[tuple[str, str]]
     2. Register it in VARIATION_REGISTRY below.
     3. Add a matching seed JSON to seeds/<name>.json.
+
+See variations/vibe_extortion.py for a complete working example.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
-from variations.promptsteal import PromptStealVariation
+from variations.vibe_extortion import VibeExtortionVariation
 
 # ---------------------------------------------------------------------------
 # Registry — maps the seed file's metadata.id (lowercased) to its class
+#
+# To add a new campaign:
+#   1. Implement a subclass of BaseVariation in variations/<name>.py
+#   2. Add a matching seed JSON to seeds/<name>.json
+#   3. Register it here: VARIATION_REGISTRY["<name>"] = YourVariationClass
+#
+# Example (once feat/promptsteal-variation merges):
+#   from variations.promptsteal import PromptStealVariation
+#   VARIATION_REGISTRY["promptsteal"] = PromptStealVariation
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
-    "promptsteal": PromptStealVariation,
+    "vibe_extortion": VibeExtortionVariation,
 }
 
 
