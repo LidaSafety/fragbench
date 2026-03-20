@@ -24,6 +24,7 @@ from dataclasses import dataclass
 import logging
 import sys
 
+from variations.clickfix import ClickFixVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
 
@@ -51,6 +52,7 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
+    "clickfix":       ClickFixVariation,
     "scope_creep":    ScopeCreepVariation,
     "vibe_extortion": VibeExtortionVariation,
 }
