@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -343,6 +344,10 @@ def run_generate(args) -> None:
 
 def main() -> None:
     args = parse_args()
+    logging.basicConfig(
+        format="%(levelname)s [%(name)s] %(message)s",
+        level=logging.WARNING,
+    )
 
     if args.generate:
         run_generate(args)
