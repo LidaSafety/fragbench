@@ -56,6 +56,43 @@ _FRAGMENT_SYSTEM = (
 )
 
 
+import re
+
+_CODE_FENCE_RE = re.compile(r"^```(?:\w+)?\s*\n?(.*?)(?:```)?$", re.DOTALL)
+
+
+def _strip_code_fence(text: str) -> str:
+    """Remove markdown code fences (```json ... ```) if present, even if truncated."""
+    m = _CODE_FENCE_RE.match(text.strip())
+    return m.group(1).strip() if m else text
+
+
+def _fix_json_escapes(text: str) -> str:
+    """Fix unescaped backslashes (e.g. Windows paths) in LLM-generated JSON.
+
+    Handles both cases: LLM returns already-escaped ``\\\\ProgramData`` (valid JSON)
+    or unescaped ``\\ProgramData`` (invalid JSON). We normalize by collapsing
+    all backslash sequences to single backslashes, then re-escaping them.
+    This only operates inside JSON string values (between quotes).
+    """
+    def _fix_string(m: re.Match) -> str:
+        s = m.group(0)
+        # Collapse any run of backslashes to the chars they represent,
+        # then re-escape for JSON.  e.g. \\P -> \P -> \\P,  \P -> \P -> \\P
+        # First: unescape valid JSON escapes to their real chars
+        # Then: re-escape all backslashes
+        # Simplest correct approach: replace \\ with a placeholder,
+        # then escape remaining \, then restore placeholder.
+        placeholder = "\x00BKSL\x00"
+        s = s.replace("\\\\", placeholder)
+        s = s.replace("\\", "\\\\")
+        s = s.replace(placeholder, "\\\\")
+        return s
+
+    # Match JSON string values (between double quotes, handling escaped quotes)
+    return re.sub(r'"(?:[^"\\]|\\.)*"', _fix_string, text)
+
+
 def make_fragments(
     var: list[tuple[str, str]],
     api_key: str | None = None,
@@ -90,7 +127,15 @@ def make_fragments(
                 system=_FRAGMENT_SYSTEM,
                 messages=[{"role": "user", "content": prompt}],
             )
-            parts = _json.loads(resp.content[0].text.strip())
+            raw = resp.content[0].text.strip()
+            if not raw:
+                log.warning("Empty LLM response for step %r (stop_reason=%s) — using original",
+                            step[:60], resp.stop_reason)
+                fragments.append(step)
+                fallbacks += 1
+                continue
+            cleaned = _fix_json_escapes(_strip_code_fence(raw))
+            parts = _json.loads(cleaned)
             if isinstance(parts, list) and len(parts) >= 2:
                 fragments.extend(str(p) for p in parts[:2])
             else:
