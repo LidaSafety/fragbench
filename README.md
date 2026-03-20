@@ -121,11 +121,15 @@ Instead of hand-authoring TOML files, you can generate attack variations program
 # Preview without making any API calls
 python run.py --generate --seed-file seeds/vibe_extortion.json --dry-run
 
-# Generate 100 variations (uses Claude Haiku for fragmentation + legitimization)
-python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 100
+# Generate 50 variations (preserves original prompts, no LLM rewriting)
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50
 
 # Reproducible run with a fixed seed
 python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --seed 42
+
+# Opt-in: LLM fragmentation (split steps) and/or legitimization (add cover stories)
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
 ```
 
 Each run writes one TOML file per variation to `attacks/generated_<campaign>_<seed>.toml`, ready to evaluate with `--campaign`.
