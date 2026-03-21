@@ -1,8 +1,8 @@
 {
   "metadata": {
     "id": "UNC2970_OPERATION_DREAM_JOB",
-    "technique": "T1566.002",
-    "technique_name": "Phishing: Spearphishing Link",
+    "technique": "T1566.003",
+    "technique_name": "Phishing: Spearphishing via Service",
     "description": "UNC2970 / Lazarus Group (DPRK) — AI-Assisted Target Profiling for Operation Dream Job. Gemini confirmed (GTIG Feb 2026) for OSINT synthesis and recruiter persona construction targeting defense and cybersecurity sector employees. LLM used to map technical job roles, organizational structures, and salary data to build high-fidelity phishing personas. Downstream kill chain (LinkedIn outreach → WhatsApp pivot → trojanized artifact delivery) documented by Mandiant (Mar 2023, Sept 2024) and ESET (Oct 2025). Malware families include BURNBOOK/TEARPAGE/MISTPEN (2024+) and SIDESHOW/LIGHTSHOW (2022-23). Active since 2019; AI augmentation observed Q4 2025.",
     "source_reports": [
       {
