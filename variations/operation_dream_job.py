@@ -272,7 +272,7 @@ if __name__ == "__main__":
         else:
             variation = gen.make_variation(s)
             for prompt, tactic in variation:
-                print(f"\n  [{tactic.value}] {prompt}")
+                print(f"\n  [{tactic}] {prompt}")
             all_variations.append({
                 "seed": s,
                 "stages": [{"prompt": p, "mitre_tactic": t} for p, t in variation],
