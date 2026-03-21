@@ -109,7 +109,7 @@ class OperationDreamJobVariation(BaseVariation):
             result.append({
                 "index": stage["index"],
                 "prompt": prompt,
-                "mitre_tactic": stage["mitre_tactic"],
+                "mitre_tactic": self._coerce_tactic(stage["mitre_tactic"]),
                 "mitre_technique": stage["mitre_technique"],
                 "mitre_technique_name": stage["mitre_technique_name"],
                 "description": stage["description"],
