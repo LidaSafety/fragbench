@@ -170,7 +170,7 @@ Encrypted PDF lure:  28a75771ebdb96d9b49c9369918ca581
 BURNBOOK (libmupdf.dll): 57e8a7ef21e7586d008d4116d70062a6
 TEARPAGE (wtsapi32.dll): 006cbff5d248ab4a1d756bce989830b9
 MISTPEN (binhex.dll):    cd6dbf51da042c34c6e7ff7b1641837d
-MISTPEN encrypted (Thumbs.ini): 0b77dcee18660bdccaf667550d2e00b00
+MISTPEN encrypted (Thumbs.ini): 0b77dcee18660bdccaf667550d2e00b0
 ```
 
 ### C2 infrastructure — MISTPEN era (Mandiant [3])
