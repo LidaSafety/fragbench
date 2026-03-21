@@ -43,7 +43,7 @@ class OperationDreamJobVariation(BaseVariation):
     Deterministic: same seed always produces the same output.
     No remote LLM calls — pure Python string formatting.
 
-    Variable types from ClickFix plus two new types introduced by this campaign:
+    Supported variable types for this campaign include two custom types:
         fake_recruiter_name — plausible professional full name (First Last)
         fake_firm_name      — plausible defense/security recruiting firm name
     """
