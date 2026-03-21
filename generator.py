@@ -24,6 +24,7 @@ from dataclasses import dataclass
 import logging
 import sys
 
+from variations.operation_dream_job import OperationDreamJobVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
 
@@ -51,8 +52,9 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
-    "scope_creep":    ScopeCreepVariation,
-    "vibe_extortion": VibeExtortionVariation,
+    "unc2970_operation_dream_job": OperationDreamJobVariation,
+    "scope_creep":                 ScopeCreepVariation,
+    "vibe_extortion":              VibeExtortionVariation,
 }
 
 
