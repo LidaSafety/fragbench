@@ -272,7 +272,7 @@ def generate_toml(
     Each fragment becomes one [[fragments]] block, and each variation string
     inside that fragment becomes one [[fragments.variations]] entry.
     """
-    campaign_id = metadata['id']
+    campaign_id = f"{metadata['id']}_{seed}"
     technique   = metadata.get("technique", "T0000")
     tech_name   = metadata.get("technique_name", "Generated")
     description = metadata.get("description", "Auto-generated attack scenario.")
