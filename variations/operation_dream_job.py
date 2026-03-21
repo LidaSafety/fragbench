@@ -57,8 +57,8 @@ class OperationDreamJobVariation(BaseVariation):
         """Select one value per variation dimension using the seeded RNG."""
         dimensions = self.data.get("variation_dimensions", {})
         return {
-            name: rng.choice(dim["values"])
-            for name, dim in dimensions.items()
+            name: rng.choice(dimensions[name]["values"])
+            for name in sorted(dimensions)
         }
 
     def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:

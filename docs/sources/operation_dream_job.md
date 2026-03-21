@@ -45,7 +45,7 @@ specify which artifact type was used in AI-enhanced instances.
 
 ---
 
-## Confirmed AMOS Payload Chain (by era)
+## Confirmed Payload Chain (by era)
 
 ### 2024+ variant (BURNBOOK/MISTPEN era)
 1. LinkedIn contact from fake recruiter persona
