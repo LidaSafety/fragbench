@@ -14,21 +14,20 @@ class MitreType(str, Enum):
     Inherits from str so values compare equal to plain strings and can be
     used directly in JSON serialisation and f-strings without .value.
     """
-    RECONNAISSANCE      = "reconnaissance"       
+    RECONNAISSANCE      = "reconnaissance"
     RESOURCE_DEVELOPMENT = "resource_development"
-    INITIAL_ACCESS      = "initial_access"       
-    EXECUTION           = "execution"            
-    PERSISTENCE         = "persistence"          
+    INITIAL_ACCESS      = "initial_access"
+    EXECUTION           = "execution"
+    PERSISTENCE         = "persistence"
     PRIVILEGE_ESCALATION = "privilege_escalation"
-    DEFENSE_EVASION     = "defense_evasion"      
-    CREDENTIAL_ACCESS   = "credential_access"    
-    DISCOVERY           = "discovery"            
-    LATERAL_MOVEMENT    = "lateral_movement"     
-    COLLECTION          = "collection"           
-    COMMAND_AND_CONTROL = "command_and_control"  
-    EXFILTRATION        = "exfiltration"         
-    IMPACT              = "impact"      
-
+    DEFENSE_EVASION     = "defense_evasion"
+    CREDENTIAL_ACCESS   = "credential_access"
+    DISCOVERY           = "discovery"
+    LATERAL_MOVEMENT    = "lateral_movement"
+    COLLECTION          = "collection"
+    COMMAND_AND_CONTROL = "command_and_control"
+    EXFILTRATION        = "exfiltration"
+    IMPACT              = "impact"
 
 class BaseVariation(ABC):
     """
