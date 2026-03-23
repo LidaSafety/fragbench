@@ -77,7 +77,6 @@ def _fix_json_escapes(text: str) -> str:
     all backslash sequences to single backslashes, then re-escaping them.
     This only operates inside JSON string values (between quotes).
     """
-
     def _fix_string(m: re.Match) -> str:
         s = m.group(0)
         # Collapse any run of backslashes to the chars they represent,
@@ -114,7 +113,6 @@ def make_fragments(
 
     try:
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning steps unchanged")
@@ -138,6 +136,8 @@ def make_fragments(
                     step[:60],
                     resp.stop_reason,
                 )
+                log.warning("Empty LLM response for step %r (stop_reason=%s) — using original",
+                            step[:60], resp.stop_reason)
                 fragments.append(step)
                 fallbacks += 1
                 continue
@@ -146,22 +146,16 @@ def make_fragments(
             if isinstance(parts, list) and len(parts) >= 2:
                 fragments.extend(str(p) for p in parts[:2])
             else:
-                log.warning(
-                    "Unexpected LLM response for step %r — using original", step[:60]
-                )
+                log.warning("Unexpected LLM response for step %r — using original", step[:60])
                 fragments.append(step)
                 fallbacks += 1
         except Exception:
-            log.warning(
-                "Fragment LLM call failed for step %r", step[:60], exc_info=True
-            )
+            log.warning("Fragment LLM call failed for step %r", step[:60], exc_info=True)
             fragments.append(step)
             fallbacks += 1
 
     if fallbacks:
-        log.warning(
-            "make_fragments: %d/%d steps fell back to originals", fallbacks, len(var)
-        )
+        log.warning("make_fragments: %d/%d steps fell back to originals", fallbacks, len(var))
     return fragments
 
 
@@ -190,7 +184,6 @@ def legitimize_fragment(
 
     try:
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning fragment unchanged")
@@ -213,7 +206,6 @@ def legitimize_fragment(
 # TOML serialization
 # ---------------------------------------------------------------------------
 
-
 def _toml_str(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
@@ -232,10 +224,10 @@ def generate_toml(
     Each inner list becomes one [[fragments]] block with style='generated'.
     """
     campaign_id = f"{metadata['id']}_{seed}"
-    technique = metadata.get("technique", "T0000")
-    tech_name = metadata.get("technique_name", "Generated")
+    technique   = metadata.get("technique", "T0000")
+    tech_name   = metadata.get("technique_name", "Generated")
     description = metadata.get("description", "Auto-generated attack scenario.")
-    tags = metadata.get("tags", ["generated"])
+    tags        = metadata.get("tags", ["generated"])
 
     lines: list[str] = [
         "[metadata]",
