@@ -1,5 +1,5 @@
 """
-AI-Driven Phishing Campaign — AIPhishingVariation implementation.
+AI-Driven Phishing Campaign - AIPhishingVariation implementation.
 
 Generates deterministic variations of the AI-enhanced phishing kill chain
 based on the Microsoft Digital Defense Report 2025 intelligence.
@@ -13,7 +13,7 @@ Usage:
         print(f"[{tactic}] {prompt}")
 
 Example usage from CLI:
-    uv run variations/ai_phishing.py --seed-file seeds/ai-phishing.json --seed 42 --detailed --output resutls/ai_phishing_variation_42.json
+    uv run variations/ai_phishing.py --seed-file seeds/ai-phishing.json --seed 42 --detailed --output results/ai_phishing_variation_42.json
 """
 
 import json
@@ -21,19 +21,31 @@ import random
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+try:
+    from variations.base import BaseVariation, MitreType
+except ModuleNotFoundError:
+    from base import BaseVariation, MitreType  # type: ignore[no-redef]
 
-class AIPhishingVariation:
+
+class AIPhishingVariation(BaseVariation):
     """
     Custom make_variation for AI-Driven Phishing campaign.
 
     Deterministic: same seed always produces the same output.
+    No remote LLM calls - pure Python string formatting.
     """
 
     def __init__(self, seed_file: str = "seeds/ai-phishing.json"):
         with open(seed_file) as f:
             self.data = json.load(f)
+        self._validate_seed_tactics(self.data)
 
-    def make_variation(self, seed: int) -> List[Tuple[str, str]]:
+    def _select_dimensions(self, rng: random.Random) -> Dict[str, str]:
+        """Select one value per variation dimension using the seeded RNG."""
+        dimensions = self.data.get("variation_dimensions", {})
+        return {name: rng.choice(dim["values"]) for name, dim in dimensions.items()}
+
+    def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         """
         Generate one deterministic variation of the full AI-Phishing kill chain.
 
@@ -41,20 +53,21 @@ class AIPhishingVariation:
             seed: Integer seed for deterministic randomness.
 
         Returns:
-            List of (prompt_text, mitre_tactic) tuples — one per attack stage.
+            List of (prompt_text, MitreType) tuples - one per attack stage.
         """
         rng = random.Random(seed)
+        dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
         resolved_vars: Dict[int, Dict[str, Any]] = {}
-        cumulative_vars: Dict[str, Any] = {}
 
         result = []
         for stage in stages:
-            stage_vars = self._resolve_variables(stage, rng, resolved_vars)
-            cumulative_vars.update(stage_vars)
-            prompt = stage["baseline_prompt"].format(**cumulative_vars)
+            stage_vars = self._resolve_variables(
+                stage, rng, resolved_vars, dimension_choices
+            )
+            prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
-            result.append((prompt, stage["mitre_tactic"]))
+            result.append((prompt, self._coerce_tactic(stage["mitre_tactic"])))
 
         return result
 
@@ -63,28 +76,32 @@ class AIPhishingVariation:
         Generate a detailed variation with full metadata per stage.
 
         Returns list of dicts with: prompt, tactic, technique, description,
-        resolved_variables — useful for debugging and JSON export.
+        resolved_variables - useful for debugging and JSON export.
         """
         rng = random.Random(seed)
+        dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
         resolved_vars: Dict[int, Dict[str, Any]] = {}
-        cumulative_vars: Dict[str, Any] = {}
 
         result = []
         for stage in stages:
-            stage_vars = self._resolve_variables(stage, rng, resolved_vars)
-            cumulative_vars.update(stage_vars)
-            prompt = stage["baseline_prompt"].format(**cumulative_vars)
+            stage_vars = self._resolve_variables(
+                stage, rng, resolved_vars, dimension_choices
+            )
+            prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
-            result.append({
-                "index": stage["index"],
-                "prompt": prompt,
-                "mitre_tactic": stage["mitre_tactic"],
-                "mitre_technique": stage["mitre_technique"],
-                "mitre_technique_name": stage["mitre_technique_name"],
-                "description": stage["description"],
-                "resolved_variables": dict(stage_vars),
-            })
+            result.append(
+                {
+                    "index": stage["index"],
+                    "prompt": prompt,
+                    "mitre_tactic": stage["mitre_tactic"],
+                    "mitre_technique": stage["mitre_technique"],
+                    "mitre_technique_name": stage["mitre_technique_name"],
+                    "description": stage["description"],
+                    "resolved_variables": dict(stage_vars),
+                    "dimension_choices": dict(dimension_choices),
+                }
+            )
 
         return result
 
@@ -93,6 +110,7 @@ class AIPhishingVariation:
         stage: dict,
         rng: random.Random,
         resolved_vars: Dict[int, Dict[str, Any]],
+        dimension_choices: Dict[str, str],
     ) -> Dict[str, Any]:
         """Resolve all variables for a stage, handling inheritance and types."""
         result = {}
@@ -113,23 +131,26 @@ class AIPhishingVariation:
                 result[var_name] = rng.choice(var_def["values"])
 
             elif var_type == "subset":
-                all_vals = var_def.get("values") or var_def.get("all_values")
-                min_c = var_def.get("min_count", 1)
-                max_c = var_def.get("max_count", len(all_vals))
-                count = rng.randint(min_c, max_c)
-                selected = rng.sample(all_vals, count)
+                count = rng.randint(var_def["min_count"], var_def["max_count"])
+                selected = rng.sample(var_def["all_values"], count)
                 result[var_name] = ", ".join(selected)
+
+            elif var_type == "dimension_driven":
+                dimension = var_def["dimension"]
+                chosen_value = dimension_choices[dimension]
+                lookup = var_def["values_by_dimension"]
+                result[var_name] = lookup[chosen_value]
 
             elif var_type == "path":
                 if "values" in var_def:
                     result[var_name] = rng.choice(var_def["values"])
                 else:
-                    base = var_def.get("base", "/tmp")
                     subdir = rng.choice(var_def.get("subdir_pool", ["cache", "tmp"]))
-                    result[var_name] = f"{base}/{subdir}"
+                    result[var_name] = f"{var_def.get('base', '/tmp')}/{subdir}"
 
             elif var_type == "filename":
-                result[var_name] = rng.choice(var_def["values"] or var_def["name_pool"])
+                pool = var_def.get("name_pool") or var_def["values"]
+                result[var_name] = rng.choice(pool)
 
             elif var_type == "ipv4":
                 if "values" in var_def:
@@ -145,7 +166,7 @@ class AIPhishingVariation:
                 if "values" in var_def:
                     result[var_name] = rng.choice(var_def["values"])
                 else:
-                    result[var_name] = rng.choice(var_def.get("range", ["443", "80", "8080"]))
+                    result[var_name] = rng.choice(var_def["range"])
 
             else:
                 raise ValueError(
@@ -207,30 +228,36 @@ if __name__ == "__main__":
     seeds = range(args.count) if args.count > 1 else [args.seed]
 
     for s in seeds:
-        print(f"\n{'='*70}")
-        print(f"  AI-PHISHING Variation — seed={s}")
-        print(f"{'='*70}")
+        print(f"\n{'=' * 70}")
+        print(f"  AI-PHISHING Variation - seed={s}")
+        print(f"{'=' * 70}")
 
         if args.detailed:
             variation = gen.make_variation_detailed(s)
             for stage in variation:
                 print(f"\n  Stage {stage['index']} [{stage['mitre_tactic']}]")
-                print(f"  Technique: {stage['mitre_technique']} — {stage['mitre_technique_name']}")
-                print(f"  Variables: {json.dumps(stage['resolved_variables'], indent=4)}")
+                print(
+                    f"  Technique: {stage['mitre_technique']} - {stage['mitre_technique_name']}"
+                )
+                print(
+                    f"  Variables: {json.dumps(stage['resolved_variables'], indent=4)}"
+                )
                 print(f"  Prompt: {stage['prompt']}")
             all_variations.append({"seed": s, "stages": variation})
         else:
             variation = gen.make_variation(s)
             for prompt, tactic in variation:
                 print(f"\n  [{tactic}] {prompt}")
-            all_variations.append({
-                "seed": s,
-                "stages": [{"prompt": p, "mitre_tactic": t} for p, t in variation],
-            })
+            all_variations.append(
+                {
+                    "seed": s,
+                    "stages": [{"prompt": p, "mitre_tactic": t} for p, t in variation],
+                }
+            )
 
     if args.output:
         output_data = {
-            "campaign_id": "AI-PHISH-2025",
+            "campaign_id": "AI_PHISHING",
             "metadata": gen.data["metadata"],
             "variations": all_variations,
         }
