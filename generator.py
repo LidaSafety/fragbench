@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import sys
 
+from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
 
 log = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
+    "scope_creep":    ScopeCreepVariation,
     "vibe_extortion": VibeExtortionVariation,
 }
 
