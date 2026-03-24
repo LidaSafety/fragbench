@@ -27,6 +27,7 @@ import sys
 from variations.gtg1002 import GTG1002Variation
 from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
+from variations.ns_power_ransomware import NsPowerRansomwareVariation
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ VARIATION_REGISTRY: dict[str, type] = {
     "gtg1002":        GTG1002Variation,
     "scope_creep":    ScopeCreepVariation,
     "vibe_extortion": VibeExtortionVariation,
+    "ns_power_ransomware": NsPowerRansomwareVariation,
 }
 
 
@@ -88,6 +90,7 @@ def _fix_json_escapes(text: str) -> str:
     all backslash sequences to single backslashes, then re-escaping them.
     This only operates inside JSON string values (between quotes).
     """
+
     def _fix_string(m: re.Match) -> str:
         s = m.group(0)
         # Collapse any run of backslashes to the chars they represent,
@@ -125,6 +128,7 @@ def make_fragment_groups(
 
     try:
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning steps unchanged")
@@ -219,6 +223,7 @@ def legitimize_fragment(
 
     try:
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning fragment unchanged")
@@ -252,6 +257,7 @@ def legitimize_fragment(
 # TOML serialization
 # ---------------------------------------------------------------------------
 
+
 def _toml_str(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
@@ -273,10 +279,10 @@ def generate_toml(
     inside that fragment becomes one [[fragments.variations]] entry.
     """
     campaign_id = f"{metadata['id']}_{seed}"
-    technique   = metadata.get("technique", "T0000")
-    tech_name   = metadata.get("technique_name", "Generated")
+    technique = metadata.get("technique", "T0000")
+    tech_name = metadata.get("technique_name", "Generated")
     description = metadata.get("description", "Auto-generated attack scenario.")
-    tags        = metadata.get("tags", ["generated"])
+    tags = metadata.get("tags", ["generated"])
 
     lines: list[str] = [
         "[metadata]",
