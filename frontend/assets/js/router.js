@@ -15,7 +15,7 @@ export function setActiveView(view) {
     if (id === view) el.classList.add("active");
     else el.classList.remove("active");
   });
-  document.querySelectorAll(".nav-item").forEach((item) => {
+  document.querySelectorAll(".sidebar-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === view);
   });
 }

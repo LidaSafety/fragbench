@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FragGuard Runtime Viewer</title>
+  <title>FragBench Runtime Viewer</title>
   <link rel="stylesheet" href="./assets/css/base.css">
   <link rel="stylesheet" href="./assets/css/components.css">
 </head>
 <body>
   <nav class="topbar">
-    <div class="logo">FRAGGUARD RUNTIME VIEWER</div>
+    <div class="logo">FRAGBENCH</div>
     <div class="controls">
       <select id="run-selector"></select>
-      <button id="refresh-runs-btn">Refresh Runs</button>
+      <button id="refresh-runs-btn">Refresh</button>
       <button id="load-latest-btn">Load Latest</button>
-      <button id="upload-mode-btn">Upload Artifacts</button>
+      <button id="upload-mode-btn">Upload</button>
     </div>
   </nav>
 
@@ -29,15 +29,59 @@
 
   <div class="layout">
     <aside class="sidebar">
-      <button class="nav-item active" data-view="campaigns">Campaigns</button>
-      <button class="nav-item" data-view="fragments">Fragments</button>
-      <button class="nav-item" data-view="traces">MCP Traces</button>
-      <button class="nav-item" data-view="gnn">GNN</button>
-      <button class="nav-item" data-view="mitre">MITRE</button>
-      <button class="nav-item" data-view="demo">Demo</button>
-      <div class="status">
-        <div id="run-summary"></div>
+      <div class="sidebar-group open">
+        <div class="sidebar-header" data-section="sec-fv">
+          <span class="chevron">▾</span> FRAGMENT VARIATIONS
+        </div>
+        <div class="sidebar-body" id="sec-fv">
+          <button class="sidebar-item active" data-view="campaigns">
+            <span class="item-dot"></span> Campaigns
+          </button>
+          <button class="sidebar-item" data-view="fragments">
+            <span class="item-dot"></span> Fragments
+          </button>
+          <div id="sidebar-campaigns-list"></div>
+        </div>
       </div>
+
+      <div class="sidebar-group open">
+        <div class="sidebar-header" data-section="sec-traces">
+          <span class="chevron">▾</span> MCP FRAGMENT TRACES
+        </div>
+        <div class="sidebar-body" id="sec-traces">
+          <button class="sidebar-item" data-view="traces">
+            <span class="item-dot"></span> All Traces
+          </button>
+          <div id="sidebar-traces-list"></div>
+        </div>
+      </div>
+
+      <div class="sidebar-group open">
+        <div class="sidebar-header" data-section="sec-gnn">
+          <span class="chevron">▾</span> GNN PIPELINE
+        </div>
+        <div class="sidebar-body" id="sec-gnn">
+          <button class="sidebar-item" data-view="gnn">
+            <span class="item-dot"></span> Graph Classification
+          </button>
+          <button class="sidebar-item" data-view="demo">
+            <span class="item-dot"></span> Interactive Demo
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-group open">
+        <div class="sidebar-header" data-section="sec-mitre">
+          <span class="chevron">▾</span> MITRE ATTACK
+        </div>
+        <div class="sidebar-body" id="sec-mitre">
+          <button class="sidebar-item" data-view="mitre">
+            <span class="item-dot"></span> Coverage Matrix
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-meta" id="run-summary"></div>
     </aside>
 
     <main class="content">

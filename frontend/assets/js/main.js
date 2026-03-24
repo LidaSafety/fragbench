@@ -3,17 +3,54 @@ import { ensureRuntimeShape } from "./ingest/normalize.js";
 import { normalizeFromUpload } from "./ingest/upload.js";
 import { setActiveView, renderAll } from "./router.js";
 import { store } from "./state/store.js";
-import { byId, toggleClass } from "./utils/dom.js";
+import { byId, escapeHtml, toggleClass } from "./utils/dom.js";
 
 function updateRunSummary(data) {
   const run = data?.run || {};
   byId("run-summary").innerHTML = `
-    <div><strong>Attack</strong>: ${run.attack_id || "n/a"}</div>
-    <div><strong>Model</strong>: ${run.model || "n/a"}</div>
-    <div><strong>Events</strong>: ${run.events || 0}</div>
-    <div><strong>KCC</strong>: ${(run.kcc ?? 0).toFixed(2)}</div>
-    <div><strong>Status</strong>: ${run.alerts ? "ALERT" : "Monitoring"}</div>
+    <div><strong>Attack:</strong> ${escapeHtml(run.attack_id || "n/a")}</div>
+    <div><strong>Model:</strong> ${escapeHtml(run.model || "n/a")}</div>
+    <div><strong>Events:</strong> ${run.events || 0}</div>
+    <div><strong>KCC:</strong> ${(run.kcc ?? 0).toFixed(2)}</div>
+    <div><strong>Status:</strong> ${run.alerts ? "ALERT" : "Monitoring"}</div>
   `;
+}
+
+function populateSidebarItems(data) {
+  const campaignsList = byId("sidebar-campaigns-list");
+  const tracesList = byId("sidebar-traces-list");
+  if (!campaignsList || !tracesList) return;
+
+  const campaigns = data?.campaigns || [];
+  campaignsList.innerHTML = campaigns
+    .map(
+      (c) =>
+        `<button class="sidebar-sub" data-view="campaigns" data-id="${escapeHtml(c.id)}">${escapeHtml(c.id)}</button>`
+    )
+    .join("");
+
+  const traces = data?.traces || [];
+  tracesList.innerHTML = traces
+    .map(
+      (t, i) => {
+        const iters = t.total_iterations || 1;
+        const calls = t.total_tool_calls || (t.tool_calls || []).length;
+        return `<button class="sidebar-sub" data-view="traces" data-idx="${i}">Turn ${
+          t.step || i + 1
+        } \u2014 ${escapeHtml(t.tactic)} (${iters}i/${calls}t)</button>`;
+      }
+    )
+    .join("");
+
+  document.querySelectorAll(".sidebar-sub").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const view = btn.dataset.view;
+      store.set({ activeView: view });
+      setActiveView(view);
+      document.querySelectorAll(".sidebar-item, .sidebar-sub").forEach((el) => el.classList.remove("active"));
+      btn.classList.add("active");
+    });
+  });
 }
 
 function setData(data) {
@@ -21,13 +58,22 @@ function setData(data) {
   store.set({ data: shaped });
   renderAll(shaped);
   updateRunSummary(shaped);
+  populateSidebarItems(shaped);
 }
 
 async function loadRuns() {
   const runs = await fetchRuns();
   store.set({ runs });
   const selector = byId("run-selector");
-  selector.innerHTML = runs.map((r) => `<option value="${r.id}">${r.id}</option>`).join("");
+  const seen = new Set();
+  const options = [];
+  for (const r of runs) {
+    if (r.run_id && seen.has(r.run_id)) continue;
+    if (r.run_id) seen.add(r.run_id);
+    const label = r.run_id ? `[chain] ${r.run_id} (${r.id})` : r.id;
+    options.push(`<option value="${r.id}">${label}</option>`);
+  }
+  selector.innerHTML = options.join("");
 }
 
 async function loadLatest() {
@@ -42,12 +88,23 @@ async function loadSelectedRun() {
   setData(data);
 }
 
+function bindSidebarSections() {
+  document.querySelectorAll(".sidebar-header").forEach((header) => {
+    header.addEventListener("click", () => {
+      const group = header.closest(".sidebar-group");
+      if (group) group.classList.toggle("open");
+    });
+  });
+}
+
 function bindNavigation() {
-  document.querySelectorAll(".nav-item").forEach((btn) => {
+  document.querySelectorAll(".sidebar-item").forEach((btn) => {
     btn.addEventListener("click", () => {
       const view = btn.dataset.view;
       store.set({ activeView: view });
       setActiveView(view);
+      document.querySelectorAll(".sidebar-item, .sidebar-sub").forEach((el) => el.classList.remove("active"));
+      btn.classList.add("active");
     });
   });
 }
@@ -68,6 +125,7 @@ function bindUpload() {
 }
 
 async function init() {
+  bindSidebarSections();
   bindNavigation();
   bindUpload();
   byId("refresh-runs-btn").addEventListener("click", loadRuns);

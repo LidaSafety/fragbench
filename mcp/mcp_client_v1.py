@@ -3403,7 +3403,21 @@ class MCPOpenRouterClientV1:
                             for p in saved_paths:
                                 ui.add_tool_event(f"saved image → {p}")
                 self.messages.append(assistant_message)
-                await self.hooks.dispatch("message_appended", message=assistant_message, role="assistant", iteration=iteration)
+                await self.hooks.dispatch(
+                    "llm_response_received",
+                    iteration=iteration,
+                    assistant_message=assistant_message,
+                    raw_choice=choice,
+                    raw_response=response,
+                )
+                await self.hooks.dispatch(
+                    "message_appended",
+                    message=assistant_message,
+                    role="assistant",
+                    iteration=iteration,
+                    raw_choice=choice,
+                    raw_response=response,
+                )
 
                 content = assistant_message.get("content")
                 if content:
@@ -3827,7 +3841,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
         allowed_tools=args.allow_tools,
         blocked_tools=args.block_tools,
         database_path=database_path,
-        default_max_iterations=args.max_iterations or 6,
+        default_max_iterations=args.max_iterations or 10,
         temperature=args.temperature if args.temperature is not None else 0.6,
         max_tokens=args.max_tokens or 4000,
         parallel_tools=not args.no_parallel_tools,

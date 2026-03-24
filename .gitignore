@@ -9,5 +9,6 @@ results/
 attacks/generated_*.toml
 .claude/
 .DS_Store
-.mcp-run
+.mcp-run/*
+*.log
 logs

@@ -38,7 +38,7 @@ ARCHIVE_URL := http://127.0.0.1:8012/mcp
 EXFIL_URL := http://127.0.0.1:8013/mcp
 NETWORK_URL := http://127.0.0.1:8014/mcp
 
-.PHONY: help stack-up stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run clean-runtime
+.PHONY: help stack-up stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run chain-run clean-runtime
 
 help:
 	@echo "Targets:"
@@ -51,6 +51,7 @@ help:
 	@echo "  make cli            - Run interactive MCP CLI (auto toolkits)"
 	@echo "  make hello-run      - Generate hello prompt and run one-shot CLI"
 	@echo "  make attack-run     - Generate attack prompt from ATTACK_SEED and run one-shot CLI"
+	@echo "  make chain-run      - Run ALL stages of ATTACK_SEED sequentially with shared run-id"
 	@echo "  make clean-runtime  - Remove pid/log runtime artifacts"
 	@echo ""
 	@echo "Config overrides:"
@@ -199,8 +200,12 @@ hello-run:
 		--log-dir "$(LOG_DIR)" \
 		--prompt "$$PROMPT"
 
+RUN_ID ?=
+ATTACK_ID_OVERRIDE ?=
+
 attack-run: stack-ready
 	@PROMPT="$$( $(UV) $(PY) -c 'import json; from pathlib import Path; from generator import VARIATION_REGISTRY; seed_file=Path("$(ATTACK_SEED)"); data=json.loads(seed_file.read_text()); key=str(data.get("metadata",{}).get("id","")).lower(); cls=VARIATION_REGISTRY.get(key); assert cls is not None, f"No variation registered for {key}"; gen=cls(str(seed_file)); detailed=gen.make_variation_detailed(seed=int("$(ATTACK_VARIATION_SEED)")); idx=max(0,min(int("$(ATTACK_STAGE)"), len(detailed)-1)); print(detailed[idx]["prompt"])' )"; \
+	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(UV) $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )}"; \
 	echo "Seed: $(ATTACK_SEED) | variation-seed: $(ATTACK_VARIATION_SEED) | stage: $(ATTACK_STAGE)"; \
 	echo "Prompt: $$PROMPT"; \
 	$(UV) $(PY) mcp/mcp_cli.py \
@@ -214,7 +219,41 @@ attack-run: stack-ready
 		--attack-seed "$(ATTACK_SEED)" \
 		--execution-mode "$(EXEC_MODE)" \
 		--log-dir "$(LOG_DIR)" \
+		$${RUN_ID:+--run-id "$(RUN_ID)"} \
+		--campaign "$$ATTACK_ID" \
+		--attack-id "$$ATTACK_ID" \
 		--prompt "$$PROMPT"
+
+chain-run: stack-ready
+	@RUN_ID="chain_$$(date +%Y%m%d_%H%M%S)"; \
+	ATTACK_ID="$$( $(UV) $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )"; \
+	NUM_STAGES="$$( $(UV) $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(len(data.get("attack_stages",[])))' )"; \
+	echo ""; \
+	echo "╔══════════════════════════════════════════════════════════════╗"; \
+	echo "║  CHAIN RUN: $$ATTACK_ID"; \
+	echo "║  Stages: $$NUM_STAGES | Variation seed: $(ATTACK_VARIATION_SEED) | Run ID: $$RUN_ID"; \
+	echo "╚══════════════════════════════════════════════════════════════╝"; \
+	echo ""; \
+	for STAGE in $$(seq 0 $$((NUM_STAGES - 1))); do \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "  Stage $$STAGE / $$((NUM_STAGES - 1))"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		$(MAKE) --no-print-directory attack-run \
+			ATTACK_SEED="$(ATTACK_SEED)" \
+			ATTACK_VARIATION_SEED="$(ATTACK_VARIATION_SEED)" \
+			ATTACK_STAGE="$$STAGE" \
+			MODEL_BACKEND="$(MODEL_BACKEND)" \
+			MODEL="$(MODEL)" \
+			RUN_ID="$$RUN_ID" \
+			ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
+			LOG_DIR="$(LOG_DIR)"; \
+		echo ""; \
+	done; \
+	echo "╔══════════════════════════════════════════════════════════════╗"; \
+	echo "║  CHAIN COMPLETE: $$ATTACK_ID | $$NUM_STAGES stages"; \
+	echo "║  Run ID: $$RUN_ID"; \
+	echo "║  View: http://127.0.0.1:8787 → Load Latest or select run"; \
+	echo "╚══════════════════════════════════════════════════════════════╝"
 
 clean-runtime:
 	@rm -rf "$(PID_DIR)"

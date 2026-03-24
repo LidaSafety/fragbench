@@ -8,6 +8,7 @@ import asyncio
 import argparse
 import json
 import os
+import re
 import signal
 import time
 from contextlib import suppress
@@ -81,6 +82,131 @@ class ConversationLogger:
         with open(self.path, "a") as f:
             f.write(line + "\n")
 
+    def _extract_text_thinking_from_payload(self, payload: Any, depth: int = 0) -> Dict[str, List[str]]:
+        text_parts: List[str] = []
+        thinking_parts: List[str] = []
+        if payload is None or depth > 4:
+            return {"text": text_parts, "thinking": thinking_parts}
+
+        if hasattr(payload, "model_dump") and callable(getattr(payload, "model_dump")):
+            with suppress(Exception):
+                payload = payload.model_dump()
+        elif hasattr(payload, "to_dict") and callable(getattr(payload, "to_dict")):
+            with suppress(Exception):
+                payload = payload.to_dict()
+
+        if isinstance(payload, str):
+            if payload.strip():
+                text_parts.append(payload)
+            return {"text": text_parts, "thinking": thinking_parts}
+
+        if isinstance(payload, list):
+            for item in payload:
+                nested = self._extract_text_thinking_from_payload(item, depth + 1)
+                text_parts.extend(nested["text"])
+                thinking_parts.extend(nested["thinking"])
+            return {"text": text_parts, "thinking": thinking_parts}
+
+        if isinstance(payload, dict):
+            ptype = str(payload.get("type") or "").lower()
+            if ptype in {"reasoning", "thinking", "thought"}:
+                t = payload.get("text")
+                if isinstance(t, str) and t.strip():
+                    thinking_parts.append(t)
+
+            key_map = {
+                "text": "text",
+                "content": "text",
+                "output_text": "text",
+                "response": "text",
+                "reasoning": "thinking",
+                "thinking": "thinking",
+                "reasoning_content": "thinking",
+            }
+            for key, mode in key_map.items():
+                if key not in payload:
+                    continue
+                value = payload.get(key)
+                if isinstance(value, str) and value.strip():
+                    if mode == "thinking":
+                        thinking_parts.append(value)
+                    else:
+                        text_parts.append(value)
+                else:
+                    nested = self._extract_text_thinking_from_payload(value, depth + 1)
+                    text_parts.extend(nested["text"])
+                    thinking_parts.extend(nested["thinking"])
+
+            for key in ("message", "messages", "choice", "choices", "delta"):
+                if key in payload:
+                    nested = self._extract_text_thinking_from_payload(payload.get(key), depth + 1)
+                    text_parts.extend(nested["text"])
+                    thinking_parts.extend(nested["thinking"])
+            return {"text": text_parts, "thinking": thinking_parts}
+
+        return {"text": text_parts, "thinking": thinking_parts}
+
+    def _extract_assistant_content(self, content: Any, *fallback_payloads: Any) -> Dict[str, str]:
+        """Extract text + thinking from assistant content across provider shapes."""
+        text_parts: List[str] = []
+        thinking_parts: List[str] = []
+
+        if isinstance(content, str):
+            text_parts.append(content)
+        elif isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                btype = str(block.get("type") or "").lower()
+                text = block.get("text")
+                if btype in {"reasoning", "thinking", "thought"}:
+                    if isinstance(text, str) and text.strip():
+                        thinking_parts.append(text)
+                    continue
+                if isinstance(text, str) and text.strip():
+                    text_parts.append(text)
+        elif content is not None:
+            text_parts.append(str(content))
+
+        # Only use fallback payloads to extract thinking; text content is already
+        # captured directly from `content` above to avoid duplication (message
+        # dicts also contain the same content string as a field).
+        for payload in fallback_payloads:
+            nested = self._extract_text_thinking_from_payload(payload)
+            thinking_parts.extend(nested["thinking"])
+            # Only pull text from fallback if primary content extraction found nothing.
+            if not text_parts:
+                text_parts.extend(nested["text"])
+
+        # Deduplicate adjacent identical parts from double-logging paths.
+        seen_text: list[str] = []
+        for part in text_parts:
+            if part and part not in seen_text:
+                seen_text.append(part)
+        text_parts = seen_text
+
+        text_full = "\n".join([p for p in text_parts if p]).strip()
+        thinking_full = "\n".join([p for p in thinking_parts if p]).strip()
+
+        # Best-effort fallback for models that include hidden reasoning tags in text.
+        if not thinking_full and text_full:
+            think_matches = re.findall(r"<think>(.*?)</think>", text_full, flags=re.IGNORECASE | re.DOTALL)
+            if think_matches:
+                thinking_full = "\n\n".join(m.strip() for m in think_matches if m.strip())
+                text_full = re.sub(r"<think>.*?</think>", "", text_full, flags=re.IGNORECASE | re.DOTALL).strip()
+
+        if len(text_full) > 6000:
+            text_full = text_full[:6000] + "…"
+        if len(thinking_full) > 6000:
+            thinking_full = thinking_full[:6000] + "…"
+
+        return {
+            "content_full": text_full,
+            "content_preview": (text_full[:300] + "…") if len(text_full) > 300 else text_full,
+            "thinking_full": thinking_full,
+            "thinking_preview": (thinking_full[:300] + "…") if len(thinking_full) > 300 else thinking_full,
+        }
+
     # ── hook: message_appended ──────────────────────────────────────
 
     def on_message(self, *, message: Dict[str, Any], role: str, **kw: Any) -> None:
@@ -103,20 +229,56 @@ class ConversationLogger:
         elif role == "assistant":
             content = message.get("content") or ""
             tool_calls = message.get("tool_calls") or []
-            tool_names = [
-                (tc.get("function") or {}).get("name", "?")
-                if isinstance(tc, dict)
-                else getattr(getattr(tc, "function", None), "name", "?")
-                for tc in tool_calls
-            ]
+            tool_names: List[str] = []
+            tool_call_details: List[Dict[str, Any]] = []
+            for tc in tool_calls:
+                if isinstance(tc, dict):
+                    fn = tc.get("function") or {}
+                    name = fn.get("name", "?")
+                    raw_args = fn.get("arguments", "")
+                else:
+                    fn = getattr(tc, "function", None)
+                    name = getattr(fn, "name", "?")
+                    raw_args = getattr(fn, "arguments", "")
+                tool_names.append(name)
+                args_preview = raw_args if isinstance(raw_args, str) else json.dumps(raw_args, default=str)
+                if len(args_preview) > 1200:
+                    args_preview = args_preview[:1200] + "…"
+                tool_call_details.append(
+                    {
+                        "name": name,
+                        "arguments_preview": args_preview,
+                    }
+                )
             self._tool_calls_this_iter = len(tool_calls)
             self._tool_results_this_iter = 0
 
+            content_bits = self._extract_assistant_content(
+                content,
+                message,
+                kw.get("raw_choice"),
+                kw.get("raw_response"),
+            )
+            thinking_raw = message.get("reasoning") or message.get("thinking") or ""
+            if thinking_raw and not content_bits["thinking_full"]:
+                thinking_full = str(thinking_raw)
+                if len(thinking_full) > 6000:
+                    thinking_full = thinking_full[:6000] + "…"
+                content_bits["thinking_full"] = thinking_full
+                content_bits["thinking_preview"] = (
+                    thinking_full[:300] + "…" if len(thinking_full) > 300 else thinking_full
+                )
+
             self._emit("assistant_response", {
                 "iteration": iteration,
-                "has_content": bool(content),
-                "content_preview": (content[:300] + "…") if len(content) > 300 else content,
+                "has_content": bool(content_bits["content_full"]),
+                "content_preview": content_bits["content_preview"],
+                "content_full": content_bits["content_full"],
+                "thinking_preview": content_bits["thinking_preview"] or None,
+                "thinking_full": content_bits["thinking_full"] or None,
+                "has_thinking": bool(content_bits["thinking_full"]),
                 "tool_calls": tool_names or None,
+                "tool_call_details": tool_call_details or None,
                 "tool_call_count": len(tool_calls),
                 "is_final": len(tool_calls) == 0,
             })
@@ -158,6 +320,25 @@ class ConversationLogger:
             })
 
     # ── hook: before_iteration ──────────────────────────────────────
+
+    def on_llm_response(self, *, iteration: int, assistant_message: Dict[str, Any], raw_choice: Any = None, raw_response: Any = None, **_kw: Any) -> None:
+        """Provider-agnostic fallback capture for raw model output."""
+        content_bits = self._extract_assistant_content(
+            assistant_message.get("content"),
+            assistant_message,
+            raw_choice,
+            raw_response,
+        )
+        self._emit(
+            "llm_response_received",
+            {
+                "iteration": iteration,
+                "content_preview": content_bits["content_preview"] or None,
+                "content_full": content_bits["content_full"] or None,
+                "thinking_preview": content_bits["thinking_preview"] or None,
+                "thinking_full": content_bits["thinking_full"] or None,
+            },
+        )
 
     def on_before_iteration(self, *, iteration: int, messages: List, available_tools: List, **kw: Any) -> None:
         self._current_iteration = iteration
@@ -201,6 +382,7 @@ class ConversationLogger:
     # ── lifecycle ───────────────────────────────────────────────────
 
     def register(self, client: MCPOpenRouterClientV1) -> None:
+        client.hooks.register("llm_response_received", self.on_llm_response)
         client.hooks.register("message_appended", self.on_message)
         client.hooks.register("before_iteration", self.on_before_iteration)
         client.hooks.register("after_conversation", self.on_after_conversation)

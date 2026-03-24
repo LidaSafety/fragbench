@@ -204,12 +204,22 @@ def estimate_risk(prompt: str, tool_calls: list[str], tool_results: list[str]) -
     return round(min(score, 0.98), 2)
 
 
-def extract_tool_names(tool_calls: list[str]) -> list[str]:
+def extract_tool_names(tool_calls: list[Any]) -> list[str]:
     names: list[str] = []
     for call in tool_calls:
-        matches = re.findall(r'tool_call\("([^"]+)"', call)
-        names.extend(matches)
-    return sorted(set(names))
+        if isinstance(call, dict):
+            name = str(call.get("name") or "").strip()
+            if name:
+                names.append(name)
+            continue
+        text = str(call)
+        matches = re.findall(r'tool_call\("([^"]+)"', text)
+        if matches:
+            names.extend(matches)
+            continue
+        if text and " " not in text and "\n" not in text:
+            names.append(text)
+    return sorted(set(n for n in names if n))
 
 
 def _seed_index(seeds: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -233,39 +243,228 @@ def _attack_index(attacks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
 
 def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    groups: list[dict[str, Any]] = []
-    current: dict[str, Any] | None = None
+    """
+    Group runtime logs into query-level records.
+
+    A single user query can span multiple iterations (tool call round-trips).
+    We merge those iterations into one query flow so the UI can show:
+    user -> intermediary assistant/tooling -> final assistant.
+    """
+    queries: list[dict[str, Any]] = []
+    current_query: dict[str, Any] | None = None
+    latest_iter = 0
+
+    def _new_iteration(iteration: int, prompt: str) -> dict[str, Any]:
+        return {
+            "iteration": iteration,
+            "prompt": prompt,
+            "assistant_previews": [],
+            "assistant_full": "",
+            "thinking_full": "",
+            "assistant_messages": [],
+            "llm_raw_fallback": None,
+            "tool_calls": [],
+            "tool_call_details": [],
+            "tool_results": [],
+            "tool_results_structured": [],
+            "query_complete": None,
+            "events": [],
+        }
+
+    def ensure_iteration(q: dict[str, Any], iteration: int) -> dict[str, Any]:
+        iters = q["iterations"]
+        if iteration not in iters:
+            iters[iteration] = _new_iteration(iteration, q.get("prompt", ""))
+            q["iteration_order"].append(iteration)
+        return iters[iteration]
+
     for event in events:
-        kind = event.get("event")
+        kind = str(event.get("event") or "")
+
         if kind == "user_query":
-            if current:
-                groups.append(current)
-            current = {
-                "prompt": event.get("query", ""),
-                "assistant_previews": [],
-                "tool_calls": [],
-                "tool_results": [],
-                "query_complete": None,
-                "events": [event],
+            if current_query is not None:
+                queries.append(current_query)
+            current_query = {
+                "prompt": str(event.get("query") or ""),
+                "iterations": {},
+                "iteration_order": [],
             }
+            latest_iter = 0
             continue
-        if current is None:
+
+        if current_query is None:
             continue
-        current["events"].append(event)
+
+        iteration_raw = event.get("iteration")
+        try:
+            iteration = int(iteration_raw) if iteration_raw is not None else None
+        except (TypeError, ValueError):
+            iteration = None
+
+        if kind == "iteration_start":
+            if iteration is None:
+                latest_iter += 1
+                iteration = latest_iter
+            latest_iter = max(latest_iter, iteration)
+            turn = ensure_iteration(current_query, iteration)
+            turn["events"].append(event)
+            continue
+
+        if iteration is None:
+            iteration = latest_iter if latest_iter > 0 else 1
+        latest_iter = max(latest_iter, iteration)
+        turn = ensure_iteration(current_query, iteration)
+        turn["events"].append(event)
+
         if kind == "assistant_response":
             preview = str(event.get("content_preview") or "")
             if preview:
-                current["assistant_previews"].append(preview)
+                turn["assistant_previews"].append(preview)
+            full = str(event.get("content_full") or "")
+            if full:
+                turn["assistant_full"] = full
+            thinking = str(event.get("thinking_full") or "")
+            if thinking:
+                turn["thinking_full"] = thinking
             calls = event.get("tool_calls") or []
             if isinstance(calls, list):
-                current["tool_calls"].extend([str(c) for c in calls])
+                turn["tool_calls"].extend([str(c) for c in calls])
+            details = event.get("tool_call_details") or []
+            msg_details: list[dict[str, str]] = []
+            if isinstance(details, list):
+                for item in details:
+                    if isinstance(item, dict):
+                        normalized = {
+                            "name": str(item.get("name") or ""),
+                            "arguments_preview": str(item.get("arguments_preview") or ""),
+                        }
+                        turn["tool_call_details"].append(normalized)
+                        msg_details.append(normalized)
+            turn["assistant_messages"].append(
+                {
+                    "is_final": bool(event.get("is_final", False)),
+                    "has_content": bool(event.get("has_content", False)),
+                    "content_preview": preview,
+                    "content_full": full,
+                    "thinking_preview": str(event.get("thinking_preview") or ""),
+                    "thinking_full": thinking,
+                    "tool_calls": [str(c) for c in calls] if isinstance(calls, list) else [],
+                    "tool_call_details": msg_details,
+                }
+            )
+        elif kind == "llm_response_received":
+            turn["llm_raw_fallback"] = {
+                "content_preview": str(event.get("content_preview") or ""),
+                "content_full": str(event.get("content_full") or ""),
+                "thinking_preview": str(event.get("thinking_preview") or ""),
+                "thinking_full": str(event.get("thinking_full") or ""),
+            }
         elif kind == "tool_result":
-            current["tool_results"].append(str(event.get("result_preview") or ""))
+            preview = str(event.get("result_preview") or "")
+            turn["tool_results"].append(preview)
+            turn["tool_results_structured"].append(
+                {
+                    "tool": str(event.get("tool") or ""),
+                    "success": bool(event.get("success", False)),
+                    "result_preview": preview,
+                }
+            )
         elif kind == "query_complete":
-            current["query_complete"] = event
-    if current:
-        groups.append(current)
-    return groups
+            turn["query_complete"] = event
+
+    if current_query is not None:
+        queries.append(current_query)
+    if not queries:
+        return []
+
+    merged_queries: list[dict[str, Any]] = []
+    for q in queries:
+        order = sorted(q["iteration_order"])
+        if not order:
+            continue
+
+        merged = _new_iteration(order[0], q.get("prompt", ""))
+        merged["iteration"] = order[0]
+        merged["iterations_detail"] = []
+
+        for it in order:
+            turn = q["iterations"][it]
+            if not turn["assistant_messages"] and isinstance(turn.get("llm_raw_fallback"), dict):
+                fb = turn["llm_raw_fallback"]
+                turn["assistant_messages"].append(
+                    {
+                        "is_final": True,
+                        "has_content": bool(fb.get("content_full")),
+                        "content_preview": str(fb.get("content_preview") or ""),
+                        "content_full": str(fb.get("content_full") or ""),
+                        "thinking_preview": str(fb.get("thinking_preview") or ""),
+                        "thinking_full": str(fb.get("thinking_full") or ""),
+                        "tool_calls": [],
+                        "tool_call_details": [],
+                    }
+                )
+                if not turn.get("assistant_full"):
+                    turn["assistant_full"] = str(fb.get("content_full") or "")
+                if not turn.get("thinking_full"):
+                    turn["thinking_full"] = str(fb.get("thinking_full") or "")
+
+            merged["iterations_detail"].append(
+                {
+                    "iteration": it,
+                    "thinking_full": str(turn.get("thinking_full") or ""),
+                    "assistant_content": str(turn.get("assistant_full") or ""),
+                    "assistant_messages": list(turn["assistant_messages"]),
+                    "tool_calls": list(turn["tool_calls"]),
+                    "tool_call_details": list(turn["tool_call_details"]),
+                    "tool_results_structured": list(turn["tool_results_structured"]),
+                }
+            )
+
+            merged["assistant_previews"].extend(turn["assistant_previews"])
+            if turn.get("assistant_full"):
+                merged["assistant_full"] = str(turn["assistant_full"])
+            if turn.get("thinking_full"):
+                merged["thinking_full"] = str(turn["thinking_full"])
+            merged["assistant_messages"].extend(turn["assistant_messages"])
+            merged["tool_calls"].extend(turn["tool_calls"])
+            merged["tool_call_details"].extend(turn["tool_call_details"])
+            merged["tool_results"].extend(turn["tool_results"])
+            merged["tool_results_structured"].extend(turn["tool_results_structured"])
+            if turn.get("query_complete"):
+                merged["query_complete"] = turn["query_complete"]
+            merged["events"].extend(turn["events"])
+
+        merged_queries.append(merged)
+
+    return merged_queries
+
+
+def _extract_run_id(path: Path) -> str | None:
+    """Read the first event from a session JSONL and return its run_id."""
+    try:
+        for line in path.open(encoding="utf-8"):
+            line = line.strip()
+            if not line:
+                continue
+            event = _safe_json_loads(line)
+            if event and event.get("event") == "session_start":
+                rid = event.get("run_id")
+                return str(rid) if rid else None
+            break
+    except OSError:
+        pass
+    return None
+
+
+def _find_sibling_sessions(session_path: Path, run_id: str) -> list[Path]:
+    """Find all session files in the same directory with the same run_id."""
+    siblings: list[Path] = []
+    for candidate in sorted(session_path.parent.glob("session_*.jsonl")):
+        if candidate == session_path:
+            continue
+        if _extract_run_id(candidate) == run_id:
+            siblings.append(candidate)
+    return sorted(siblings, key=lambda p: p.name)
 
 
 def build_artifact_bundle(
@@ -282,6 +481,15 @@ def build_artifact_bundle(
     else:
         candidate = session_path or (list_session_files()[0] if list_session_files() else None)
         events = load_jsonl(candidate) if candidate else []
+
+        if candidate:
+            run_id = _extract_run_id(candidate)
+            if run_id:
+                siblings = _find_sibling_sessions(candidate, run_id)
+                for sib in siblings:
+                    events.extend(load_jsonl(sib))
+                events.sort(key=lambda e: str(e.get("ts", "")))
+
     source = {
         "session_file": session_path.name if session_path else None,
         "seeds_count": len(loaded_seeds),
@@ -310,48 +518,10 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
     if attack is None and bundle.attacks:
         attack = bundle.attacks[0]
 
-    grouped_queries = _group_queries(events)
-    traces: list[dict[str, Any]] = []
-    tactics_seen: list[str] = []
-
-    for idx, query in enumerate(grouped_queries, start=1):
-        prompt = str(query.get("prompt") or "")
-        tool_calls = [str(x) for x in query.get("tool_calls", [])]
-        tool_results = [str(x) for x in query.get("tool_results", [])]
-        tactic = detect_tactic(prompt)
-        if tactic not in tactics_seen:
-            tactics_seen.append(tactic)
-        risk = estimate_risk(prompt, tool_calls, tool_results)
-        kcc = round(min(len(tactics_seen) / 6.0, 1.0), 2)
-        traces.append(
-            {
-                "step": idx,
-                "prompt": prompt,
-                "tool_calls": tool_calls,
-                "tool_results": tool_results,
-                "assistant_preview": (query.get("assistant_previews") or [""])[0],
-                "tactic": tactic,
-                "risk": risk,
-                "kcc": kcc,
-                "toolkit_set": extract_tool_names(tool_calls),
-                "alert": kcc > 0.7 or risk > 0.85,
-            }
-        )
-
     seed_metadata = (seed or {}).get("metadata", {})
     stages = (seed or {}).get("attack_stages", [])
     fragments = (attack or {}).get("fragments", [])
     campaign_name = seed_metadata.get("id") or attack_id or "UNKNOWN"
-
-    campaign = {
-        "id": campaign_name,
-        "title": seed_metadata.get("description") or f"Campaign {campaign_name}",
-        "technique": seed_metadata.get("technique"),
-        "technique_name": seed_metadata.get("technique_name"),
-        "tags": seed_metadata.get("tags", []),
-        "aliases": seed_metadata.get("aliases", []),
-        "session_count": len(traces),
-    }
 
     fragment_rows: list[dict[str, Any]] = []
     attack_fragment_map = {int(f.get("index", i)): f for i, f in enumerate(fragments) if isinstance(f, dict)}
@@ -376,6 +546,75 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
                 ],
             }
         )
+
+    grouped_queries = _group_queries(events)
+    traces: list[dict[str, Any]] = []
+    tactics_seen: list[str] = []
+
+    # Map runtime turns to fragment metadata by ordinal order.
+    ordered_fragment_rows = sorted(fragment_rows, key=lambda row: int(row.get("index", 0)))
+
+    for idx, query in enumerate(grouped_queries, start=1):
+        prompt = str(query.get("prompt") or "")
+        assistant_messages = [x for x in query.get("assistant_messages", []) if isinstance(x, dict)]
+        tool_calls = [str(x) for x in query.get("tool_calls", [])]
+        tool_call_details = [x for x in query.get("tool_call_details", []) if isinstance(x, dict)]
+        tool_results = [str(x) for x in query.get("tool_results", [])]
+        tool_results_structured = [
+            x for x in query.get("tool_results_structured", []) if isinstance(x, dict)
+        ]
+        stage_meta = ordered_fragment_rows[idx - 1] if idx - 1 < len(ordered_fragment_rows) else {}
+        tactic = str(stage_meta.get("mitre_tactic") or detect_tactic(prompt))
+        if tactic not in tactics_seen:
+            tactics_seen.append(tactic)
+        risk = estimate_risk(prompt, tool_calls, tool_results)
+        kcc = round(min(len(tactics_seen) / 6.0, 1.0), 2)
+        iterations_detail = [
+            x for x in query.get("iterations_detail", []) if isinstance(x, dict)
+        ]
+        traces.append(
+            {
+                "step": idx,
+                "iteration": query.get("iteration", idx),
+                "prompt": prompt,
+                "assistant_messages": assistant_messages,
+                "tool_calls": tool_calls,
+                "tool_call_details": tool_call_details,
+                "tool_results": tool_results,
+                "tool_results_structured": tool_results_structured,
+                "iterations_detail": iterations_detail,
+                "total_iterations": len(iterations_detail),
+                "total_tool_calls": sum(len(it.get("tool_calls", [])) for it in iterations_detail),
+                "assistant_preview": (query.get("assistant_previews") or [""])[0],
+                "assistant_full": str(query.get("assistant_full") or ""),
+                "thinking_full": str(query.get("thinking_full") or ""),
+                "tactic": tactic,
+                "risk": risk,
+                "kcc": kcc,
+                "toolkit_set": extract_tool_names(tool_call_details or tool_calls),
+                "alert": kcc > 0.7 or risk > 0.85,
+                "fragment_index": stage_meta.get("index"),
+                "fragment_description": str(stage_meta.get("description") or ""),
+                "mitre_technique": str(stage_meta.get("mitre_technique") or ""),
+                "mitre_technique_name": str(stage_meta.get("mitre_technique_name") or ""),
+                "baseline_prompt": str(stage_meta.get("baseline_prompt") or ""),
+                "alt_phrasings": [
+                    str(v.get("prompt") or "")
+                    for v in stage_meta.get("variations", [])
+                    if isinstance(v, dict) and str(v.get("prompt") or "").strip()
+                ],
+            }
+        )
+
+    campaign = {
+        "id": campaign_name,
+        "title": seed_metadata.get("description") or f"Campaign {campaign_name}",
+        "technique": seed_metadata.get("technique"),
+        "technique_name": seed_metadata.get("technique_name"),
+        "tags": seed_metadata.get("tags", []),
+        "aliases": seed_metadata.get("aliases", []),
+        "session_count": len(traces),
+    }
 
     tactic_totals: dict[str, int] = {}
     for row in fragment_rows:
@@ -463,14 +702,17 @@ class ViewerHandler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path == "/api/runs":
             files = list_session_files()
-            payload = [
-                {
+            payload = []
+            for f in files[:50]:
+                entry: dict[str, Any] = {
                     "id": f.name,
                     "mtime": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat(),
                     "bytes": f.stat().st_size,
                 }
-                for f in files[:50]
-            ]
+                rid = _extract_run_id(f)
+                if rid:
+                    entry["run_id"] = rid
+                payload.append(entry)
             _json_response(self, {"runs": payload})
             return
         if path == "/api/run/latest":

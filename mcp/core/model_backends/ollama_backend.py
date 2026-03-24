@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
@@ -14,11 +14,17 @@ class _CompatMessage:
     role: str
     content: str
     tool_calls: Optional[List[Dict[str, Any]]] = None
+    thinking: Optional[str] = None
+    reasoning: Optional[str] = None
 
     def model_dump(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"role": self.role, "content": self.content}
         if self.tool_calls:
             payload["tool_calls"] = self.tool_calls
+        if self.thinking:
+            payload["thinking"] = self.thinking
+        if self.reasoning:
+            payload["reasoning"] = self.reasoning
         return payload
 
 
@@ -36,8 +42,27 @@ class _CompatResponse:
 class OllamaBackend(ChatBackend):
     name = "ollama"
 
-    def __init__(self, *, base_url: str = "http://127.0.0.1:11434") -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str = "http://127.0.0.1:11434",
+        think: Optional[Union[bool, str]] = "low",
+    ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.think = think
+
+    @staticmethod
+    def _normalize_think_value(value: Optional[Union[bool, str]]) -> Optional[Union[bool, str]]:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        lowered = str(value).strip().lower()
+        if lowered in {"true", "false"}:
+            return lowered == "true"
+        if lowered in {"low", "medium", "high"}:
+            return lowered
+        return None
 
     def _convert_tool_calls(self, value: Any) -> List[Dict[str, Any]]:
         if not isinstance(value, list):
@@ -168,6 +193,9 @@ class OllamaBackend(ChatBackend):
             "stream": False,
             "options": {"temperature": temperature, "num_predict": max_tokens},
         }
+        think_value = self._normalize_think_value(self.think)
+        if think_value is not None:
+            payload["think"] = think_value
         if tools:
             payload["tools"] = tools
         if tool_choice:
@@ -216,6 +244,7 @@ class OllamaBackend(ChatBackend):
         raw = await _request()
         message = raw.get("message") or {}
         content = message.get("content", "") or ""
+        thinking = message.get("thinking") or raw.get("thinking") or raw.get("reasoning")
         tool_calls = self._convert_tool_calls(message.get("tool_calls"))
         compat = _CompatResponse(
             choices=[
@@ -224,6 +253,7 @@ class OllamaBackend(ChatBackend):
                         role="assistant",
                         content=content,
                         tool_calls=tool_calls or None,
+                        thinking=str(thinking) if thinking else None,
                     )
                 )
             ]
