@@ -4,7 +4,6 @@ UV ?= uv run
 PY ?= python3
 
 MODEL_BACKEND ?= openrouter
-MODEL ?= anthropic/claude-haiku-4.5
 OLLAMA_BASE_URL ?= http://127.0.0.1:11434
 VLLM_BASE_URL ?= http://127.0.0.1:8000/v1
 VLLM_API_KEY ?= EMPTY
@@ -19,11 +18,25 @@ PID_DIR := .mcp-run
 SERVER_LOG_DIR := $(PID_DIR)/logs
 TOOLKIT_ENDPOINTS := http://127.0.0.1:8001/mcp http://127.0.0.1:8011/mcp http://127.0.0.1:8012/mcp http://127.0.0.1:8013/mcp http://127.0.0.1:8014/mcp
 
+ifeq ($(MODEL_BACKEND),ollama)
+MODEL ?= huihui_ai/qwen3.5-abliterated:35b
+else ifeq ($(MODEL_BACKEND),vllm)
+MODEL ?= huihui-ai/Huihui-Qwen3.5-35B-A3B-abliterated
+else
+MODEL ?= anthropic/claude-haiku-4.5
+endif
+
 FS_PID := $(PID_DIR)/filesystem.pid
 SHELL_PID := $(PID_DIR)/shell.pid
 ARCHIVE_PID := $(PID_DIR)/archive.pid
 EXFIL_PID := $(PID_DIR)/exfil.pid
 NETWORK_PID := $(PID_DIR)/network.pid
+
+FS_URL := http://127.0.0.1:8001/mcp
+SHELL_URL := http://127.0.0.1:8011/mcp
+ARCHIVE_URL := http://127.0.0.1:8012/mcp
+EXFIL_URL := http://127.0.0.1:8013/mcp
+NETWORK_URL := http://127.0.0.1:8014/mcp
 
 .PHONY: help stack-up stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run clean-runtime
 
@@ -49,17 +62,25 @@ help:
 $(PID_DIR):
 	@mkdir -p "$(PID_DIR)" "$(SERVER_LOG_DIR)"
 
+define URL_IS_REACHABLE
+	@$(PY) -c 'import socket,sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); host=u.hostname or "127.0.0.1"; port=u.port or 80; s=socket.socket(); s.settimeout(1.5); s.connect((host,port)); s.close()' "$(1)" >/dev/null 2>&1
+endef
+
+define START_IF_NEEDED
+	@if $(PY) -c 'import socket,sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); host=u.hostname or "127.0.0.1"; port=u.port or 80; s=socket.socket(); s.settimeout(1.5); code=s.connect_ex((host,port)); s.close(); sys.exit(0 if code==0 else 1)' "$(1)" >/dev/null 2>&1; then \
+		echo "Already running $(2) at $(1)"; \
+	else \
+		echo "Starting $(2) at $(1)..."; \
+		nohup $(UV) $(PY) $(3) > "$(4)" 2>&1 & echo $$! > "$(5)"; \
+	fi
+endef
+
 stack-up: $(PID_DIR)
-	@echo "Starting filesystem server on 8001..."
-	@nohup $(UV) $(PY) mcp/servers/filesystem_server.py --transport sse --port 8001 > "$(SERVER_LOG_DIR)/filesystem.log" 2>&1 & echo $$! > "$(FS_PID)"
-	@echo "Starting shell server on 8011..."
-	@nohup $(UV) $(PY) mcp/servers/shell_server.py --transport sse --port 8011 > "$(SERVER_LOG_DIR)/shell.log" 2>&1 & echo $$! > "$(SHELL_PID)"
-	@echo "Starting archive server on 8012..."
-	@nohup $(UV) $(PY) mcp/servers/archive_server.py --transport sse --port 8012 > "$(SERVER_LOG_DIR)/archive.log" 2>&1 & echo $$! > "$(ARCHIVE_PID)"
-	@echo "Starting exfil server on 8013..."
-	@nohup $(UV) $(PY) mcp/servers/exfil_server.py --transport sse --port 8013 > "$(SERVER_LOG_DIR)/exfil.log" 2>&1 & echo $$! > "$(EXFIL_PID)"
-	@echo "Starting network recon server on 8014..."
-	@nohup $(UV) $(PY) mcp/servers/network_recon_server.py --transport sse --port 8014 > "$(SERVER_LOG_DIR)/network.log" 2>&1 & echo $$! > "$(NETWORK_PID)"
+	$(call START_IF_NEEDED,$(FS_URL),filesystem,mcp/servers/filesystem_server.py --transport sse --port 8001,$(SERVER_LOG_DIR)/filesystem.log,$(FS_PID))
+	$(call START_IF_NEEDED,$(SHELL_URL),shell,mcp/servers/shell_server.py --transport sse --port 8011,$(SERVER_LOG_DIR)/shell.log,$(SHELL_PID))
+	$(call START_IF_NEEDED,$(ARCHIVE_URL),archive,mcp/servers/archive_server.py --transport sse --port 8012,$(SERVER_LOG_DIR)/archive.log,$(ARCHIVE_PID))
+	$(call START_IF_NEEDED,$(EXFIL_URL),exfil,mcp/servers/exfil_server.py --transport sse --port 8013,$(SERVER_LOG_DIR)/exfil.log,$(EXFIL_PID))
+	$(call START_IF_NEEDED,$(NETWORK_URL),network,mcp/servers/network_recon_server.py --transport sse --port 8014,$(SERVER_LOG_DIR)/network.log,$(NETWORK_PID))
 	@sleep 2
 	@$(MAKE) stack-status
 
@@ -76,13 +97,21 @@ define CHECK_PID
 	fi
 endef
 
+define CHECK_ENDPOINT
+	@if $(PY) -c 'import socket,sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); host=u.hostname or "127.0.0.1"; port=u.port or 80; s=socket.socket(); s.settimeout(1.5); code=s.connect_ex((host,port)); s.close(); sys.exit(0 if code==0 else 1)' "$(1)" >/dev/null 2>&1; then \
+		echo "UP   ----  $(2)"; \
+	else \
+		echo "DOWN ----  $(2)"; \
+	fi
+endef
+
 stack-status:
-	@echo "Server status:"
-	$(call CHECK_PID,$(FS_PID),filesystem:8001)
-	$(call CHECK_PID,$(SHELL_PID),shell:8011)
-	$(call CHECK_PID,$(ARCHIVE_PID),archive:8012)
-	$(call CHECK_PID,$(EXFIL_PID),exfil:8013)
-	$(call CHECK_PID,$(NETWORK_PID),network:8014)
+	@echo "Server endpoint status:"
+	$(call CHECK_ENDPOINT,$(FS_URL),filesystem:8001)
+	$(call CHECK_ENDPOINT,$(SHELL_URL),shell:8011)
+	$(call CHECK_ENDPOINT,$(ARCHIVE_URL),archive:8012)
+	$(call CHECK_ENDPOINT,$(EXFIL_URL),exfil:8013)
+	$(call CHECK_ENDPOINT,$(NETWORK_URL),network:8014)
 
 define STOP_PID
 	@if [ -f "$(1)" ]; then \
@@ -118,6 +147,13 @@ maple-check:
 		URL="$(OLLAMA_BASE_URL)"; \
 		$(PY) -c 'import socket,sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); host=u.hostname or "127.0.0.1"; port=u.port or 80; s=socket.socket(); s.settimeout(2); s.connect((host,port)); s.close(); print(f"OK: ollama reachable at {host}:{port}")' "$$URL" || \
 		(echo "ERROR: Ollama endpoint unreachable: $(OLLAMA_BASE_URL)"; exit 1); \
+		$(PY) -c 'import sys,urllib.request; base=sys.argv[1].rstrip("/"); url=f"{base}/api/tags"; r=urllib.request.urlopen(url, timeout=3); print(f"OK: ollama API responds at {url} (status={r.getcode()})")' "$$URL" || \
+		(echo "ERROR: Ollama API did not respond at /api/tags; check base URL/version"; exit 1); \
+		$(PY) -c 'import json,sys,urllib.request; base=sys.argv[1].rstrip("/"); model=sys.argv[2]; data=json.load(urllib.request.urlopen(f"{base}/api/tags", timeout=3)); names={m.get("name","") for m in data.get("models",[])}; \
+ok=(model in names) or any(str(n).startswith(model + ":") for n in names); \
+print(f"OK: ollama model available: {model}" if ok else f"MISSING: ollama model {model}. Available: {sorted(names)[:20]}"); \
+raise SystemExit(0 if ok else 1)' "$$URL" "$(MODEL)" || \
+		(echo "ERROR: Requested MODEL not found in Ollama. Run: ollama pull $(MODEL)"; exit 1); \
 	fi
 	@if [ "$(MODEL_BACKEND)" = "vllm" ]; then \
 		URL="$(VLLM_BASE_URL)"; \

@@ -154,6 +154,12 @@ Run interactive CLI with attack-aware toolkit routing:
 make cli ATTACK_SEED=seeds/hello_world.json MODEL_BACKEND=openrouter
 ```
 
+When using Ollama backend, set an Ollama model name (not OpenRouter model ids):
+
+```bash
+make cli MODEL_BACKEND=ollama MODEL=huihui_ai/qwen3.5-abliterated:35b
+```
+
 Run one-shot hello-world variation:
 
 ```bash
@@ -218,6 +224,17 @@ Maple setup docs and bootstrap scripts:
 
 - `mcp/deploy/bootstrap_mcp_env.sh`
 - `mcp/deploy/maple_abliterated_setup.md`
+- `scripts/maple_tmux.sh` (tmux-based maple launcher)
+
+Start maple tmux workspace:
+
+```bash
+bash scripts/maple_tmux.sh openrouter
+# or
+bash scripts/maple_tmux.sh ollama
+# or
+bash scripts/maple_tmux.sh vllm
+```
 
 **Start the filesystem server:**
 ```bash

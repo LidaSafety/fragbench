@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FragGuard Runtime Viewer</title>
+  <link rel="stylesheet" href="./assets/css/base.css">
+  <link rel="stylesheet" href="./assets/css/components.css">
+</head>
+<body>
+  <nav class="topbar">
+    <div class="logo">FRAGGUARD RUNTIME VIEWER</div>
+    <div class="controls">
+      <select id="run-selector"></select>
+      <button id="refresh-runs-btn">Refresh Runs</button>
+      <button id="load-latest-btn">Load Latest</button>
+      <button id="upload-mode-btn">Upload Artifacts</button>
+    </div>
+  </nav>
+
+  <section id="upload-panel" class="upload-panel hidden">
+    <h3>Manual Upload Fallback</h3>
+    <p>Upload seed JSON files, attack TOML-exported JSON data, and a session JSONL parsed into event objects.</p>
+    <textarea id="upload-seeds" placeholder="Paste JSON array of seed objects"></textarea>
+    <textarea id="upload-attacks" placeholder="Paste JSON array of attack objects"></textarea>
+    <textarea id="upload-events" placeholder="Paste JSON array of session events"></textarea>
+    <button id="upload-submit-btn">Normalize Uploaded Artifacts</button>
+  </section>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <button class="nav-item active" data-view="campaigns">Campaigns</button>
+      <button class="nav-item" data-view="fragments">Fragments</button>
+      <button class="nav-item" data-view="traces">MCP Traces</button>
+      <button class="nav-item" data-view="gnn">GNN</button>
+      <button class="nav-item" data-view="mitre">MITRE</button>
+      <button class="nav-item" data-view="demo">Demo</button>
+      <div class="status">
+        <div id="run-summary"></div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section id="view-campaigns" class="view active"></section>
+      <section id="view-fragments" class="view"></section>
+      <section id="view-traces" class="view"></section>
+      <section id="view-gnn" class="view"></section>
+      <section id="view-mitre" class="view"></section>
+      <section id="view-demo" class="view"></section>
+    </main>
+  </div>
+
+  <script type="module" src="./assets/js/main.js"></script>
+</body>
+</html>

@@ -16,14 +16,12 @@
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 
-[03/24/26 15:46:17] INFO     Starting MCP server 'shell' with   transport.py:273
+[03/24/26 17:00:50] INFO     Starting MCP server 'shell' with   transport.py:273
                              transport 'sse' on                                 
                              http://127.0.0.1:8011/mcp                          
-INFO:     Started server process [31019]
+INFO:     Started server process [74841]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1INFO:     127.0.0.1:51399 - "GET /mcp HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51400 - "POST /messages/?session_id=03b0ca6af410413cafb63c3c306868af HTTP/1.1" 202 Accepted
-INFO:     127.0.0.1:51400 - "POST /messages/?session_id=03b0ca6af410413cafb63c3c306868af HTTP/1.1" 202 Accepted
-INFO:     127.0.0.1:51400 - "POST /messages/?session_id=03b0ca6af410413cafb63c3c306868af HTTP/1.1" 202 Accepted
-INFO:     127.0.0.1:51400 - "POST /messages/?session_id=03b0ca6af410413cafb63c3c306868af HTTP/1.1" 202 Accepted
+ERROR:    [Errno 48] error while attempting to bind on address ('127.0.0.1', 8011): [errno 48] address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.

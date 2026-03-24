@@ -1,0 +1,88 @@
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.8rem;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.panel-body { padding: 0.75rem; }
+
+.badge {
+  font-size: 0.72rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  margin-right: 0.25rem;
+  color: var(--muted);
+}
+
+.risk-low { color: var(--green); }
+.risk-med { color: var(--amber); }
+.risk-high { color: var(--red); }
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+}
+
+.kv {
+  border: 1px dashed var(--border);
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+}
+
+.tool-list, .variation-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.progress {
+  width: 100%;
+  height: 8px;
+  border: 1px solid var(--border);
+  background: #0a1019;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--blue);
+}
+
+.trace-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+}
+
+.trace-box {
+  border: 1px solid var(--border);
+  background: #0d1420;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
