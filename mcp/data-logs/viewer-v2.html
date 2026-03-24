@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCP Log Viewer v2</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #0d1117; color: #e6edf3; }
+    header { padding: 14px 18px; border-bottom: 1px solid #30363d; display: flex; gap: 10px; align-items: center; }
+    main { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 57px); }
+    aside { border-right: 1px solid #30363d; overflow: auto; }
+    section { overflow: auto; padding: 14px; }
+    .row { padding: 8px 10px; border-bottom: 1px solid #21262d; cursor: pointer; }
+    .row.active { background: #161b22; }
+    .event { border: 1px solid #30363d; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .event-head { display: flex; justify-content: space-between; font-size: 12px; color: #8b949e; }
+    input, select, button { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 6px 8px; }
+    button { cursor: pointer; }
+    .summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .pill { border: 1px solid #30363d; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <input id="fileInput" type="file" accept=".jsonl,.ndjson" multiple />
+    <input id="search" placeholder="Search event payload..." />
+    <select id="eventFilter">
+      <option value="all">all events</option>
+    </select>
+    <button id="compareBtn">toggle compare</button>
+  </header>
+  <main>
+    <aside id="sessionList"></aside>
+    <section id="eventPanel"></section>
+  </main>
+  <script>
+    const S = {
+      sessions: [],
+      activeIdx: 0,
+      compareMode: false,
+      compareIdx: null,
+      eventFilter: "all",
+      search: "",
+    };
+
+    const els = {
+      fileInput: document.getElementById("fileInput"),
+      search: document.getElementById("search"),
+      eventFilter: document.getElementById("eventFilter"),
+      compareBtn: document.getElementById("compareBtn"),
+      sessionList: document.getElementById("sessionList"),
+      eventPanel: document.getElementById("eventPanel"),
+    };
+
+    function parseJsonl(name, raw) {
+      const rows = [];
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          rows.push(JSON.parse(trimmed));
+        } catch (_err) {
+          // Skip malformed lines.
+        }
+      }
+      return { name, events: rows };
+    }
+
+    function enrichSession(session) {
+      const events = session.events || [];
+      const start = events.find((e) => e.event === "session_start") || {};
+      const complete = [...events].reverse().find((e) => e.event === "query_complete") || {};
+      const schemaVersion = start.schema_version || "1.0";
+      const toolCalls = events.filter((e) => e.event === "tool_result").length;
+      const iterations = events.filter((e) => e.event === "iteration_start").length;
+      const uniqueEvents = [...new Set(events.map((e) => e.event))].sort();
+      return { ...session, start, complete, schemaVersion, toolCalls, iterations, uniqueEvents };
+    }
+
+    function renderFilters() {
+      const allEvents = new Set();
+      for (const s of S.sessions) for (const evt of s.uniqueEvents) allEvents.add(evt);
+      const values = ["all", ...[...allEvents].sort()];
+      els.eventFilter.innerHTML = values.map((v) => `<option value="${v}">${v}</option>`).join("");
+      els.eventFilter.value = S.eventFilter;
+    }
+
+    function renderSessionList() {
+      els.sessionList.innerHTML = S.sessions
+        .map((s, idx) => {
+          const active = idx === S.activeIdx ? "active" : "";
+          const title = s.start.run_id || s.name;
+          const sub = `${s.start.backend || "openrouter"} · ${s.iterations} iter · ${s.toolCalls} tool`;
+          return `<div class="row ${active}" data-idx="${idx}">
+            <div>${title}</div>
+            <div style="font-size:12px;color:#8b949e">${sub}</div>
+          </div>`;
+        })
+        .join("");
+      for (const row of els.sessionList.querySelectorAll(".row")) {
+        row.addEventListener("click", () => {
+          S.activeIdx = Number(row.dataset.idx);
+          renderAll();
+        });
+      }
+    }
+
+    function eventVisible(evt) {
+      if (S.eventFilter !== "all" && evt.event !== S.eventFilter) return false;
+      if (!S.search) return true;
+      return JSON.stringify(evt).toLowerCase().includes(S.search.toLowerCase());
+    }
+
+    function renderSingleSession(session) {
+      const visible = (session.events || []).filter(eventVisible);
+      const summary = `<div class="summary">
+        <span class="pill">schema ${session.schemaVersion}</span>
+        <span class="pill">backend ${session.start.backend || "n/a"}</span>
+        <span class="pill">campaign ${session.start.campaign || "n/a"}</span>
+        <span class="pill">attack ${session.start.attack_id || "n/a"}</span>
+        <span class="pill">events ${visible.length}</span>
+      </div>`;
+      const body = visible
+        .map(
+          (evt) => `<article class="event">
+            <div class="event-head"><span>${evt.event}</span><span>#${evt.seq || "?"}</span></div>
+            <pre>${escapeHtml(JSON.stringify(evt, null, 2))}</pre>
+          </article>`
+        )
+        .join("");
+      return summary + body;
+    }
+
+    function renderCompare(left, right) {
+      return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>${renderSingleSession(left)}</div>
+        <div>${renderSingleSession(right)}</div>
+      </div>`;
+    }
+
+    function renderEventPanel() {
+      const active = S.sessions[S.activeIdx];
+      if (!active) {
+        els.eventPanel.innerHTML = "<p>No sessions loaded.</p>";
+        return;
+      }
+      if (S.compareMode && S.compareIdx != null && S.sessions[S.compareIdx]) {
+        els.eventPanel.innerHTML = renderCompare(active, S.sessions[S.compareIdx]);
+        return;
+      }
+      els.eventPanel.innerHTML = renderSingleSession(active);
+    }
+
+    function renderAll() {
+      renderFilters();
+      renderSessionList();
+      renderEventPanel();
+    }
+
+    async function onFilesSelected(files) {
+      const next = [];
+      for (const file of files) {
+        const raw = await file.text();
+        const parsed = parseJsonl(file.name, raw);
+        next.push(enrichSession(parsed));
+      }
+      S.sessions = next;
+      S.activeIdx = 0;
+      S.compareIdx = next.length > 1 ? 1 : null;
+      renderAll();
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    els.fileInput.addEventListener("change", (e) => onFilesSelected(e.target.files || []));
+    els.search.addEventListener("input", (e) => {
+      S.search = e.target.value || "";
+      renderEventPanel();
+    });
+    els.eventFilter.addEventListener("change", (e) => {
+      S.eventFilter = e.target.value || "all";
+      renderEventPanel();
+    });
+    els.compareBtn.addEventListener("click", () => {
+      S.compareMode = !S.compareMode;
+      renderEventPanel();
+    });
+  </script>
+</body>
+</html>

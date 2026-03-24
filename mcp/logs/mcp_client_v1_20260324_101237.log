@@ -1,0 +1,20 @@
+2026-03-24 15:42:37,107 - INFO - Using basic tool retriever (Tool Context Manager unavailable)
+2026-03-24 15:42:37,143 - INFO - HTTP Request: GET http://127.0.0.1:8001/mcp "HTTP/1.1 307 Temporary Redirect"
+2026-03-24 15:42:37,145 - INFO - HTTP Request: GET http://127.0.0.1:8001/mcp/ "HTTP/1.1 200 OK"
+2026-03-24 15:42:37,148 - INFO - HTTP Request: POST http://127.0.0.1:8001/mcp/messages/?session_id=74652e0e6034442bbc67e7220cef742b "HTTP/1.1 202 Accepted"
+2026-03-24 15:42:37,151 - INFO - HTTP Request: POST http://127.0.0.1:8001/mcp/messages/?session_id=74652e0e6034442bbc67e7220cef742b "HTTP/1.1 202 Accepted"
+2026-03-24 15:42:37,152 - INFO - HTTP Request: POST http://127.0.0.1:8001/mcp/messages/?session_id=74652e0e6034442bbc67e7220cef742b "HTTP/1.1 202 Accepted"
+2026-03-24 15:42:37,155 - INFO - Registered 14 MCP tool(s) from filesystem_toolkit
+2026-03-24 15:42:37,155 - INFO - Connected to HTTP MCP server 'filesystem_toolkit' at http://127.0.0.1:8001/mcp
+2026-03-24 15:42:37,163 - INFO - HTTP Request: GET http://127.0.0.1:8014/mcp "HTTP/1.1 200 OK"
+2026-03-24 15:42:37,165 - INFO - HTTP Request: POST http://127.0.0.1:8014/messages/?session_id=76612791ac664fd8b9ce3041a2bc0715 "HTTP/1.1 202 Accepted"
+2026-03-24 15:42:37,166 - INFO - HTTP Request: POST http://127.0.0.1:8014/messages/?session_id=76612791ac664fd8b9ce3041a2bc0715 "HTTP/1.1 202 Accepted"
+2026-03-24 15:42:37,167 - INFO - HTTP Request: POST http://127.0.0.1:8014/messages/?session_id=76612791ac664fd8b9ce3041a2bc0715 "HTTP/1.1 202 Accepted"
+2026-03-24 15:42:37,168 - INFO - Registered 2 MCP tool(s) from network_recon_toolkit
+2026-03-24 15:42:37,168 - INFO - Connected to HTTP MCP server 'network_recon_toolkit' at http://127.0.0.1:8014/mcp
+2026-03-24 15:42:37,269 - INFO - Processing query (iterations=6, strategy=linear)
+2026-03-24 15:42:40,474 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-24 15:42:40,755 - INFO - HTTP Request: POST http://127.0.0.1:8001/mcp/messages/?session_id=74652e0e6034442bbc67e7220cef742b "HTTP/1.1 202 Accepted"
+2026-03-24 15:42:40,761 - INFO - Tool glob_files [SUCCESS] args={"pattern": "*.py", "path": "."} result=[{"type": "text", "text": "{\"success\": true, \"pattern\": \"*.py\", \"base\": \".\", \"matches\": [{\"path\": \"./detector.py\", \"type\": \"file\", \"size\": 9347}, {\"path\": \"./run.py\", \"type\
+2026-03-24 15:42:42,330 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-24 15:42:42,687 - INFO - Model responded without tool calls; terminating loop.

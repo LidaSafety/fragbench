@@ -126,6 +126,99 @@ uv run jupyter lab mcp/fragbench_demo.ipynb
 
 ## How to Run
 
+### One-command stack startup (Makefile)
+
+From repo root:
+
+```bash
+make stack-ready
+```
+
+This starts all configured MCP toolkit servers (`filesystem`, `shell`, `archive`, `exfil`, `network`).
+
+Run maple-oriented preflight checks (backend/env + endpoint reachability):
+
+```bash
+make maple-check MODEL_BACKEND=openrouter
+```
+
+Or start + verify in one command:
+
+```bash
+make maple-ready MODEL_BACKEND=openrouter
+```
+
+Run interactive CLI with attack-aware toolkit routing:
+
+```bash
+make cli ATTACK_SEED=seeds/hello_world.json MODEL_BACKEND=openrouter
+```
+
+Run one-shot hello-world variation:
+
+```bash
+make hello-run ATTACK_SEED=seeds/hello_world.json MODEL_BACKEND=openrouter
+```
+
+Run one-shot attack stage generated from any registered variation:
+
+```bash
+make attack-run ATTACK_SEED=seeds/promptsteal.json ATTACK_VARIATION_SEED=42 ATTACK_STAGE=1 MODEL_BACKEND=openrouter
+```
+
+Stop everything:
+
+```bash
+make stack-down
+```
+
+The `ATTACK_SEED` argument is passed to `mcp_cli.py --attack-seed`, which triggers
+`AttackProfileBuilder` to derive tactics/tags from the seed and lets `ToolkitRouter`
+choose the relevant toolkits from `mcp/registry/toolkits.toml`.
+
+### Backend portability (OpenRouter + Ollama + vLLM)
+
+The CLI now supports backend routing:
+
+```bash
+# OpenRouter (default)
+uv run mcp/mcp_cli.py --model-backend openrouter --model anthropic/claude-haiku-4.5
+
+# Ollama local
+uv run mcp/mcp_cli.py --model-backend ollama --model huihui_ai/qwen3.5-abliterated:35b
+
+# vLLM OpenAI-compatible local
+uv run mcp/mcp_cli.py --model-backend vllm --vllm-base-url http://127.0.0.1:8000/v1 --model huihui-ai/Huihui-Qwen3.5-35B-A3B-abliterated
+```
+
+### Registry-driven toolkit loading
+
+Use `mcp/registry/toolkits.toml` to define toolkits and connect the selected set:
+
+```bash
+uv run mcp/mcp_cli.py \
+  --auto-toolkits \
+  --registry-path mcp/registry/toolkits.toml \
+  --attack-seed seeds/promptsteal.json \
+  --execution-mode simulated
+```
+
+### New simulation toolkit servers
+
+- `mcp/servers/shell_server.py`
+- `mcp/servers/archive_server.py`
+- `mcp/servers/exfil_server.py`
+- `mcp/servers/network_recon_server.py`
+
+Each server is simulation-first and supports bounded-real operation only when explicitly enabled.
+
+### Deployment on maple
+
+Maple setup docs and bootstrap scripts:
+
+- `mcp/deploy/bootstrap_mcp_env.sh`
+- `mcp/deploy/maple_abliterated_setup.md`
+
 **Start the filesystem server:**
 ```bash
 uv run mcp/servers/filesystem_server.py --transport sse --port 8001
@@ -155,6 +248,11 @@ uv run jupyter lab mcp_cli_walkthrough.ipynb
 **View session logs:**
 ```
 open data-logs/viewer.html
+```
+
+**View logs with self-contained v2 viewer:**
+```
+open data-logs/viewer-v2.html
 ```
 
 ---

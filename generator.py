@@ -24,6 +24,8 @@ import logging
 import sys
 
 from variations.vibe_extortion import VibeExtortionVariation
+from variations.promptsteal import PromptStealVariation
+from variations.hello_world import HelloWorldVariation
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +43,8 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
+    "hello_world": HelloWorldVariation,
+    "promptsteal": PromptStealVariation,
     "vibe_extortion": VibeExtortionVariation,
 }
 

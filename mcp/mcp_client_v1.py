@@ -64,6 +64,13 @@ except Exception:  # pragma: no cover - pydantic not installed
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp_config_loader import MCPServerConfig, load_mcp_configs
+from core.execution_policy import ExecutionPolicy, ToolExecutionContext
+from core.hooks import HookManager as ExternalHookManager
+from core.model_backends import ModelBackendRouter
+from core.tool_registry import MCPToolRecord, MCPToolRegistry, MCPToolTransport
+from registry.attack_profile_builder import AttackProfileBuilder
+from registry.toolkit_registry import ToolkitRegistry
+from registry.toolkit_router import AttackProfile, ToolkitRouter
 
 # SSE transport for HTTP-based MCP servers (like tool registries)
 try:
@@ -574,50 +581,6 @@ class RealtimeUI:
 
     def __exit__(self, *args):
         self.close()
-
-
-class HookManager:
-    """
-    Lightweight event hook dispatcher inspired by the richer hook framework found
-    in the Jina variants. Callbacks can be synchronous or asynchronous.
-    """
-
-    def __init__(self) -> None:
-        self._hooks: Dict[str, List[Tuple[int, Callable[..., Any]]]] = {}
-
-    def register(self, event: str, callback: Callable[..., Any], priority: int = 0) -> None:
-        if not event or not callable(callback):
-            raise ValueError("Hook registration requires a valid event name and callable.")
-        self._hooks.setdefault(event, []).append((priority, callback))
-        # Highest priority first
-        self._hooks[event].sort(key=lambda entry: entry[0], reverse=True)
-
-    def clear(self, event: Optional[str] = None) -> None:
-        if event is None:
-            self._hooks.clear()
-        else:
-            self._hooks.pop(event, None)
-
-    async def dispatch(self, event: str, **payload: Any) -> Any:
-        callbacks = self._hooks.get(event, [])
-        if not callbacks:
-            return None
-
-        results: List[Any] = []
-        for _, callback in callbacks:
-            try:
-                result = callback(**payload)
-                if inspect.isawaitable(result):
-                    result = await result  # type: ignore[assignment]
-                if result is not None:
-                    results.append(result)
-            except Exception as exc:  # pragma: no cover - hook failures should not crash client
-                logger.debug("Hook '%s' raised %s", event, exc, exc_info=True)
-        if not results:
-            return None
-        if len(results) == 1:
-            return results[0]
-        return results
 
 
 class ReasoningStrategy(Enum):
@@ -1310,6 +1273,10 @@ class MCPOpenRouterClientV1:
         *,
         model: str = "anthropic/claude-sonnet-4.5",
         base_url: str = "https://openrouter.ai/api/v1",
+        model_backend: str = "openrouter",
+        ollama_base_url: str = "http://127.0.0.1:11434",
+        vllm_base_url: str = "http://127.0.0.1:8000/v1",
+        vllm_api_key: str = "EMPTY",
         system_prompt: Optional[str] = None,
         capabilities: Optional[Iterable[str]] = None,
         allowed_tools: Optional[Iterable[str]] = None,
@@ -1336,9 +1303,15 @@ class MCPOpenRouterClientV1:
         tool_eviction_policy: str = "cost_aware",  # lru, lfu, cost_aware, learned
         enable_rl_tracking: bool = True,
         mcp_only: bool = False,
+        execution_mode: str = "simulated",
+        execution_root: Optional[str] = None,
+        allowed_egress_hosts: Optional[Iterable[str]] = None,
+        attack_seed_path: Optional[str] = None,
+        registry_path: Optional[str] = None,
     ) -> None:
         self.model = model
         self.base_url = base_url
+        self.model_backend_name = model_backend
         self.system_prompt = system_prompt.strip() if system_prompt else None
         self.capabilities: Set[str] = {cap.strip().lower() for cap in capabilities or [] if cap.strip()}
 
@@ -1375,10 +1348,26 @@ class MCPOpenRouterClientV1:
         self.native_tool_executors: Dict[str, Callable[[Dict[str, Any]], Awaitable[str]]] = {}
         self.native_tool_groups: Dict[str, List[str]] = {}
         self.mcp_sessions: Dict[str, ClientSession] = {}
-        self.mcp_tool_registry: Dict[str, Tuple[str, str]] = {}
+        self.mcp_tool_registry = MCPToolRegistry()
         self.mcp_tool_schemas: List[Dict[str, Any]] = []
         self.mcp_tools_by_server: Dict[str, List[str]] = {}
 
+        self.execution_policy = ExecutionPolicy.from_config(
+            mode=execution_mode,
+            root_dir=execution_root,
+            allowed_hostnames=allowed_egress_hosts,
+        )
+        self.attack_profile = AttackProfile()
+        self.toolkit_registry: Optional[ToolkitRegistry] = None
+        self.toolkit_router: Optional[ToolkitRouter] = None
+        self.attack_profile_builder = AttackProfileBuilder()
+        self.attack_seed_path: Optional[Path] = Path(attack_seed_path).expanduser() if attack_seed_path else None
+        default_registry = Path(registry_path).expanduser() if registry_path else (PROJECT_ROOT / "registry" / "toolkits.toml")
+        if default_registry.exists():
+            self.toolkit_registry = ToolkitRegistry.from_toml(default_registry)
+            self.toolkit_router = ToolkitRouter(self.toolkit_registry)
+        if self.attack_seed_path:
+            self._refresh_attack_profile(self.attack_seed_path)
         # Initialize Tool Context Manager or fallback to basic retriever
         self.tool_context: Optional[Any] = None
         self.tool_retriever: Optional[Any] = None
@@ -1435,7 +1424,7 @@ class MCPOpenRouterClientV1:
         self.enable_logging = True
         self.verbose_mode = True
 
-        self.hooks = HookManager()
+        self.hooks = ExternalHookManager()
         self.reasoning_threads: Dict[str, ReasoningThread] = {}
         self.active_thread_id: Optional[str] = None
         self.iteration_history: deque = deque(maxlen=50)
@@ -1446,11 +1435,15 @@ class MCPOpenRouterClientV1:
         if self.database_path:
             self._init_database()
 
-        self.openai = OpenAI(
-            api_key=os.getenv("OPENROUTER_API_KEY"),
-            base_url=base_url,
-            max_retries=3  # Add retry mechanism for resilience
+        self.model_backend_router = ModelBackendRouter(
+            backend=model_backend,
+            openrouter_base_url=base_url,
+            ollama_base_url=ollama_base_url,
+            vllm_base_url=vllm_base_url,
+            vllm_api_key=vllm_api_key,
         )
+        # Backward compatibility for legacy codepaths that reference self.openai.
+        self.openai = getattr(self.model_backend_router.get("openrouter"), "client", None)
 
         # Image handling configuration/state
         self._images_dir: Path = (Path.cwd() / "images").resolve()
@@ -1473,6 +1466,25 @@ class MCPOpenRouterClientV1:
         if self.capabilities:
             return capability_name.lower() in self.capabilities
         return True
+
+    def _refresh_attack_profile(self, seed_path: Path) -> None:
+        """Load and cache attack profile for toolkit routing."""
+        try:
+            self.attack_profile = self.attack_profile_builder.from_seed_file(seed_path)
+            self.attack_seed_path = seed_path
+            logger.info(
+                "Loaded attack profile: id=%s tactics=%s techniques=%s tags=%s",
+                self.attack_profile.attack_id,
+                sorted(self.attack_profile.tactics),
+                sorted(self.attack_profile.techniques),
+                sorted(self.attack_profile.attack_tags),
+            )
+        except Exception as exc:
+            logger.warning("Failed to load attack seed profile '%s': %s", seed_path, exc)
+
+    def set_attack_seed(self, seed_path: str) -> None:
+        """Public API for callers to update attack profile routing seed."""
+        self._refresh_attack_profile(Path(seed_path).expanduser())
 
     def _init_database(self) -> None:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2128,6 +2140,51 @@ class MCPOpenRouterClientV1:
 
         return connected
 
+    async def connect_registered_toolkits(
+        self,
+        *,
+        mode: Optional[str] = None,
+        attack_seed_path: Optional[str] = None,
+    ) -> List[str]:
+        """
+        Connect to toolkits selected by the registry/router.
+
+        This keeps onboarding config-driven: adding a new toolkit in registry TOML
+        is sufficient to expose it to the client.
+        """
+        if attack_seed_path:
+            self.set_attack_seed(attack_seed_path)
+        elif self.attack_seed_path and self.attack_profile.attack_id == "default":
+            # If caller passed seed in constructor but profile wasn't loaded yet, load now.
+            self._refresh_attack_profile(self.attack_seed_path)
+
+        if not self.toolkit_registry:
+            return []
+        runtime_mode = mode or self.execution_policy.mode.value
+        selected = (
+            self.toolkit_router.select(self.attack_profile, mode=runtime_mode)
+            if self.toolkit_router
+            else self.toolkit_registry.all()
+        )
+        logger.info(
+            "Toolkit routing selected %d toolkit(s) for attack=%s mode=%s",
+            len(selected),
+            self.attack_profile.attack_id,
+            runtime_mode,
+        )
+        connected: List[str] = []
+        for toolkit in selected:
+            if toolkit.transport in {"sse", "streamable-http"} and toolkit.endpoint:
+                try:
+                    if toolkit.transport == "sse":
+                        await self.connect_to_http_server(toolkit.endpoint, server_name=toolkit.toolkit_id)
+                    else:
+                        await self.connect_to_streamable_http_server(toolkit.endpoint, server_name=toolkit.toolkit_id)
+                    connected.append(toolkit.toolkit_id)
+                except Exception as exc:
+                    logger.warning("Failed to connect toolkit '%s': %s", toolkit.toolkit_id, exc)
+        return connected
+
     async def _register_http_mcp_tools(self, mcp_url: str, server_name: str) -> None:
         """
         Register tools from an HTTP JSON-RPC MCP server.
@@ -2188,8 +2245,16 @@ class MCPOpenRouterClientV1:
                 }
 
                 sanitized_name = formatted["function"]["name"]
-                # Store mapping: sanitized_name -> (server_name, remote_name, mcp_url)
-                self.mcp_tool_registry[sanitized_name] = (server_name, remote_name, mcp_url)
+                # Store typed mapping for HTTP-RPC execution.
+                self.mcp_tool_registry.set(
+                    MCPToolRecord(
+                        local_name=sanitized_name,
+                        server_name=server_name,
+                        remote_name=remote_name,
+                        transport=MCPToolTransport.HTTP_RPC,
+                        endpoint=mcp_url,
+                    )
+                )
                 self.mcp_tool_schemas.append(formatted)
                 registered_names.append(sanitized_name)
 
@@ -2282,7 +2347,14 @@ class MCPOpenRouterClientV1:
                 continue
             sanitized_name = self._format_mcp_tool_name(server_name, remote_name)
             formatted["function"]["name"] = sanitized_name
-            self.mcp_tool_registry[sanitized_name] = (server_name, remote_name)
+            self.mcp_tool_registry.set(
+                MCPToolRecord(
+                    local_name=sanitized_name,
+                    server_name=server_name,
+                    remote_name=remote_name,
+                    transport=MCPToolTransport.SESSION,
+                )
+            )
             self.mcp_tool_schemas.append(formatted)
             registered_names.append(sanitized_name)
 
@@ -2316,7 +2388,7 @@ class MCPOpenRouterClientV1:
             if function_name not in names_to_remove:
                 surviving.append(schema)
             else:
-                self.mcp_tool_registry.pop(function_name, None)
+                self.mcp_tool_registry.pop(function_name)
         self.mcp_tool_schemas = surviving
 
     def _format_mcp_tool_name(self, server_name: str, tool_name: str) -> str:
@@ -2325,7 +2397,7 @@ class MCPOpenRouterClientV1:
         base = re.sub(r"_+", "_", base).strip("_") or "mcp_tool"
         candidate = base
         counter = 1
-        taken = set(self.native_tool_executors.keys()) | set(self.mcp_tool_registry.keys())
+        taken = set(self.native_tool_executors.keys()) | set(self.mcp_tool_registry.names())
         while candidate in taken:
             counter += 1
             candidate = f"{base}_{counter}"
@@ -2823,6 +2895,25 @@ class MCPOpenRouterClientV1:
         except json.JSONDecodeError:
             arguments = {"__raw_arguments": raw_arguments}
 
+        target_url = None
+        if isinstance(arguments, dict):
+            maybe_url = arguments.get("url") or arguments.get("target_url")
+            if isinstance(maybe_url, str):
+                target_url = maybe_url
+        working_directory = None
+        if isinstance(arguments, dict):
+            maybe_wd = arguments.get("working_directory")
+            if isinstance(maybe_wd, str):
+                working_directory = maybe_wd
+        self.execution_policy.validate(
+            ToolExecutionContext(
+                tool_name=tool_name,
+                arguments=arguments,
+                working_directory=working_directory,
+                target_url=target_url,
+            )
+        )
+
         start = time.perf_counter()
         try:
             if tool_name in {tool["function"]["name"] for tool in self._get_builtin_tools()}:
@@ -2840,20 +2931,21 @@ class MCPOpenRouterClientV1:
 
                 return {"tool_call_id": tool_call_id, "name": tool_name, "content": result, "success": True}
 
-            if tool_name in self.mcp_tool_registry:
-                registry_entry = self.mcp_tool_registry[tool_name]
-                # Handle both 2-tuple (SSE session) and 3-tuple (HTTP direct) formats
-                if len(registry_entry) == 3:
-                    # HTTP-based MCP tool (registered via _register_http_mcp_tools)
-                    server_name, remote_tool_name, mcp_url = registry_entry
-                    content = await self._execute_http_mcp_tool(mcp_url, remote_tool_name, arguments)
+            mcp_record = self.mcp_tool_registry.get(tool_name)
+            if mcp_record:
+                if mcp_record.transport == MCPToolTransport.HTTP_RPC:
+                    if not mcp_record.endpoint:
+                        raise RuntimeError(f"MCP tool '{tool_name}' is missing HTTP endpoint.")
+                    content = await self._execute_http_mcp_tool(
+                        mcp_record.endpoint,
+                        mcp_record.remote_name,
+                        arguments,
+                    )
                 else:
-                    # SSE session-based tool
-                    server_name, remote_tool_name = registry_entry
-                    session = self.mcp_sessions.get(server_name)
+                    session = self.mcp_sessions.get(mcp_record.server_name)
                     if not session:
-                        raise RuntimeError(f"MCP server '{server_name}' is not connected.")
-                    response = await session.call_tool(remote_tool_name, arguments)
+                        raise RuntimeError(f"MCP server '{mcp_record.server_name}' is not connected.")
+                    response = await session.call_tool(mcp_record.remote_name, arguments)
                     raw_content = response.content if hasattr(response, "content") else response
                     content = _json_dumps(raw_content)
                 latency = time.perf_counter() - start
@@ -2932,35 +3024,18 @@ class MCPOpenRouterClientV1:
         parallel_tool_calls: bool = True,
         provider_preferences: Optional[Dict[str, Any]] = None
     ) -> Any:
-        params = {
-            "model": self.model,
-            "messages": messages,
-            "tools": tools or None,
-            "temperature": temperature if temperature is not None else self.temperature,
-            "max_tokens": self.max_tokens,
-            "tool_choice": "auto" if tools and self.multi_turn_enabled else None,
-            "stream": stream,
-        }
-
-        # Enable parallel tool calls for faster multi-turn
-        if tools and parallel_tool_calls:
-            params["parallel_tool_calls"] = True
-
-        # Add stream_options to get usage data with streaming
-        if stream:
-            params["stream_options"] = {"include_usage": True}
-
-        # Add middle-out transform if enabled and needed
-        if use_transform and self.enable_middle_out:
-            params.setdefault("extra_body", {})["transforms"] = ["middle-out"]
-            logger.info("Using middle-out transform for context compression")
-
-        # Advanced provider routing (OpenRouter feature)
-        if provider_preferences:
-            params["provider"] = provider_preferences
-
-        # Use realtime dynamics - no timeouts
-        return await asyncio.to_thread(self.openai.chat.completions.create, **params)
+        return await self.model_backend_router.active_backend.create_completion(
+            model=self.model,
+            messages=messages,
+            tools=tools or None,
+            temperature=temperature if temperature is not None else self.temperature,
+            max_tokens=self.max_tokens,
+            tool_choice="auto" if tools and self.multi_turn_enabled else None,
+            stream=stream,
+            parallel_tool_calls=parallel_tool_calls,
+            provider_preferences=provider_preferences,
+            use_transform=use_transform and self.enable_middle_out,
+        )
 
     async def _call_openrouter_streaming(
         self,
@@ -2973,6 +3048,23 @@ class MCPOpenRouterClientV1:
         provider_preferences: Optional[Dict[str, Any]] = None
     ) -> Any:
         """Call OpenRouter with streaming and real-time UI updates."""
+        active_backend = self.model_backend_router.active_backend
+        if self.model_backend_router.active_name == "ollama":
+            if ui:
+                ui.update_iteration(0, status="model", detail="ollama backend does not stream in this client; using non-stream call")
+            return await self._call_openrouter(
+                messages,
+                tools=tools,
+                temperature=temperature,
+                use_transform=use_transform,
+                stream=False,
+                parallel_tool_calls=parallel_tool_calls,
+                provider_preferences=provider_preferences,
+            )
+
+        chat_client = getattr(active_backend, "client", None)
+        if chat_client is None:
+            raise RuntimeError(f"Backend '{self.model_backend_router.active_name}' does not expose streaming chat client.")
 
         def sync_stream_processor():
             """Process stream synchronously in a thread."""
@@ -2998,7 +3090,7 @@ class MCPOpenRouterClientV1:
             if provider_preferences:
                 params["provider"] = provider_preferences
 
-            stream = self.openai.chat.completions.create(**params)
+            stream = chat_client.chat.completions.create(**params)
 
             # Immediately notify UI that streaming started
             if ui:
@@ -3143,6 +3235,28 @@ class MCPOpenRouterClientV1:
 
     async def _get_relevant_tools_for_query(self, query: str) -> List[Dict[str, Any]]:
         """Get tools relevant to the current query using semantic retrieval."""
+        if self.toolkit_router:
+            mode = self.execution_policy.mode.value
+            selected = self.toolkit_router.select(self.attack_profile, mode=mode)
+            if selected:
+                allowed_prefixes = {
+                    toolkit.tool_prefix
+                    for toolkit in selected
+                    if toolkit.tool_prefix
+                }
+                filtered = []
+                for schema in self.mcp_tool_schemas:
+                    name = schema.get("function", {}).get("name", "")
+                    if not allowed_prefixes:
+                        filtered.append(schema)
+                        continue
+                    if any(name.startswith(prefix) for prefix in allowed_prefixes):
+                        filtered.append(schema)
+                if filtered:
+                    # Respect attack-aware router first, then builtin fallback.
+                    filtered.extend(self._get_builtin_tools())
+                    return filtered
+
         if not self.enable_tool_retrieval:
             # Return all tools if retrieval is disabled
             tools = list(self.mcp_tool_schemas)
@@ -3477,6 +3591,10 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--workspace", default=os.getcwd(), help="Workspace directory for filesystem MCP server.")
     parser.add_argument("--model", default="anthropic/claude-haiku-4.5", help="Model identifier for OpenRouter.")
     parser.add_argument("--base-url", default="https://openrouter.ai/api/v1", help="OpenRouter-compatible base URL.")
+    parser.add_argument("--model-backend", choices=["openrouter", "ollama", "vllm"], default="openrouter")
+    parser.add_argument("--ollama-base-url", default="http://127.0.0.1:11434")
+    parser.add_argument("--vllm-base-url", default="http://127.0.0.1:8000/v1")
+    parser.add_argument("--vllm-api-key", default="EMPTY")
     parser.add_argument("--system-prompt", help="Inline system prompt.")
     parser.add_argument("--system-prompt-file", help="Path to a file containing the system prompt.")
     parser.add_argument("--capabilities", nargs="*", help="Capabilities to advertise (e.g., delegation routing mutation).")
@@ -3524,6 +3642,12 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
                        help="Connect directly to all distributed MCP servers (Search, Research, Publish, Memory).")
     parser.add_argument("--http-mcp", action="append", metavar="URL",
                        help="Connect to an HTTP/SSE MCP server (can be specified multiple times).")
+    parser.add_argument("--auto-toolkits", action="store_true", help="Connect toolkit set from registry profile.")
+    parser.add_argument("--attack-seed", default=None, help="Seed JSON path for attack-aware toolkit routing.")
+    parser.add_argument("--registry-path", default=None, help="Toolkit registry TOML path.")
+    parser.add_argument("--execution-mode", choices=["simulated", "bounded_real"], default="simulated")
+    parser.add_argument("--execution-root", default=None, help="Root directory for bounded-real mode.")
+    parser.add_argument("--allow-egress-host", action="append", default=[], help="Allowlisted outbound host.")
     return parser.parse_args(argv)
 
 
@@ -3680,7 +3804,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
     _load_env_file()
     args = _parse_args(argv)
 
-    if not os.getenv("OPENROUTER_API_KEY"):
+    if args.model_backend == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
         print("Error: OPENROUTER_API_KEY is not set. Please configure it via environment or .env file.")
         return
 
@@ -3694,6 +3818,10 @@ async def main(argv: Optional[List[str]] = None) -> None:
     client = MCPOpenRouterClientV1(
         model=args.model,
         base_url=args.base_url,
+        model_backend=args.model_backend,
+        ollama_base_url=args.ollama_base_url,
+        vllm_base_url=args.vllm_base_url,
+        vllm_api_key=args.vllm_api_key,
         system_prompt=system_prompt,
         capabilities=args.capabilities,
         allowed_tools=args.allow_tools,
@@ -3711,6 +3839,11 @@ async def main(argv: Optional[List[str]] = None) -> None:
         tool_load_strategy=args.tool_load_strategy,
         tool_eviction_policy=args.tool_eviction_policy,
         enable_rl_tracking=args.enable_rl_tracking,
+        execution_mode=args.execution_mode,
+        execution_root=args.execution_root,
+        allowed_egress_hosts=args.allow_egress_host,
+        attack_seed_path=args.attack_seed,
+        registry_path=args.registry_path,
     )
 
     # Default: connect only to tools.distributed.systems (the unified tool registry)
@@ -3732,14 +3865,19 @@ async def main(argv: Optional[List[str]] = None) -> None:
             return
 
     async with client:
-        # Primary: connect to tools.distributed.systems MCP via SSE
-        try:
-            await client.connect_to_http_server(registry_url, server_name="tool_registry")
-            logger.info("Connected to tool registry at %s", registry_url)
-            print(f"Connected to tool registry: {registry_url}")
-        except Exception as exc:
-            logger.error("Failed to connect to tool registry at %s: %s", registry_url, exc)
-            print(f"Warning: failed to connect to tool registry ({exc}). Continuing without registry tools.")
+        if args.auto_toolkits:
+            connected_toolkits = await client.connect_registered_toolkits(attack_seed_path=args.attack_seed)
+            logger.info("Connected to %d toolkit(s) from registry", len(connected_toolkits))
+            print(f"Connected toolkit(s): {connected_toolkits}")
+        else:
+            # Primary: connect to tools.distributed.systems MCP via SSE
+            try:
+                await client.connect_to_http_server(registry_url, server_name="tool_registry")
+                logger.info("Connected to tool registry at %s", registry_url)
+                print(f"Connected to tool registry: {registry_url}")
+            except Exception as exc:
+                logger.error("Failed to connect to tool registry at %s: %s", registry_url, exc)
+                print(f"Warning: failed to connect to tool registry ({exc}). Continuing without registry tools.")
 
         # Optional: load local MCP servers if explicitly requested
         if loaded_mcp_servers:

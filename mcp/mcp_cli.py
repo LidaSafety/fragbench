@@ -31,7 +31,18 @@ LOG_DIR = Path("logs")
 class ConversationLogger:
     """Writes structured JSONL logs capturing the full conversation flow."""
 
-    def __init__(self, log_dir: Path, model: str, server: str):
+    def __init__(
+        self,
+        log_dir: Path,
+        model: str,
+        server: str,
+        *,
+        run_id: Optional[str] = None,
+        campaign: Optional[str] = None,
+        attack_id: Optional[str] = None,
+        backend: Optional[str] = None,
+        toolkit_set: Optional[List[str]] = None,
+    ):
         log_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.path = log_dir / f"session_{ts}.jsonl"
@@ -44,10 +55,17 @@ class ConversationLogger:
         self._current_iteration: int = 0
         self._tool_calls_this_iter: int = 0
         self._tool_results_this_iter: int = 0
+        self.toolkit_set: List[str] = list(toolkit_set or [])
 
         self._emit("session_start", {
+            "schema_version": "2.0",
             "model": model,
             "server": server,
+            "backend": backend or "openrouter",
+            "run_id": run_id,
+            "campaign": campaign,
+            "attack_id": attack_id,
+            "toolkit_set": self.toolkit_set,
             "pid": os.getpid(),
         })
 
@@ -192,14 +210,23 @@ class ConversationLogger:
             "total_events": self.seq,
         })
 
+    def update_toolkits(self, toolkits: List[str]) -> None:
+        self.toolkit_set = list(toolkits)
+        self._emit("toolkits_connected", {"toolkit_set": self.toolkit_set})
+
 
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MCP CLI - filesystem server on 8001")
     p.add_argument("--model", default="anthropic/claude-haiku-4.5")
     p.add_argument("--base-url", default="https://openrouter.ai/api/v1")
+    p.add_argument("--model-backend", choices=["openrouter", "ollama", "vllm"], default="openrouter")
+    p.add_argument("--ollama-base-url", default="http://127.0.0.1:11434")
+    p.add_argument("--vllm-base-url", default="http://127.0.0.1:8000/v1")
+    p.add_argument("--vllm-api-key", default="EMPTY")
     p.add_argument("--server-url", default=SERVER_URL)
     p.add_argument("--server-name", default=SERVER_NAME)
     p.add_argument("--transport", choices=["sse", "streamable-http"], default="sse")
+    p.add_argument("--auto-toolkits", action="store_true", help="Connect toolkits selected from registry profile.")
     p.add_argument("--max-iterations", type=int, default=6)
     p.add_argument("--temperature", type=float, default=0.6)
     p.add_argument("--max-tokens", type=int, default=4000)
@@ -207,6 +234,14 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--non-interactive", action="store_true")
     p.add_argument("--log-dir", default="logs", help="Directory for session JSONL logs.")
     p.add_argument("--no-log", action="store_true", help="Disable conversation logging.")
+    p.add_argument("--run-id", default=None)
+    p.add_argument("--campaign", default=None)
+    p.add_argument("--attack-id", default=None)
+    p.add_argument("--execution-mode", choices=["simulated", "bounded_real"], default="simulated")
+    p.add_argument("--execution-root", default=None)
+    p.add_argument("--allow-egress-host", action="append", default=[])
+    p.add_argument("--attack-seed", default=None, help="Path to a seed JSON for attack-aware toolkit routing.")
+    p.add_argument("--registry-path", default=None, help="Path to toolkit registry TOML.")
     return p.parse_args(argv)
 
 
@@ -214,13 +249,17 @@ async def main(argv: Optional[List[str]] = None) -> None:
     _load_env_file()
     args = _parse_args(argv)
 
-    if not os.getenv("OPENROUTER_API_KEY"):
+    if args.model_backend == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
         print("Error: OPENROUTER_API_KEY not set.")
         return
 
     client = MCPOpenRouterClientV1(
         model=args.model,
         base_url=args.base_url,
+        model_backend=args.model_backend,
+        ollama_base_url=args.ollama_base_url,
+        vllm_base_url=args.vllm_base_url,
+        vllm_api_key=args.vllm_api_key,
         default_max_iterations=args.max_iterations,
         temperature=args.temperature,
         max_tokens=args.max_tokens,
@@ -231,31 +270,50 @@ async def main(argv: Optional[List[str]] = None) -> None:
         enable_tool_context_manager=False,
         enable_rl_tracking=False,
         mcp_only=True,
+        execution_mode=args.execution_mode,
+        execution_root=args.execution_root,
+        allowed_egress_hosts=args.allow_egress_host,
+        attack_seed_path=args.attack_seed,
+        registry_path=args.registry_path,
     )
 
+    connected_toolkits: List[str] = []
     conv_logger: Optional[ConversationLogger] = None
     if not args.no_log:
         conv_logger = ConversationLogger(
             log_dir=Path(args.log_dir),
             model=args.model,
             server=args.server_name,
+            run_id=args.run_id,
+            campaign=args.campaign,
+            attack_id=args.attack_id,
+            backend=args.model_backend,
+            toolkit_set=connected_toolkits,
         )
         conv_logger.register(client)
         print(f"Logging to {conv_logger.path}")
 
     async with client:
         try:
-            if args.transport == "sse":
-                await client.connect_to_http_server(
-                    args.server_url,
-                    server_name=args.server_name,
+            if args.auto_toolkits:
+                connected_toolkits.extend(
+                    await client.connect_registered_toolkits(attack_seed_path=args.attack_seed)
                 )
+                print(f"Connected toolkit set: {connected_toolkits if connected_toolkits else '[none]'}")
+                if conv_logger:
+                    conv_logger.update_toolkits(connected_toolkits)
             else:
-                await client.connect_to_streamable_http_server(
-                    args.server_url,
-                    server_name=args.server_name,
-                )
-            print(f"Connected: {args.server_name} -> {args.server_url} ({args.transport})")
+                if args.transport == "sse":
+                    await client.connect_to_http_server(
+                        args.server_url,
+                        server_name=args.server_name,
+                    )
+                else:
+                    await client.connect_to_streamable_http_server(
+                        args.server_url,
+                        server_name=args.server_name,
+                    )
+                print(f"Connected: {args.server_name} -> {args.server_url} ({args.transport})")
         except Exception as exc:
             print(f"Failed to connect to {args.server_url}: {exc}")
             return
