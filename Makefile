@@ -41,7 +41,7 @@ NETWORK_URL := http://127.0.0.1:8014/mcp
 .PHONY: help stack-up stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run chain-run clean-runtime
 
 help:
-	@echo "Targets:"
+	@echo "Targets (bare-metal):"
 	@echo "  make stack-up       - Start all MCP toolkit servers"
 	@echo "  make stack-down     - Stop all MCP toolkit servers"
 	@echo "  make stack-status   - Show server process status"
@@ -54,7 +54,15 @@ help:
 	@echo "  make chain-run      - Run ALL stages of ATTACK_SEED sequentially with shared run-id"
 	@echo "  make clean-runtime  - Remove pid/log runtime artifacts"
 	@echo ""
-	@echo "Config overrides:"
+	@echo "Targets (Docker-isolated):"
+	@echo "  make docker-up         - Start MCP servers + viewer in containers"
+	@echo "  make docker-down       - Stop all containers"
+	@echo "  make docker-status     - Show container status"
+	@echo "  make docker-cli        - Interactive MCP CLI inside container"
+	@echo "  make docker-attack-run - Single-stage attack in container"
+	@echo "  make docker-chain-run  - Full kill-chain in container (all stages)"
+	@echo ""
+	@echo "Config overrides (both bare-metal and Docker):"
 	@echo "  MODEL_BACKEND=$(MODEL_BACKEND) MODEL=$(MODEL) EXEC_MODE=$(EXEC_MODE)"
 	@echo "  OLLAMA_BASE_URL=$(OLLAMA_BASE_URL) VLLM_BASE_URL=$(VLLM_BASE_URL)"
 	@echo "  ATTACK_SEED=$(ATTACK_SEED) ATTACK_VARIATION_SEED=$(ATTACK_VARIATION_SEED) ATTACK_STAGE=$(ATTACK_STAGE)"
@@ -257,3 +265,104 @@ chain-run: stack-ready
 
 clean-runtime:
 	@rm -rf "$(PID_DIR)"
+
+# =========================================================================
+# Docker-isolated equivalents
+# =========================================================================
+#
+# These targets run inside Docker containers with full network isolation.
+# Prerequisite: docker compose up -d  (starts MCP servers + viewer)
+#
+# Config overrides work the same way:
+#   make docker-chain-run ATTACK_SEED=seeds/promptsteal.json MODEL_BACKEND=ollama ATTACK_VARIATION_SEED=99
+# =========================================================================
+
+DOCKER_COMPOSE ?= docker compose
+DOCKER_REGISTRY_PATH ?= mcp/registry/toolkits.toml
+DOCKER_OLLAMA_URL ?= http://host.docker.internal:11434
+DOCKER_VLLM_URL ?= http://host.docker.internal:8000/v1
+
+.PHONY: docker-up docker-down docker-status docker-cli docker-attack-run docker-chain-run
+
+docker-up:
+	@$(DOCKER_COMPOSE) up -d
+	@echo "MCP servers + viewer running. Viewer: http://localhost:8787"
+
+docker-down:
+	@$(DOCKER_COMPOSE) down
+
+docker-status:
+	@$(DOCKER_COMPOSE) ps
+
+define DOCKER_CLIENT_CMD
+$(DOCKER_COMPOSE) run --rm \
+	-e OPENROUTER_API_KEY \
+	-e OPENAI_API_KEY \
+	-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
+	-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
+	mcp-client \
+		--model-backend "$(MODEL_BACKEND)" \
+		--model "$(MODEL)" \
+		--auto-toolkits \
+		--registry-path "$(DOCKER_REGISTRY_PATH)" \
+		--attack-seed "$(ATTACK_SEED)" \
+		--execution-mode "$(EXEC_MODE)" \
+		--log-dir "$(LOG_DIR)"
+endef
+
+docker-cli: docker-up
+	$(DOCKER_CLIENT_CMD)
+
+docker-attack-run: docker-up
+	@PROMPT="$$( $(PY) -c 'import json; from pathlib import Path; from generator import VARIATION_REGISTRY; seed_file=Path("$(ATTACK_SEED)"); data=json.loads(seed_file.read_text()); key=str(data.get("metadata",{}).get("id","")).lower(); cls=VARIATION_REGISTRY.get(key); assert cls is not None, f"No variation registered for {key}"; gen=cls(str(seed_file)); detailed=gen.make_variation_detailed(seed=int("$(ATTACK_VARIATION_SEED)")); idx=max(0,min(int("$(ATTACK_STAGE)"), len(detailed)-1)); print(detailed[idx]["prompt"])' )"; \
+	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )}"; \
+	echo "Seed: $(ATTACK_SEED) | variation-seed: $(ATTACK_VARIATION_SEED) | stage: $(ATTACK_STAGE)"; \
+	echo "Prompt: $$PROMPT"; \
+	$(DOCKER_COMPOSE) run --rm \
+		-e OPENROUTER_API_KEY \
+		-e OPENAI_API_KEY \
+		-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
+		-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
+		mcp-client \
+			--model-backend "$(MODEL_BACKEND)" \
+			--model "$(MODEL)" \
+			--auto-toolkits \
+			--registry-path "$(DOCKER_REGISTRY_PATH)" \
+			--attack-seed "$(ATTACK_SEED)" \
+			--execution-mode "$(EXEC_MODE)" \
+			--log-dir "$(LOG_DIR)" \
+			$${RUN_ID:+--run-id "$(RUN_ID)"} \
+			--campaign "$$ATTACK_ID" \
+			--attack-id "$$ATTACK_ID" \
+			--prompt "$$PROMPT"
+
+docker-chain-run: docker-up
+	@RUN_ID="chain_$$(date +%Y%m%d_%H%M%S)"; \
+	ATTACK_ID="$$( $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )"; \
+	NUM_STAGES="$$( $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(len(data.get("attack_stages",[])))' )"; \
+	echo ""; \
+	echo "╔══════════════════════════════════════════════════════════════╗"; \
+	echo "║  DOCKER CHAIN RUN: $$ATTACK_ID"; \
+	echo "║  Stages: $$NUM_STAGES | Variation seed: $(ATTACK_VARIATION_SEED) | Run ID: $$RUN_ID"; \
+	echo "╚══════════════════════════════════════════════════════════════╝"; \
+	echo ""; \
+	for STAGE in $$(seq 0 $$((NUM_STAGES - 1))); do \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "  Stage $$STAGE / $$((NUM_STAGES - 1))"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		$(MAKE) --no-print-directory docker-attack-run \
+			ATTACK_SEED="$(ATTACK_SEED)" \
+			ATTACK_VARIATION_SEED="$(ATTACK_VARIATION_SEED)" \
+			ATTACK_STAGE="$$STAGE" \
+			MODEL_BACKEND="$(MODEL_BACKEND)" \
+			MODEL="$(MODEL)" \
+			RUN_ID="$$RUN_ID" \
+			ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
+			LOG_DIR="$(LOG_DIR)"; \
+		echo ""; \
+	done; \
+	echo "╔══════════════════════════════════════════════════════════════╗"; \
+	echo "║  CHAIN COMPLETE: $$ATTACK_ID | $$NUM_STAGES stages"; \
+	echo "║  Run ID: $$RUN_ID"; \
+	echo "║  View: http://127.0.0.1:8787 → Load Latest or select run"; \
+	echo "╚══════════════════════════════════════════════════════════════╝"

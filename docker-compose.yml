@@ -1,0 +1,202 @@
+################################################################################
+# FragBench — Isolated MCP + Attack Runtime
+#
+# Usage:
+#   docker compose up -d                         # start servers + viewer
+#   docker compose --profile client up -d        # also start client (bg)
+#   docker compose run mcp-client <args...>      # one-shot attack run
+#
+# Backends:
+#   OPENROUTER (default):
+#     OPENROUTER_API_KEY=sk-... docker compose run --rm mcp-client \
+#       --auto-toolkits --attack-seed seeds/promptsteal.json
+#
+#   OLLAMA (local):
+#     OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+#     docker compose run --rm mcp-client \
+#       --model-backend ollama --model llama3:8b \
+#       --auto-toolkits --attack-seed seeds/promptsteal.json
+#
+#   vLLM (local):
+#     VLLM_BASE_URL=http://host.docker.internal:8000/v1 \
+#     docker compose run --rm mcp-client \
+#       --model-backend vllm --model <model-name> \
+#       --auto-toolkits --attack-seed seeds/promptsteal.json
+#
+# Network topology:
+#   mcp-internal   — all MCP servers + client; no internet access
+#   egress-limited — exfil-server + client; controlled outbound
+#   viewer-net     — frontend viewer exposed to host
+################################################################################
+
+x-common: &common
+  build:
+    context: .
+    target: mcp-server
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=64M
+  security_opt:
+    - no-new-privileges:true
+  deploy:
+    resources:
+      limits:
+        memory: 512M
+        cpus: "1.0"
+
+services:
+  # ---------- MCP Servers (all listen on 0.0.0.0 inside containers) ----------
+
+  filesystem-server:
+    <<: *common
+    container_name: fragbench-filesystem
+    command:
+      - mcp/servers/filesystem_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8001
+    volumes:
+      - workspace:/workspace
+      - logs:/app/logs
+    networks:
+      - mcp-internal
+
+  shell-server:
+    <<: *common
+    container_name: fragbench-shell
+    command:
+      - mcp/servers/shell_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8011
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+
+  archive-server:
+    <<: *common
+    container_name: fragbench-archive
+    command:
+      - mcp/servers/archive_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8012
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+
+  exfil-server:
+    <<: *common
+    container_name: fragbench-exfil
+    command:
+      - mcp/servers/exfil_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8013
+    volumes:
+      - workspace:/workspace:ro
+    networks:
+      - mcp-internal
+      - egress-limited
+
+  network-recon-server:
+    <<: *common
+    container_name: fragbench-network
+    command:
+      - mcp/servers/network_recon_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8014
+    networks:
+      - mcp-internal
+
+  # ---------- MCP Client ----------
+  # All mcp_cli.py flags are passed as command args after the image entrypoint.
+  # Environment variables supply secrets and backend URLs so they stay out of
+  # the command line.
+
+  mcp-client:
+    build:
+      context: .
+      target: mcp-client
+    container_name: fragbench-client
+    stdin_open: true
+    tty: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+      - /app/mcp/images:size=32M
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # LLM backend credentials — set on host or in .env
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Override base URLs for local model servers (ollama / vllm)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
+    volumes:
+      - logs:/app/logs
+      - logs:/app/mcp/logs
+      - workspace:/workspace
+      - ./mcp/registry/toolkits.docker.toml:/app/mcp/registry/toolkits.toml:ro
+    networks:
+      - mcp-internal
+      - egress-limited
+    depends_on:
+      - filesystem-server
+      - shell-server
+      - archive-server
+      - exfil-server
+      - network-recon-server
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+    profiles:
+      - client
+
+  # ---------- Frontend Viewer (host-accessible) ----------
+
+  viewer:
+    build:
+      context: .
+      target: viewer
+    container_name: fragbench-viewer
+    command:
+      - --host=0.0.0.0
+      - --port=8787
+    ports:
+      - "${VIEWER_PORT:-8787}:8787"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32M
+    volumes:
+      - logs:/app/logs:ro
+      - ./seeds:/app/seeds:ro
+      - ./attacks:/app/attacks:ro
+    networks:
+      - viewer-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+volumes:
+  workspace:
+    driver: local
+  logs:
+    driver: local
+
+networks:
+  mcp-internal:
+    internal: true
+  egress-limited:
+    driver: bridge
+  viewer-net:
+    driver: bridge
