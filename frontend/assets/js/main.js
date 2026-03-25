@@ -4,6 +4,7 @@ import { normalizeFromUpload } from "./ingest/upload.js";
 import { setActiveView, renderAll } from "./router.js";
 import { store } from "./state/store.js";
 import { byId, escapeHtml, toggleClass } from "./utils/dom.js";
+import { formatDuration } from "./utils/format.js";
 
 function updateRunSummary(data) {
   const run = data?.run || {};
@@ -12,6 +13,7 @@ function updateRunSummary(data) {
     <div><strong>Model:</strong> ${escapeHtml(run.model || "n/a")}</div>
     <div><strong>Events:</strong> ${run.events || 0}</div>
     <div><strong>KCC:</strong> ${(run.kcc ?? 0).toFixed(2)}</div>
+    <div><strong>Duration:</strong> ${formatDuration(run.total_duration_ms)}</div>
     <div><strong>Status:</strong> ${run.alerts ? "ALERT" : "Monitoring"}</div>
   `;
 }

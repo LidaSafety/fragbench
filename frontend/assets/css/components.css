@@ -51,6 +51,14 @@
   color: var(--amber);
 }
 
+.badge-duration {
+  background: var(--green-dim);
+  border-color: rgba(0, 229, 155, 0.35);
+  color: var(--green);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
 .risk-low  { color: var(--green); }
 .risk-med  { color: var(--amber); }
 .risk-high { color: var(--red); }

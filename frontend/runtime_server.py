@@ -242,6 +242,25 @@ def _attack_index(attacks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return idx
 
 
+def _parse_ts(value: Any) -> str | None:
+    """Return an ISO timestamp string if *value* is non-empty, else None."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _ms_between(start_iso: str | None, end_iso: str | None) -> int | None:
+    """Return milliseconds between two ISO timestamps, or None."""
+    if not start_iso or not end_iso:
+        return None
+    try:
+        t0 = datetime.fromisoformat(start_iso)
+        t1 = datetime.fromisoformat(end_iso)
+        return max(0, int((t1 - t0).total_seconds() * 1000))
+    except (ValueError, TypeError):
+        return None
+
+
 def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Group runtime logs into query-level records.
@@ -269,6 +288,8 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "tool_results_structured": [],
             "query_complete": None,
             "events": [],
+            "ts_start": None,
+            "ts_end": None,
         }
 
     def ensure_iteration(q: dict[str, Any], iteration: int) -> dict[str, Any]:
@@ -288,6 +309,8 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "prompt": str(event.get("query") or ""),
                 "iterations": {},
                 "iteration_order": [],
+                "ts_start": _parse_ts(event.get("ts")),
+                "ts_end": None,
             }
             latest_iter = 0
             continue
@@ -301,6 +324,8 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         except (TypeError, ValueError):
             iteration = None
 
+        event_ts = _parse_ts(event.get("ts"))
+
         if kind == "iteration_start":
             if iteration is None:
                 latest_iter += 1
@@ -308,6 +333,8 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             latest_iter = max(latest_iter, iteration)
             turn = ensure_iteration(current_query, iteration)
             turn["events"].append(event)
+            if event_ts and not turn["ts_start"]:
+                turn["ts_start"] = event_ts
             continue
 
         if iteration is None:
@@ -315,6 +342,11 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         latest_iter = max(latest_iter, iteration)
         turn = ensure_iteration(current_query, iteration)
         turn["events"].append(event)
+        if event_ts:
+            if not turn["ts_start"]:
+                turn["ts_start"] = event_ts
+            turn["ts_end"] = event_ts
+            current_query["ts_end"] = event_ts
 
         if kind == "assistant_response":
             preview = str(event.get("content_preview") or "")
@@ -386,6 +418,8 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         merged = _new_iteration(order[0], q.get("prompt", ""))
         merged["iteration"] = order[0]
         merged["iterations_detail"] = []
+        merged["ts_start"] = q.get("ts_start")
+        merged["ts_end"] = q.get("ts_end")
 
         for it in order:
             turn = q["iterations"][it]
@@ -408,6 +442,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 if not turn.get("thinking_full"):
                     turn["thinking_full"] = str(fb.get("thinking_full") or "")
 
+            iter_duration_ms = _ms_between(turn.get("ts_start"), turn.get("ts_end"))
             merged["iterations_detail"].append(
                 {
                     "iteration": it,
@@ -417,6 +452,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "tool_calls": list(turn["tool_calls"]),
                     "tool_call_details": list(turn["tool_call_details"]),
                     "tool_results_structured": list(turn["tool_results_structured"]),
+                    "duration_ms": iter_duration_ms,
                 }
             )
 
@@ -572,6 +608,7 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
         iterations_detail = [
             x for x in query.get("iterations_detail", []) if isinstance(x, dict)
         ]
+        step_duration_ms = _ms_between(query.get("ts_start"), query.get("ts_end"))
         traces.append(
             {
                 "step": idx,
@@ -603,6 +640,9 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
                     for v in stage_meta.get("variations", [])
                     if isinstance(v, dict) and str(v.get("prompt") or "").strip()
                 ],
+                "started_at": query.get("ts_start"),
+                "ended_at": query.get("ts_end"),
+                "duration_ms": step_duration_ms,
             }
         )
 
@@ -639,6 +679,12 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
     latest_kcc = traces[-1]["kcc"] if traces else 0.0
     latest_alert = bool(traces[-1]["alert"]) if traces else False
 
+    all_ts = [_parse_ts(e.get("ts")) for e in events]
+    all_ts = [t for t in all_ts if t]
+    run_started = min(all_ts) if all_ts else None
+    run_ended = max(all_ts) if all_ts else None
+    total_duration_ms = _ms_between(run_started, run_ended)
+
     return {
         "run": {
             "session_file": bundle.source.get("session_file"),
@@ -649,6 +695,9 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
             "events": len(events),
             "alerts": latest_alert,
             "kcc": latest_kcc,
+            "started_at": run_started,
+            "ended_at": run_ended,
+            "total_duration_ms": total_duration_ms,
         },
         "campaigns": [campaign],
         "fragments": fragment_rows,

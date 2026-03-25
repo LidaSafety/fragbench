@@ -1,5 +1,5 @@
 import { escapeHtml } from "../utils/dom.js";
-import { riskClass, percent } from "../utils/format.js";
+import { riskClass, percent, formatDuration } from "../utils/format.js";
 
 function parseJsonMaybe(value) {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -95,11 +95,12 @@ function renderIteration(iter, iterIdx, totalIters) {
     toolsHtml = `<div class="muted-line">(no tool calls)</div>`;
   }
 
+  const iterDuration = iter.duration_ms != null ? ` \u00b7 ${formatDuration(iter.duration_ms)}` : "";
   return `
     <details class="iter-section" ${isOpen ? "open" : ""}>
       <summary class="iter-header">
         <span>Iteration ${iter.iteration}</span>
-        <span class="iter-meta">${calls.length} tool call${calls.length !== 1 ? "s" : ""}${thinking ? " \u00b7 thinking" : ""}</span>
+        <span class="iter-meta">${calls.length} tool call${calls.length !== 1 ? "s" : ""}${thinking ? " \u00b7 thinking" : ""}${iterDuration}</span>
       </summary>
       <div class="iter-body">
         <div class="iter-columns">
@@ -144,6 +145,7 @@ function renderFragbenchParse(trace) {
       <div class="frag-line"><strong>Iterations:</strong> ${trace.total_iterations || 1}</div>
       <div class="frag-line"><strong>Tool calls:</strong> ${trace.total_tool_calls || (trace.tool_calls || []).length}</div>
       <div class="frag-line"><strong>Status:</strong> ${trace.alert ? "ALERT" : "MONITORING"}</div>
+      ${trace.duration_ms != null ? `<div class="frag-line"><strong>Duration:</strong> ${formatDuration(trace.duration_ms)}</div>` : ""}
     </div>`;
 }
 
@@ -169,12 +171,14 @@ export function renderTraces(container, data) {
         ? iters.map((it, i) => renderIteration(it, i, iters.length)).join("")
         : renderFallbackColumns(t);
 
+      const stepDuration = t.duration_ms != null ? formatDuration(t.duration_ms) : null;
       return `
       <div class="turn-card">
         <div class="turn-header">
           <div class="turn-header-left">
             <span class="turn-label">TURN ${t.step}</span>
             <span class="badge badge-tactic">${escapeHtml(t.tactic)}</span>
+            ${stepDuration ? `<span class="badge badge-duration">${stepDuration}</span>` : ""}
             <span class="turn-prompt-preview mono">${escapeHtml(truncate(t.prompt, 90))}</span>
           </div>
           <span class="turn-kcc">KCC ${t.kcc.toFixed(2)}</span>
@@ -194,7 +198,7 @@ export function renderTraces(container, data) {
             </div>
           </div>
           <div class="turn-iterations-header">
-            <span>Agent Loop &mdash; ${hasIters ? iters.length : 1} iteration${(hasIters ? iters.length : 1) !== 1 ? "s" : ""}, ${t.total_tool_calls || (t.tool_calls || []).length} tool calls</span>
+            <span>Agent Loop &mdash; ${hasIters ? iters.length : 1} iteration${(hasIters ? iters.length : 1) !== 1 ? "s" : ""}, ${t.total_tool_calls || (t.tool_calls || []).length} tool calls${t.duration_ms != null ? ` \u00b7 ${formatDuration(t.duration_ms)}` : ""}</span>
           </div>
           <div class="turn-iterations">
             ${iterationsHtml}
