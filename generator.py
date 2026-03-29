@@ -213,8 +213,9 @@ def generate_toml(
     Build a TOML attack-spec string compatible with harness.load_attack().
 
     *metadata* should be the 'metadata' dict from the seed JSON file.
-    *fragments_list* is a list of legitimized-fragment lists, one per variation.
-    Each inner list becomes one [[fragments]] block with style='generated'.
+    *fragments_list* is a list of fragment-variation lists, one per fragment.
+    Each inner list becomes one [[fragments]] block, and each string inside that
+    inner list becomes one [[fragments.variations]] entry.
     """
     campaign_id = f"{metadata['id']}_{seed}"
     technique   = metadata.get("technique", "T0000")

@@ -171,6 +171,30 @@ def print_result_row(style: str, verdict: str, justification: str = "") -> None:
     print(f"  {color}{verdict:8s}{reset}  {style}{just}")
 
 
+def _shape_generated_fragments(
+    var: list[tuple[str, str]],
+    *,
+    fragment: bool,
+    legitimize: bool,
+    api_key: str | None,
+    make_fragments_fn,
+    legitimize_fragment_fn,
+) -> list[list[str]]:
+    """
+    Convert one generated variation into TOML-ready fragment blocks.
+
+    Output shape is always: one outer item per fragment, one inner item per
+    generated variation of that fragment. Today we emit a single generated
+    variation per fragment.
+    """
+    steps = [step for step, _ in var]
+    if fragment:
+        steps = make_fragments_fn(var, api_key=api_key)
+    if legitimize:
+        steps = [legitimize_fragment_fn(step, api_key=api_key) for step in steps]
+    return [[step] for step in steps]
+
+
 def run_campaign(spec, runner, args) -> dict:
     from detector import JudgeResult, keyword_classify, killchain_score, llm_judge
 
@@ -319,7 +343,7 @@ def run_generate(args) -> None:
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
 
-    final_frag_list: list[list[str]] = []
+    final_frag_list: list[list[list[str]]] = []
     for i in range(args.num_variations):
         seed = base_seed + i
         var = gen.make_variation(seed)  # list[tuple[str, str]]
@@ -330,12 +354,16 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        steps = [step for step, _ in var]
-        if args.fragment:
-            steps = make_fragments(var, api_key=api_key)
-        if args.legitimize:
-            steps = [legitimize_fragment(s, api_key=api_key) for s in steps]
-        final_frag_list.append(steps)
+        final_frag_list.append(
+            _shape_generated_fragments(
+                var,
+                fragment=args.fragment,
+                legitimize=args.legitimize,
+                api_key=api_key,
+                make_fragments_fn=make_fragments,
+                legitimize_fragment_fn=legitimize_fragment,
+            )
+        )
 
     if args.dry_run:
         return
@@ -346,7 +374,7 @@ def run_generate(args) -> None:
     written: list[Path] = []
     for i, frags in enumerate(final_frag_list):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], [frags], seed)
+        toml_text = generate_toml(seed_data["metadata"], frags, seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)
