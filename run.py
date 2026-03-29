@@ -173,26 +173,54 @@ def print_result_row(style: str, verdict: str, justification: str = "") -> None:
 
 def _shape_generated_fragments(
     var: list[tuple[str, str]],
+    stage_descriptions: list[str],
     *,
     fragment: bool,
     legitimize: bool,
     api_key: str | None,
-    make_fragments_fn,
+    make_fragment_groups_fn,
     legitimize_fragment_fn,
-) -> list[list[str]]:
+) -> list:
     """
-    Convert one generated variation into TOML-ready fragment blocks.
+    Convert one generated variation into TOML-ready fragment blocks while
+    preserving the original stage boundary and human-meaningful descriptions.
+    """
+    from generator import GeneratedFragment
 
-    Output shape is always: one outer item per fragment, one inner item per
-    generated variation of that fragment. Today we emit a single generated
-    variation per fragment.
-    """
-    steps = [step for step, _ in var]
+    if len(stage_descriptions) != len(var):
+        raise ValueError("stage_descriptions must have the same length as var")
+
     if fragment:
-        steps = make_fragments_fn(var, api_key=api_key)
-    if legitimize:
-        steps = [legitimize_fragment_fn(step, api_key=api_key) for step in steps]
-    return [[step] for step in steps]
+        fragment_groups = make_fragment_groups_fn(var, api_key=api_key)
+    else:
+        fragment_groups = [[step] for step, _ in var]
+
+    if len(fragment_groups) != len(var):
+        raise ValueError("fragment_groups must preserve one outer group per input stage")
+
+    shaped: list[GeneratedFragment] = []
+    for idx, (group, description) in enumerate(zip(fragment_groups, stage_descriptions)):
+        if not group:
+            continue
+        base_description = description or f"Stage {idx}"
+        total_parts = len(group)
+        for part_idx, frag_text in enumerate(group, start=1):
+            if legitimize:
+                frag_text = legitimize_fragment_fn(frag_text, api_key=api_key)
+
+            if total_parts == 1:
+                fragment_description = base_description
+            else:
+                fragment_description = f"{base_description} (fragment {part_idx}/{total_parts})"
+
+            shaped.append(
+                GeneratedFragment(
+                    description=fragment_description,
+                    variations=[frag_text],
+                )
+            )
+
+    return shaped
 
 
 def run_campaign(spec, runner, args) -> dict:
@@ -317,7 +345,12 @@ def run_generate(args) -> None:
     import json as _json
     import random as _random
 
-    from generator import VARIATION_REGISTRY, generate_toml, legitimize_fragment, make_fragments
+    from generator import (
+        VARIATION_REGISTRY,
+        generate_toml,
+        legitimize_fragment,
+        make_fragment_groups,
+    )
 
     if not args.seed_file:
         print("ERROR: --seed-file <path> is required with --generate", file=sys.stderr)
@@ -343,7 +376,12 @@ def run_generate(args) -> None:
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
 
-    final_frag_list: list[list[list[str]]] = []
+    stage_descriptions = [
+        stage.get("description", f"Stage {idx}")
+        for idx, stage in enumerate(seed_data.get("attack_stages", []))
+    ]
+
+    final_frag_list: list[list] = []
     for i in range(args.num_variations):
         seed = base_seed + i
         var = gen.make_variation(seed)  # list[tuple[str, str]]
@@ -357,10 +395,11 @@ def run_generate(args) -> None:
         final_frag_list.append(
             _shape_generated_fragments(
                 var,
+                stage_descriptions,
                 fragment=args.fragment,
                 legitimize=args.legitimize,
                 api_key=api_key,
-                make_fragments_fn=make_fragments,
+                make_fragment_groups_fn=make_fragment_groups,
                 legitimize_fragment_fn=legitimize_fragment,
             )
         )
