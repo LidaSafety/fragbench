@@ -1,5 +1,5 @@
 """
-CLI entry point for fragbench.
+CLI entry point for fragguard-chain.
 
 Examples:
     # Run all campaigns against Qwen (keyword classifier)
@@ -109,7 +109,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--output",
         default=None,
-        help="Write JSON results to this file path (default: output/<timestamp>_<model>.json)",
+        help="Write JSON results to this file path",
     )
     p.add_argument(
         "--dry-run",

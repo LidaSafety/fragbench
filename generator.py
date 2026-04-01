@@ -5,7 +5,6 @@ Pipeline:
     seeds/<campaign>.json
         -> VariationClass(seed_file).make_variation(seed)   [deterministic, no LLM]
         -> make_fragments(var, ...)                          [LLM: split into sub-fragments]
-        -> stylize_fragment(frag, ...)                      [LLM: rephrase into 10 styles]
         -> legitimize_fragment(frag, ...)                   [LLM: add cover story]
         -> generate_toml(metadata, fragments, seed)         [write for evaluation harness]
 
@@ -42,8 +41,8 @@ from variations.promptsteal import PromptStealVariation
 from variations.quietvault import QuietVaultVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.dprk_fraud import DPRKFraudVariation
+from variations.promptsteal import PromptStealVariation
 from variations.vibe_extortion import VibeExtortionVariation
-from variations.wormgpt_kawaiigpt import WormGptKawaiiGptVariation
 
 log = logging.getLogger(__name__)
 
@@ -162,7 +161,6 @@ def _fix_json_escapes(text: str) -> str:
     all backslash sequences to single backslashes, then re-escaping them.
     This only operates inside JSON string values (between quotes).
     """
-
     def _fix_string(m: re.Match) -> str:
         s = m.group(0)
         # Collapse any run of backslashes to the chars they represent,
@@ -200,7 +198,6 @@ def make_fragment_groups(
 
     try:
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning steps unchanged")
@@ -438,7 +435,6 @@ def legitimize_fragment(
 
     try:
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning fragment unchanged")
@@ -473,7 +469,6 @@ def legitimize_fragment(
 # TOML serialization
 # ---------------------------------------------------------------------------
 
-
 def _toml_str(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
@@ -496,10 +491,10 @@ def generate_toml(
     inside that fragment becomes one [[fragments.variations]] entry.
     """
     campaign_id = f"{metadata['id']}_{seed}"
-    technique = metadata.get("technique", "T0000")
-    tech_name = metadata.get("technique_name", "Generated")
+    technique   = metadata.get("technique", "T0000")
+    tech_name   = metadata.get("technique_name", "Generated")
     description = metadata.get("description", "Auto-generated attack scenario.")
-    tags = metadata.get("tags", ["generated"])
+    tags        = metadata.get("tags", ["generated"])
 
     lines: list[str] = [
         "[metadata]",
@@ -548,5 +543,27 @@ def generate_toml(
                 f"prompt = {_toml_str(frag_text)}",
                 "",
             ]
+            for sv in frag.variations:
+                lines += [
+                    "[[fragments.variations]]",
+                    f'style = "{sv.style}"',
+                    f"prompt = {_toml_str(sv.prompt)}",
+                    "",
+                ]
+        else:
+            # Legacy: list[str]
+            lines += [
+                "[[fragments]]",
+                f"index = {frag_idx}",
+                f'description = "Generated fragment {frag_idx} (seed={seed})"',
+                "",
+            ]
+            for frag_text in frag:
+                lines += [
+                    "[[fragments.variations]]",
+                    'style = "generated"',
+                    f"prompt = {_toml_str(frag_text)}",
+                    "",
+                ]
 
     return "\n".join(lines)
