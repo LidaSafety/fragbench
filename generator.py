@@ -25,6 +25,7 @@ import logging
 import sys
 from dataclasses import dataclass, field
 
+from variations.promptsteal import PromptStealVariation
 from variations.vibe_extortion import VibeExtortionVariation
 
 log = logging.getLogger(__name__)
@@ -79,13 +80,11 @@ class StyledFragmentGroup:
 #   2. Add a matching seed JSON to seeds/<name>.json
 #   3. Register it here: VARIATION_REGISTRY["<name>"] = YourVariationClass
 #
-# Example (once feat/promptsteal-variation merges):
-#   from variations.promptsteal import PromptStealVariation
-#   VARIATION_REGISTRY["promptsteal"] = PromptStealVariation
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
     "vibe_extortion": VibeExtortionVariation,
+    "promptsteal": PromptStealVariation,
 }
 
 
