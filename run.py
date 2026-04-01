@@ -24,6 +24,10 @@ Examples:
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
+
+    # Generate with LLM style variations (auto-generates all 10 styles per fragment)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize --styles direct,sysadmin,ctf
 """
 
 from __future__ import annotations
@@ -135,6 +139,17 @@ def parse_args() -> argparse.Namespace:
         "--legitimize",
         action="store_true",
         help="Apply LLM legitimization (reframe steps with cover stories)",
+    )
+    p.add_argument(
+        "--stylize",
+        action="store_true",
+        help="Apply LLM style variations (rephrase each fragment into 10 styles)",
+    )
+    p.add_argument(
+        "--styles",
+        default=None,
+        help="Comma-separated list of styles to generate (default: all 10). "
+             "E.g. --styles direct,sysadmin,ctf",
     )
 
     return p.parse_args()
@@ -289,11 +304,18 @@ def run_campaign(spec, runner, args) -> dict:
 
 
 def run_generate(args) -> None:
-    """Dataset generation pipeline: seed file → vary → [fragment] → [legitimize] → TOML."""
+    """Dataset generation pipeline: seed file → vary → [fragment] → [stylize] → [legitimize] → TOML."""
     import json as _json
     import random as _random
 
-    from generator import VARIATION_REGISTRY, generate_toml, legitimize_fragment, make_fragments
+    from generator import (
+        STYLES,
+        VARIATION_REGISTRY,
+        generate_toml,
+        legitimize_fragment,
+        make_fragments,
+        stylize_fragment_group,
+    )
 
     if not args.seed_file:
         print("ERROR: --seed-file <path> is required with --generate", file=sys.stderr)
@@ -316,10 +338,23 @@ def run_generate(args) -> None:
     api_key = args.claude_key if not args.dry_run else None
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
 
+    # Parse style filter
+    styles = None
+    if args.styles:
+        styles = [s.strip() for s in args.styles.split(",")]
+        invalid = [s for s in styles if s not in STYLES]
+        if invalid:
+            print(f"ERROR: unknown styles: {', '.join(invalid)}. Available: {', '.join(STYLES)}",
+                  file=sys.stderr)
+            sys.exit(1)
+
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
+    if args.stylize:
+        used_styles = styles or STYLES
+        print(f"  Styles: {', '.join(used_styles)}")
 
-    final_frag_list: list[list[str]] = []
+    final_frag_list: list = []
     for i in range(args.num_variations):
         seed = base_seed + i
         var = gen.make_variation(seed)  # list[tuple[str, str]]
@@ -330,12 +365,30 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        steps = [step for step, _ in var]
-        if args.fragment:
-            steps = make_fragments(var, api_key=api_key)
-        if args.legitimize:
-            steps = [legitimize_fragment(s, api_key=api_key) for s in steps]
-        final_frag_list.append(steps)
+        # Step 1: Fragment (split each step into sub-steps)
+        groups = make_fragments(var, api_key=api_key)
+
+        if args.stylize:
+            # Step 2: Stylize (rephrase each sub-fragment into 10 styles)
+            styled_fragments = []
+            for group in groups:
+                styled_fragments.extend(
+                    stylize_fragment_group(group, styles=styles, api_key=api_key)
+                )
+            if args.legitimize:
+                # Legitimize each styled prompt in-place
+                for sfg in styled_fragments:
+                    for sv in sfg.variations:
+                        sv.prompt = legitimize_fragment(sv.prompt, api_key=api_key)
+            final_frag_list.append(styled_fragments)
+        else:
+            # Legacy path: flat list of strings
+            steps = []
+            for group in groups:
+                steps.extend(group.sub_fragments)
+            if args.legitimize:
+                steps = [legitimize_fragment(s, api_key=api_key) for s in steps]
+            final_frag_list.append(steps)
 
     if args.dry_run:
         return
@@ -346,7 +399,7 @@ def run_generate(args) -> None:
     written: list[Path] = []
     for i, frags in enumerate(final_frag_list):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], [frags], seed)
+        toml_text = generate_toml(seed_data["metadata"], frags, seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)
