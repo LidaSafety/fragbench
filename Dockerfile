@@ -13,15 +13,18 @@ RUN pip install --no-cache-dir -e '.[all]' 2>/dev/null || pip install --no-cache
     uvicorn \
     starlette
 
-COPY mcp/ ./mcp/
+COPY fragbench_mcp/ ./fragbench_mcp/
 COPY seeds/ ./seeds/
 COPY attacks/ ./attacks/
 COPY frontend/ ./frontend/
 COPY generator.py ./
+COPY run.py ./
+COPY harness.py ./
+COPY detector.py ./
 COPY variations/ ./variations/
 
-RUN mkdir -p /workspace /logs /app/logs /app/mcp/logs /app/mcp/images && \
-    chown -R fragbench:fragbench /workspace /logs /app/logs /app/mcp/logs /app/mcp/images
+RUN mkdir -p /workspace /logs /app/logs /app/fragbench_mcp/logs /app/fragbench_mcp/images && \
+    chown -R fragbench:fragbench /workspace /logs /app/logs /app/fragbench_mcp/logs /app/fragbench_mcp/images
 
 # ---------- MCP server target ----------
 FROM base AS mcp-server
@@ -32,7 +35,7 @@ ENTRYPOINT ["python"]
 # ---------- MCP client target ----------
 FROM base AS mcp-client
 USER fragbench
-ENTRYPOINT ["python", "mcp/mcp_cli.py"]
+ENTRYPOINT ["python", "fragbench_mcp/mcp_cli.py"]
 
 # ---------- Frontend viewer ----------
 FROM base AS viewer

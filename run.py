@@ -137,6 +137,24 @@ def parse_args() -> argparse.Namespace:
         help="Apply LLM legitimization (reframe steps with cover stories)",
     )
 
+    # Generation LLM selection (used only with --generate + --fragment/--legitimize)
+    p.add_argument(
+        "--gen-backend",
+        choices=["ollama", "anthropic"],
+        default=os.environ.get("GEN_BACKEND", "ollama"),
+        help="Backend for dataset generation LLM (default: ollama)",
+    )
+    p.add_argument(
+        "--gen-model",
+        default=os.environ.get("GEN_MODEL", "huihui_ai/qwen3.5-abliterated:35b"),
+        help="Model name for generation backend (default: huihui_ai/qwen3.5-abliterated:35b)",
+    )
+    p.add_argument(
+        "--gen-base-url",
+        default=os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434"),
+        help="Base URL for OpenAI-compatible generation backend (default: $OLLAMA_BASE_URL or host Ollama)",
+    )
+
     return p.parse_args()
 
 
@@ -313,13 +331,13 @@ def run_generate(args) -> None:
         sys.exit(1)
 
     gen = VARIATION_REGISTRY[campaign_id](args.seed_file)
-    api_key = args.claude_key if not args.dry_run else None
+    api_key = args.claude_key if (not args.dry_run and args.gen_backend == "anthropic") else None
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
 
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
 
-    final_frag_list: list[list[str]] = []
+    # Note: each generated TOML will have one [[fragments]] block per original step.
     for i in range(args.num_variations):
         seed = base_seed + i
         var = gen.make_variation(seed)  # list[tuple[str, str]]
@@ -330,12 +348,38 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        steps = [step for step, _ in var]
-        if args.fragment:
-            steps = make_fragments(var, api_key=api_key)
-        if args.legitimize:
-            steps = [legitimize_fragment(s, api_key=api_key) for s in steps]
-        final_frag_list.append(steps)
+        # Build TOML stages as one [[fragments]] block per original step.
+        # - Without --fragment: each stage has 1 variation prompt (the original step).
+        # - With --fragment: each stage has 2 variation prompts (split sub-steps).
+        fragments_list: list[list[str]] = []
+        for step, tactic in var:
+            stage_prompts: list[str]
+            if args.fragment:
+                stage_prompts = make_fragments(
+                    [(step, tactic)],
+                    backend=args.gen_backend,
+                    api_key=api_key,
+                    model=args.gen_model,
+                    base_url=args.gen_base_url,
+                )
+            else:
+                stage_prompts = [step]
+
+            if args.legitimize:
+                stage_prompts = [
+                    legitimize_fragment(
+                        s,
+                        backend=args.gen_backend,
+                        api_key=api_key,
+                        model=args.gen_model,
+                        base_url=args.gen_base_url,
+                    )
+                    for s in stage_prompts
+                ]
+
+            fragments_list.append(stage_prompts)
+
+        # No need to store prompts; we write TOML immediately below.
 
     if args.dry_run:
         return
@@ -344,9 +388,38 @@ def run_generate(args) -> None:
     attacks_dir.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
-    for i, frags in enumerate(final_frag_list):
+    for i in range(args.num_variations):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], [frags], seed)
+        # Recompute staged fragment lists deterministically to preserve stage structure
+        # (one [[fragments]] per original step).
+        var = gen.make_variation(seed)
+        staged: list[list[str]] = []
+        for step, tactic in var:
+            stage_prompts: list[str]
+            if args.fragment:
+                stage_prompts = make_fragments(
+                    [(step, tactic)],
+                    backend=args.gen_backend,
+                    api_key=api_key,
+                    model=args.gen_model,
+                    base_url=args.gen_base_url,
+                )
+            else:
+                stage_prompts = [step]
+            if args.legitimize:
+                stage_prompts = [
+                    legitimize_fragment(
+                        s,
+                        backend=args.gen_backend,
+                        api_key=api_key,
+                        model=args.gen_model,
+                        base_url=args.gen_base_url,
+                    )
+                    for s in stage_prompts
+                ]
+            staged.append(stage_prompts)
+
+        toml_text = generate_toml(seed_data["metadata"], staged, seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)

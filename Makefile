@@ -4,13 +4,14 @@ UV ?= uv run
 PY ?= python3
 
 MODEL_BACKEND ?= openrouter
-OLLAMA_BASE_URL ?= http://127.0.0.1:11434
+# Host Ollama (reachable from Docker via host.docker.internal on Mac/Windows Desktop)
+OLLAMA_BASE_URL ?= http://host.docker.internal:11434
 VLLM_BASE_URL ?= http://127.0.0.1:8000/v1
 VLLM_API_KEY ?= EMPTY
 ATTACK_SEED ?= seeds/hello_world.json
 ATTACK_VARIATION_SEED ?= 42
 ATTACK_STAGE ?= 0
-REGISTRY_PATH ?= mcp/registry/toolkits.toml
+REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.toml
 EXEC_MODE ?= simulated
 LOG_DIR ?= logs
 
@@ -62,11 +63,29 @@ help:
 	@echo "  make docker-attack-run - Single-stage attack in container"
 	@echo "  make docker-chain-run  - Full kill-chain in container (all stages)"
 	@echo ""
+	@echo "Targets (Docker dataset pipeline - TOML generation + eval):"
+	@echo "  make docker-dataset-up                  - Reminder: host Ollama at host.docker.internal:11434"
+	@echo "  make docker-dataset-down                - Stop dataset profile containers"
+	@echo "  make docker-dataset-validate-seed       - Validate ATTACK_SEED + VARIATION_REGISTRY wiring"
+	@echo "  make docker-dataset-generate            - Generate TOMLs (no rewriting)"
+	@echo "  make docker-dataset-generate-fragment   - Generate TOMLs with --fragment (via Ollama)"
+	@echo "  make docker-dataset-generate-legitimize - Generate TOMLs with --legitimize (via Ollama)"
+	@echo "  make docker-dataset-generate-frag-legit - Generate TOMLs with --fragment --legitimize (via Ollama)"
+	@echo "  make docker-attacks-list                - List generated TOMLs"
+	@echo "  make docker-attacks-show                - Print one TOML (ATTACK_TOML=...)"
+	@echo "  make docker-dataset-eval-qwen           - Evaluate attacks/*.toml using Qwen"
+	@echo "  make docker-dataset-eval-claude         - Evaluate attacks/*.toml using Claude"
+	@echo "  make docker-dataset-eval-judge          - Evaluate using Qwen/Claude + LLM judge"
+	@echo ""
 	@echo "Config overrides (both bare-metal and Docker):"
 	@echo "  MODEL_BACKEND=$(MODEL_BACKEND) MODEL=$(MODEL) EXEC_MODE=$(EXEC_MODE)"
 	@echo "  OLLAMA_BASE_URL=$(OLLAMA_BASE_URL) VLLM_BASE_URL=$(VLLM_BASE_URL)"
 	@echo "  ATTACK_SEED=$(ATTACK_SEED) ATTACK_VARIATION_SEED=$(ATTACK_VARIATION_SEED) ATTACK_STAGE=$(ATTACK_STAGE)"
 	@echo "  REGISTRY_PATH=$(REGISTRY_PATH)"
+	@echo ""
+	@echo "Dataset config (Docker TOML pipeline):"
+	@echo "  DATASET_N=$(DATASET_N) DATASET_BASE_SEED=$(DATASET_BASE_SEED) ATTACKS_DIR=$(ATTACKS_DIR)"
+	@echo "  GEN_BACKEND=$(GEN_BACKEND) GEN_MODEL=$(GEN_MODEL) GEN_BASE_URL=$(GEN_BASE_URL)"
 
 $(PID_DIR):
 	@mkdir -p "$(PID_DIR)" "$(SERVER_LOG_DIR)"
@@ -85,11 +104,11 @@ define START_IF_NEEDED
 endef
 
 stack-up: $(PID_DIR)
-	$(call START_IF_NEEDED,$(FS_URL),filesystem,mcp/servers/filesystem_server.py --transport sse --port 8001,$(SERVER_LOG_DIR)/filesystem.log,$(FS_PID))
-	$(call START_IF_NEEDED,$(SHELL_URL),shell,mcp/servers/shell_server.py --transport sse --port 8011,$(SERVER_LOG_DIR)/shell.log,$(SHELL_PID))
-	$(call START_IF_NEEDED,$(ARCHIVE_URL),archive,mcp/servers/archive_server.py --transport sse --port 8012,$(SERVER_LOG_DIR)/archive.log,$(ARCHIVE_PID))
-	$(call START_IF_NEEDED,$(EXFIL_URL),exfil,mcp/servers/exfil_server.py --transport sse --port 8013,$(SERVER_LOG_DIR)/exfil.log,$(EXFIL_PID))
-	$(call START_IF_NEEDED,$(NETWORK_URL),network,mcp/servers/network_recon_server.py --transport sse --port 8014,$(SERVER_LOG_DIR)/network.log,$(NETWORK_PID))
+	$(call START_IF_NEEDED,$(FS_URL),filesystem,fragbench_mcp/servers/filesystem_server.py --transport sse --port 8001,$(SERVER_LOG_DIR)/filesystem.log,$(FS_PID))
+	$(call START_IF_NEEDED,$(SHELL_URL),shell,fragbench_mcp/servers/shell_server.py --transport sse --port 8011,$(SERVER_LOG_DIR)/shell.log,$(SHELL_PID))
+	$(call START_IF_NEEDED,$(ARCHIVE_URL),archive,fragbench_mcp/servers/archive_server.py --transport sse --port 8012,$(SERVER_LOG_DIR)/archive.log,$(ARCHIVE_PID))
+	$(call START_IF_NEEDED,$(EXFIL_URL),exfil,fragbench_mcp/servers/exfil_server.py --transport sse --port 8013,$(SERVER_LOG_DIR)/exfil.log,$(EXFIL_PID))
+	$(call START_IF_NEEDED,$(NETWORK_URL),network,fragbench_mcp/servers/network_recon_server.py --transport sse --port 8014,$(SERVER_LOG_DIR)/network.log,$(NETWORK_PID))
 	@sleep 2
 	@$(MAKE) stack-status
 
@@ -180,7 +199,7 @@ maple-ready: stack-ready maple-check
 	@echo "Maple stack is ready for attack runs."
 
 cli:
-	@$(UV) $(PY) mcp/mcp_cli.py \
+	@$(UV) $(PY) fragbench_mcp/mcp_cli.py \
 		--model-backend "$(MODEL_BACKEND)" \
 		--model "$(MODEL)" \
 		--ollama-base-url "$(OLLAMA_BASE_URL)" \
@@ -195,7 +214,7 @@ cli:
 hello-run:
 	@PROMPT="$$( $(UV) $(PY) -c 'from variations.hello_world import HelloWorldVariation; p,_=HelloWorldVariation("seeds/hello_world.json").make_variation(seed=42)[0]; print(p)' )"; \
 	echo "Prompt: $$PROMPT"; \
-	$(UV) $(PY) mcp/mcp_cli.py \
+	$(UV) $(PY) fragbench_mcp/mcp_cli.py \
 		--model-backend "$(MODEL_BACKEND)" \
 		--model "$(MODEL)" \
 		--ollama-base-url "$(OLLAMA_BASE_URL)" \
@@ -216,7 +235,7 @@ attack-run: stack-ready
 	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(UV) $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )}"; \
 	echo "Seed: $(ATTACK_SEED) | variation-seed: $(ATTACK_VARIATION_SEED) | stage: $(ATTACK_STAGE)"; \
 	echo "Prompt: $$PROMPT"; \
-	$(UV) $(PY) mcp/mcp_cli.py \
+	$(UV) $(PY) fragbench_mcp/mcp_cli.py \
 		--model-backend "$(MODEL_BACKEND)" \
 		--model "$(MODEL)" \
 		--ollama-base-url "$(OLLAMA_BASE_URL)" \
@@ -278,7 +297,7 @@ clean-runtime:
 # =========================================================================
 
 DOCKER_COMPOSE ?= docker compose
-DOCKER_REGISTRY_PATH ?= mcp/registry/toolkits.toml
+DOCKER_REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.toml
 DOCKER_OLLAMA_URL ?= http://host.docker.internal:11434
 DOCKER_VLLM_URL ?= http://host.docker.internal:8000/v1
 
@@ -295,6 +314,10 @@ docker-status:
 	@$(DOCKER_COMPOSE) ps
 
 define DOCKER_CLIENT_CMD
+EFFECTIVE_MODEL="$(MODEL)"; \
+if [ "$(MODEL_BACKEND)" = "ollama" ]; then \
+  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
+fi; \
 $(DOCKER_COMPOSE) run --rm \
 	-e OPENROUTER_API_KEY \
 	-e OPENAI_API_KEY \
@@ -302,7 +325,7 @@ $(DOCKER_COMPOSE) run --rm \
 	-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
 	mcp-client \
 		--model-backend "$(MODEL_BACKEND)" \
-		--model "$(MODEL)" \
+		--model "$$EFFECTIVE_MODEL" \
 		--auto-toolkits \
 		--registry-path "$(DOCKER_REGISTRY_PATH)" \
 		--attack-seed "$(ATTACK_SEED)" \
@@ -316,6 +339,10 @@ docker-cli: docker-up
 docker-attack-run: docker-up
 	@PROMPT="$$( $(PY) -c 'import json; from pathlib import Path; from generator import VARIATION_REGISTRY; seed_file=Path("$(ATTACK_SEED)"); data=json.loads(seed_file.read_text()); key=str(data.get("metadata",{}).get("id","")).lower(); cls=VARIATION_REGISTRY.get(key); assert cls is not None, f"No variation registered for {key}"; gen=cls(str(seed_file)); detailed=gen.make_variation_detailed(seed=int("$(ATTACK_VARIATION_SEED)")); idx=max(0,min(int("$(ATTACK_STAGE)"), len(detailed)-1)); print(detailed[idx]["prompt"])' )"; \
 	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )}"; \
+	EFFECTIVE_MODEL="$(MODEL)"; \
+	if [ "$(MODEL_BACKEND)" = "ollama" ]; then \
+	  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
+	fi; \
 	echo "Seed: $(ATTACK_SEED) | variation-seed: $(ATTACK_VARIATION_SEED) | stage: $(ATTACK_STAGE)"; \
 	echo "Prompt: $$PROMPT"; \
 	$(DOCKER_COMPOSE) run --rm \
@@ -325,7 +352,7 @@ docker-attack-run: docker-up
 		-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
 		mcp-client \
 			--model-backend "$(MODEL_BACKEND)" \
-			--model "$(MODEL)" \
+			--model "$$EFFECTIVE_MODEL" \
 			--auto-toolkits \
 			--registry-path "$(DOCKER_REGISTRY_PATH)" \
 			--attack-seed "$(ATTACK_SEED)" \
@@ -366,3 +393,202 @@ docker-chain-run: docker-up
 	echo "║  Run ID: $$RUN_ID"; \
 	echo "║  View: http://127.0.0.1:8787 → Load Latest or select run"; \
 	echo "╚══════════════════════════════════════════════════════════════╝"
+
+# -------------------------------------------------------------------------
+# Docker: Run TOML prompts as MCP stages (Option B)
+# -------------------------------------------------------------------------
+#
+# Treat each TOML variation prompt as a stage prompt and run `mcp-client` once
+# per prompt. This is *not* the same as evaluating TOMLs via `run.py`; it uses
+# the MCP toolkits/agent loop.
+#
+# Required:
+#   - MCP servers up (`make docker-up`)
+#   - TOMLs present under ATTACKS_DIR (default attacks/)
+#
+
+TOML_GLOB ?= $(ATTACKS_DIR)/generated_*.toml
+
+.PHONY: docker-toml-mcp-chain-run
+
+docker-toml-mcp-chain-run: docker-up
+	@RUN_ID="toml_chain_$$(date +%Y%m%d_%H%M%S)"; \
+	echo ""; \
+	echo "╔══════════════════════════════════════════════════════════════╗"; \
+	echo "║  DOCKER TOML→MCP CHAIN RUN"; \
+	echo "║  TOMLs: $(TOML_GLOB)"; \
+	echo "║  Routing seed (toolkit selection): $(ATTACK_SEED)"; \
+	echo "║  Model backend: $(MODEL_BACKEND) | Model: $(MODEL)"; \
+	echo "║  Run ID: $$RUN_ID"; \
+	echo "╚══════════════════════════════════════════════════════════════╝"; \
+	echo ""; \
+	shopt -s nullglob; \
+	TOMLS=( $(TOML_GLOB) ); \
+	if [ $${#TOMLS[@]} -eq 0 ]; then \
+		echo "ERROR: no TOMLs matched: $(TOML_GLOB)"; \
+		exit 1; \
+	fi; \
+	for TOML in "$${TOMLS[@]}"; do \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "  TOML: $$TOML"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		ATTACK_ID="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$$TOML" )"; \
+		$(PY) -c 'import sys,tomllib,base64; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); \
+frags=d.get("fragments") or []; \
+	vals=[str(v.get("prompt","")) for f in frags for v in (f.get("variations") or [])]; \
+	vals=[p for p in vals if p and p.strip()]; \
+	print("\\n".join(base64.b64encode(p.encode("utf-8")).decode("ascii") for p in vals))' "$$TOML" | while read -r B64; do \
+			[ -n "$$B64" ] || continue; \
+			PROMPT="$$( printf "%s" "$$B64" | (base64 --decode 2>/dev/null || base64 -D) )"; \
+			[ -n "$$PROMPT" ] || continue; \
+			echo "  Prompt: $${PROMPT:0:120}..."; \
+			$(DOCKER_COMPOSE) run --rm \
+				-e OPENROUTER_API_KEY \
+				-e OPENAI_API_KEY \
+				-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
+				-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
+				mcp-client \
+					--model-backend "$(MODEL_BACKEND)" \
+					--model "$(MODEL)" \
+					--auto-toolkits \
+					--registry-path "$(DOCKER_REGISTRY_PATH)" \
+					--attack-seed "$(ATTACK_SEED)" \
+					--execution-mode "$(EXEC_MODE)" \
+					--log-dir "$(LOG_DIR)" \
+					--run-id "$$RUN_ID" \
+					--campaign "$$ATTACK_ID" \
+					--attack-id "$$ATTACK_ID" \
+					--prompt "$$PROMPT"; \
+		done; \
+		echo ""; \
+	done; \
+	echo "╔══════════════════════════════════════════════════════════════╗"; \
+	echo "║  TOML→MCP CHAIN COMPLETE"; \
+	echo "║  Run ID: $$RUN_ID"; \
+	echo "║  View: http://127.0.0.1:8787 → Load Latest or select run"; \
+	echo "╚══════════════════════════════════════════════════════════════╝"
+
+# =========================================================================
+# Docker: TOML dataset pipeline (generation + evaluation)
+# =========================================================================
+
+DATASET_N ?= 10
+DATASET_BASE_SEED ?= 1000
+ATTACKS_DIR ?= attacks
+
+# Generator LLM settings (used by run.py --generate when --fragment/--legitimize)
+GEN_BACKEND ?= ollama
+GEN_BASE_URL ?= http://host.docker.internal:11434
+
+# Default GEN_MODEL depends on GEN_BACKEND (not MODEL_BACKEND)
+ifeq ($(GEN_BACKEND),ollama)
+GEN_MODEL ?= huihui_ai/qwen3.5-abliterated:35b
+else ifeq ($(GEN_BACKEND),anthropic)
+GEN_MODEL ?= claude-haiku-4.5
+else
+# Treat as OpenAI-compatible / OpenRouter-style model id
+GEN_MODEL ?= huihui-ai/Huihui-Qwen3.5-35B-A3B-abliterated
+endif
+
+ATTACK_TOML ?=
+
+.PHONY: docker-dataset-up docker-dataset-down docker-dataset-validate-seed \
+        docker-dataset-generate docker-dataset-generate-fragment docker-dataset-generate-legitimize docker-dataset-generate-frag-legit \
+        docker-attacks-list docker-attacks-show \
+        docker-dataset-eval-qwen docker-dataset-eval-claude docker-dataset-eval-judge
+
+docker-dataset-up:
+	@echo "Dataset generation uses Ollama on the host (Docker → $(GEN_BASE_URL))."
+	@echo "Start Ollama on the host (e.g. ollama serve) on port 11434 if not already running."
+
+docker-dataset-down:
+	@echo "Nothing to stop (Ollama runs on the host; no ollama container)."
+
+docker-dataset-validate-seed:
+	@[ -f "$(ATTACK_SEED)" ] || (echo "ERROR: ATTACK_SEED file not found: $(ATTACK_SEED)"; exit 1)
+	@echo "Validating seed wiring: $(ATTACK_SEED)"
+	@$(DOCKER_COMPOSE) run --rm \
+		--entrypoint python dataset-runner -c 'import json; from pathlib import Path; from generator import VARIATION_REGISTRY; seed=Path("$(ATTACK_SEED)"); data=json.loads(seed.read_text()); key=str(data.get("metadata",{}).get("id","")).lower(); assert key, "seed missing metadata.id"; assert key in VARIATION_REGISTRY, f"No variation registered for {key}. Registered: {list(VARIATION_REGISTRY)}"; print(f"OK: metadata.id={key} -> {VARIATION_REGISTRY[key].__name__}")'
+
+define DATASET_RUN
+$(DOCKER_COMPOSE) run --rm \
+	-e DASHSCOPE_API_KEY \
+	-e ANTHROPIC_API_KEY \
+	-e OLLAMA_BASE_URL="$(GEN_BASE_URL)" \
+	dataset-runner
+endef
+
+docker-dataset-generate: docker-dataset-validate-seed
+	@echo "Generating TOMLs (no rewriting) -> $(ATTACKS_DIR)/"
+	@$(DATASET_RUN) --generate \
+		--seed-file "$(ATTACK_SEED)" \
+		--num-variations "$(DATASET_N)" \
+		--seed "$(DATASET_BASE_SEED)" \
+		--attacks-dir "$(ATTACKS_DIR)"
+
+docker-dataset-generate-fragment: docker-dataset-validate-seed
+	@echo "Generating TOMLs with --fragment (gen-backend=$(GEN_BACKEND), gen-model=$(GEN_MODEL)) -> $(ATTACKS_DIR)/"
+	@$(DATASET_RUN) --generate \
+		--seed-file "$(ATTACK_SEED)" \
+		--num-variations "$(DATASET_N)" \
+		--seed "$(DATASET_BASE_SEED)" \
+		--attacks-dir "$(ATTACKS_DIR)" \
+		--fragment \
+		--gen-backend "$(GEN_BACKEND)" \
+		--gen-model "$(GEN_MODEL)" \
+		--gen-base-url "$(GEN_BASE_URL)"
+
+docker-dataset-generate-legitimize: docker-dataset-validate-seed
+	@echo "Generating TOMLs with --legitimize (gen-backend=$(GEN_BACKEND), gen-model=$(GEN_MODEL)) -> $(ATTACKS_DIR)/"
+	@$(DATASET_RUN) --generate \
+		--seed-file "$(ATTACK_SEED)" \
+		--num-variations "$(DATASET_N)" \
+		--seed "$(DATASET_BASE_SEED)" \
+		--attacks-dir "$(ATTACKS_DIR)" \
+		--legitimize \
+		--gen-backend "$(GEN_BACKEND)" \
+		--gen-model "$(GEN_MODEL)" \
+		--gen-base-url "$(GEN_BASE_URL)"
+
+docker-dataset-generate-frag-legit: docker-dataset-validate-seed
+	@echo "Generating TOMLs with --fragment --legitimize (gen-backend=$(GEN_BACKEND), gen-model=$(GEN_MODEL)) -> $(ATTACKS_DIR)/"
+	@$(DATASET_RUN) --generate \
+		--seed-file "$(ATTACK_SEED)" \
+		--num-variations "$(DATASET_N)" \
+		--seed "$(DATASET_BASE_SEED)" \
+		--attacks-dir "$(ATTACKS_DIR)" \
+		--fragment --legitimize \
+		--gen-backend "$(GEN_BACKEND)" \
+		--gen-model "$(GEN_MODEL)" \
+		--gen-base-url "$(GEN_BASE_URL)"
+
+docker-attacks-list:
+	@echo "Generated attack TOMLs under $(ATTACKS_DIR)/:"
+	@ls -1 "$(ATTACKS_DIR)"/generated_*.toml 2>/dev/null || echo "(none)"
+
+docker-attacks-show:
+	@if [ -z "$(ATTACK_TOML)" ]; then echo "ERROR: set ATTACK_TOML=attacks/generated_<campaign>_<seed>.toml"; exit 1; fi
+	@[ -f "$(ATTACK_TOML)" ] || (echo "ERROR: file not found: $(ATTACK_TOML)"; exit 1)
+	@$(PY) -c 'from pathlib import Path; print(Path("$(ATTACK_TOML)").read_text())'
+
+docker-dataset-eval-qwen: docker-dataset-up
+	@echo "Evaluating TOMLs in $(ATTACKS_DIR)/ using Qwen (model=$(QWEN_MODEL))"
+	@$(DATASET_RUN) \
+		--attacks-dir "$(ATTACKS_DIR)" \
+		--model qwen \
+		--qwen-model "$(QWEN_MODEL)"
+
+docker-dataset-eval-claude: docker-dataset-up
+	@echo "Evaluating TOMLs in $(ATTACKS_DIR)/ using Claude (model=$(CLAUDE_MODEL))"
+	@$(DATASET_RUN) \
+		--attacks-dir "$(ATTACKS_DIR)" \
+		--model claude \
+		--claude-model "$(CLAUDE_MODEL)"
+
+docker-dataset-eval-judge: docker-dataset-up
+	@echo "Evaluating TOMLs in $(ATTACKS_DIR)/ with --judge (requires ANTHROPIC_API_KEY)"
+	@$(DATASET_RUN) \
+		--attacks-dir "$(ATTACKS_DIR)" \
+		--model qwen \
+		--qwen-model "$(QWEN_MODEL)" \
+		--judge

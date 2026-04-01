@@ -2166,6 +2166,11 @@ class MCPOpenRouterClientV1:
             if self.toolkit_router
             else self.toolkit_registry.all()
         )
+        # Be permissive by default: if attack-aware routing yields nothing, fall back
+        # to connecting the full registry so runs remain usable (especially for new
+        # campaigns whose tactic/tag mappings aren't represented in routing tables).
+        if not selected and self.toolkit_registry:
+            selected = self.toolkit_registry.all()
         logger.info(
             "Toolkit routing selected %d toolkit(s) for attack=%s mode=%s",
             len(selected),

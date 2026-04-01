@@ -242,6 +242,50 @@ def _attack_index(attacks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return idx
 
 
+def _normalize_attack_id(value: Any) -> str:
+    """Normalize an attack/seed id into a stable lookup key."""
+    text = str(value or "").strip().upper()
+    text = re.sub(r"\s+", "_", text)
+    return text
+
+
+def _base_attack_id(value: str) -> str:
+    """Strip common numeric suffixes like HONESTCUE_1000 -> HONESTCUE."""
+    return re.sub(r"[_-]\d+$", "", value)
+
+
+def _select_by_id(
+    items: list[dict[str, Any]],
+    idx: dict[str, dict[str, Any]],
+    wanted: str,
+) -> dict[str, Any] | None:
+    if not wanted:
+        return None
+
+    direct = idx.get(wanted)
+    if direct is not None:
+        return direct
+
+    base = _base_attack_id(wanted)
+    if base and base in idx:
+        return idx[base]
+
+    # Fall back to prefix match: HONESTCUE matches HONESTCUE_1000, etc.
+    if base:
+        for key, value in idx.items():
+            if key.startswith(base + "_") or key.startswith(base + "-"):
+                return value
+
+    # As a last resort, scan the list for any metadata id containing the base token.
+    token = base or wanted
+    for it in items:
+        md = it.get("metadata", {})
+        mid = _normalize_attack_id(md.get("id"))
+        if token and token in mid:
+            return it
+    return None
+
+
 def _parse_ts(value: Any) -> str | None:
     """Return an ISO timestamp string if *value* is non-empty, else None."""
     if isinstance(value, str) and value.strip():
@@ -543,11 +587,11 @@ def build_artifact_bundle(
 def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
     events = bundle.session_events
     session_start = next((e for e in events if e.get("event") == "session_start"), {})
-    attack_id = str(session_start.get("attack_id") or "").upper()
+    attack_id = _normalize_attack_id(session_start.get("attack_id"))
     seed_idx = _seed_index(bundle.seeds)
     attack_idx = _attack_index(bundle.attacks)
-    seed = seed_idx.get(attack_id) if attack_id else None
-    attack = attack_idx.get(attack_id) if attack_id else None
+    seed = _select_by_id(bundle.seeds, seed_idx, attack_id)
+    attack = _select_by_id(bundle.attacks, attack_idx, attack_id)
 
     if seed is None and bundle.seeds:
         seed = bundle.seeds[0]

@@ -52,21 +52,23 @@ services:
     <<: *common
     container_name: fragbench-filesystem
     command:
-      - mcp/servers/filesystem_server.py
+      - fragbench_mcp/servers/filesystem_server.py
       - --transport=sse
       - --host=0.0.0.0
       - --port=8001
     volumes:
       - workspace:/workspace
-      - logs:/app/logs
+      - ./logs:/app/logs
     networks:
       - mcp-internal
+    environment:
+      - PYTHONPATH=/app
 
   shell-server:
     <<: *common
     container_name: fragbench-shell
     command:
-      - mcp/servers/shell_server.py
+      - fragbench_mcp/servers/shell_server.py
       - --transport=sse
       - --host=0.0.0.0
       - --port=8011
@@ -74,12 +76,14 @@ services:
       - workspace:/workspace
     networks:
       - mcp-internal
+    environment:
+      - PYTHONPATH=/app
 
   archive-server:
     <<: *common
     container_name: fragbench-archive
     command:
-      - mcp/servers/archive_server.py
+      - fragbench_mcp/servers/archive_server.py
       - --transport=sse
       - --host=0.0.0.0
       - --port=8012
@@ -87,12 +91,14 @@ services:
       - workspace:/workspace
     networks:
       - mcp-internal
+    environment:
+      - PYTHONPATH=/app
 
   exfil-server:
     <<: *common
     container_name: fragbench-exfil
     command:
-      - mcp/servers/exfil_server.py
+      - fragbench_mcp/servers/exfil_server.py
       - --transport=sse
       - --host=0.0.0.0
       - --port=8013
@@ -101,17 +107,300 @@ services:
     networks:
       - mcp-internal
       - egress-limited
+    environment:
+      - PYTHONPATH=/app
 
   network-recon-server:
     <<: *common
     container_name: fragbench-network
     command:
-      - mcp/servers/network_recon_server.py
+      - fragbench_mcp/servers/network_recon_server.py
       - --transport=sse
       - --host=0.0.0.0
       - --port=8014
     networks:
       - mcp-internal
+    environment:
+      - PYTHONPATH=/app
+
+  # ---------- Extra MCP Servers (optional profile: extras) ----------
+
+  recon-osint-server:
+    <<: *common
+    container_name: fragbench-recon-osint
+    command:
+      - fragbench_mcp/servers/recon_osint.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8020
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  recon-network-server:
+    <<: *common
+    container_name: fragbench-recon-network
+    command:
+      - fragbench_mcp/servers/recon_network.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8021
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  recon-subdomain-server:
+    <<: *common
+    container_name: fragbench-recon-subdomain
+    command:
+      - fragbench_mcp/servers/recon_subdomain.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8022
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  recon-web-server:
+    <<: *common
+    container_name: fragbench-recon-web
+    command:
+      - fragbench_mcp/servers/recon_web.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8023
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  cloud-recon-server:
+    <<: *common
+    container_name: fragbench-cloud-recon
+    command:
+      - fragbench_mcp/servers/cloud_recon.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8024
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  git-server:
+    <<: *common
+    container_name: fragbench-git
+    command:
+      - fragbench_mcp/servers/git_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8025
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  code-server:
+    <<: *common
+    container_name: fragbench-code
+    command:
+      - fragbench_mcp/servers/code_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8026
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  package-server:
+    <<: *common
+    container_name: fragbench-package
+    command:
+      - fragbench_mcp/servers/package_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8027
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  credential-server:
+    <<: *common
+    container_name: fragbench-credential
+    command:
+      - fragbench_mcp/servers/credential_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8028
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  crypto-server:
+    <<: *common
+    container_name: fragbench-crypto
+    command:
+      - fragbench_mcp/servers/crypto_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8029
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  report-server:
+    <<: *common
+    container_name: fragbench-report
+    command:
+      - fragbench_mcp/servers/report_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8030
+    volumes:
+      - workspace:/workspace
+      - ./logs:/app/logs
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  terminal-server:
+    <<: *common
+    container_name: fragbench-terminal
+    command:
+      - fragbench_mcp/servers/terminal_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8031
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  ssh-bruteforce-server:
+    <<: *common
+    container_name: fragbench-ssh-bruteforce
+    command:
+      - fragbench_mcp/servers/ssh_bruteforce.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8032
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  payload-evasion-server:
+    <<: *common
+    container_name: fragbench-payload-evasion
+    command:
+      - fragbench_mcp/servers/payload_evasion.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8033
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  vuln-scanner-server:
+    <<: *common
+    container_name: fragbench-vuln-scanner
+    command:
+      - fragbench_mcp/servers/vuln_scanner.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8034
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  agent-control-server:
+    <<: *common
+    container_name: fragbench-agent-control
+    command:
+      - fragbench_mcp/servers/agent_control.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8035
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  c2-callback-server:
+    <<: *common
+    container_name: fragbench-c2-callback
+    command:
+      - fragbench_mcp/servers/c2_callback.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8036
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
+
+  project-server:
+    <<: *common
+    container_name: fragbench-project
+    command:
+      - fragbench_mcp/servers/project_server.py
+      - --transport=sse
+      - --host=0.0.0.0
+      - --port=8037
+    volumes:
+      - workspace:/workspace
+    networks:
+      - mcp-internal
+    # (no profile) start by default
+    environment:
+      - PYTHONPATH=/app
 
   # ---------- MCP Client ----------
   # All mcp_cli.py flags are passed as command args after the image entrypoint.
@@ -128,7 +417,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=64M
-      - /app/mcp/images:size=32M
+      - /app/fragbench_mcp/images:size=32M
     security_opt:
       - no-new-privileges:true
     environment:
@@ -139,10 +428,11 @@ services:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - VLLM_BASE_URL=${VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
     volumes:
-      - logs:/app/logs
-      - logs:/app/mcp/logs
+      - ./logs:/app/logs
+      - ./logs:/app/fragbench_mcp/logs
       - workspace:/workspace
-      - ./mcp/registry/toolkits.docker.toml:/app/mcp/registry/toolkits.toml:ro
+      - ./seeds:/app/seeds:ro
+      - ./fragbench_mcp/registry/toolkits.docker.toml:/app/fragbench_mcp/registry/toolkits.toml:ro
     networks:
       - mcp-internal
       - egress-limited
@@ -176,7 +466,7 @@ services:
     tmpfs:
       - /tmp:size=32M
     volumes:
-      - logs:/app/logs:ro
+      - ./logs:/app/logs:ro
       - ./seeds:/app/seeds:ro
       - ./attacks:/app/attacks:ro
     networks:
@@ -187,10 +477,45 @@ services:
           memory: 256M
           cpus: "0.5"
 
+  # ---------- Dataset generation + evaluation (TOML pipeline) ----------
+  #
+  # Runs `python run.py ...` inside Docker, with `seeds/` mounted read-only and
+  # `attacks/` mounted read-write so generated TOMLs persist on the host.
+  #
+  # Example:
+  #   docker compose run --rm dataset-runner --generate --seed-file seeds/honestcue.json --num-variations 10 --seed 1000
+  #
+
+  dataset-runner:
+    build:
+      context: .
+      target: base
+    container_name: fragbench-dataset-runner
+    entrypoint: ["python", "run.py"]
+    stdin_open: true
+    tty: true
+    # Needs to write generated TOMLs to /app/attacks (bind-mounted).
+    read_only: false
+    tmpfs:
+      - /tmp:size=64M
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - PYTHONPATH=/app
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Ollama on the host (Docker Desktop / Mac): use host.docker.internal
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    volumes:
+      - ./seeds:/app/seeds:ro
+      - ./attacks:/app/attacks
+    networks:
+      - egress-limited
+    # Ollama on host: set OLLAMA_BASE_URL (default host.docker.internal). On Linux you may need:
+    #   extra_hosts: ["host.docker.internal:host-gateway"]
+
 volumes:
   workspace:
-    driver: local
-  logs:
     driver: local
 
 networks:
