@@ -8,3 +8,4 @@ build/
 results/
 attacks/generated_*.toml
 .claude/
+.DS_Store
