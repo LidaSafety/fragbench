@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.egg-info
+.mcp-run
+node_modules
+.DS_Store
+*.log
+file_preview.txt
+summary.txt

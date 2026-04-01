@@ -1,0 +1,229 @@
+[[toolkit]]
+id = "filesystem_toolkit"
+description = "Filesystem discovery and collection tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8001/mcp"
+tags = ["filesystem", "collection", "recon"]
+attack_tags = []
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "filesystem"
+
+[[toolkit]]
+id = "shell_toolkit"
+description = "Sandboxed command synthesis and execution tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8011/mcp"
+tags = ["shell", "execution"]
+attack_tags = []
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "shell"
+
+[[toolkit]]
+id = "archive_toolkit"
+description = "Archive/staging simulation tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8012/mcp"
+tags = ["archive", "collection"]
+attack_tags = []
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "archive"
+
+[[toolkit]]
+id = "exfil_toolkit"
+description = "Exfiltration simulation over HTTP/SFTP channels."
+transport = "sse"
+endpoint = "http://127.0.0.1:8013/mcp"
+tags = ["exfil", "http"]
+attack_tags = []
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "exfil"
+
+[[toolkit]]
+id = "network_recon_toolkit"
+description = "Network reconnaissance and host inventory simulation."
+transport = "sse"
+endpoint = "http://127.0.0.1:8014/mcp"
+tags = ["recon", "network"]
+attack_tags = []
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "network"
+
+[[toolkit]]
+id = "recon_osint_toolkit"
+description = "OSINT reconnaissance and public-data aggregation tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8020/mcp"
+tags = ["recon", "osint"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "recon_osint"
+
+[[toolkit]]
+id = "recon_network_ext_toolkit"
+description = "Extended network recon and scanning tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8021/mcp"
+tags = ["recon", "network"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "recon_network"
+
+[[toolkit]]
+id = "recon_subdomain_toolkit"
+description = "Subdomain enumeration and DNS recon tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8022/mcp"
+tags = ["recon", "dns"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "recon_subdomain"
+
+[[toolkit]]
+id = "recon_web_toolkit"
+description = "Web application reconnaissance tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8023/mcp"
+tags = ["recon", "web"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "recon_web"
+
+[[toolkit]]
+id = "cloud_recon_toolkit"
+description = "Cloud infrastructure reconnaissance tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8024/mcp"
+tags = ["recon", "cloud"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "cloud_recon"
+
+[[toolkit]]
+id = "git_toolkit"
+description = "Git operations toolkit (status/diff/log/branch/remote)."
+transport = "sse"
+endpoint = "http://127.0.0.1:8025/mcp"
+tags = ["dev", "git"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "git"
+
+[[toolkit]]
+id = "code_toolkit"
+description = "Code analysis and editing helper tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8026/mcp"
+tags = ["dev", "code"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "code"
+
+[[toolkit]]
+id = "package_toolkit"
+description = "Package management helper tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8027/mcp"
+tags = ["dev", "packages"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "package"
+
+[[toolkit]]
+id = "credential_toolkit"
+description = "Credential handling and validation tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8028/mcp"
+tags = ["creds"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "credential"
+
+[[toolkit]]
+id = "crypto_toolkit"
+description = "Cryptographic helper tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8029/mcp"
+tags = ["crypto"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "crypto"
+
+[[toolkit]]
+id = "report_toolkit"
+description = "Report generation and aggregation tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8030/mcp"
+tags = ["reporting"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "report"
+
+[[toolkit]]
+id = "terminal_toolkit"
+description = "Terminal execution and process management tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8031/mcp"
+tags = ["execution", "terminal"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "terminal"
+
+[[toolkit]]
+id = "ssh_bruteforce_toolkit"
+description = "SSH bruteforce simulation toolkit."
+transport = "sse"
+endpoint = "http://127.0.0.1:8032/mcp"
+tags = ["execution", "ssh"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "ssh_bruteforce"
+
+[[toolkit]]
+id = "payload_evasion_toolkit"
+description = "Payload evasion and mutation tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8033/mcp"
+tags = ["evasion"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "payload_evasion"
+
+[[toolkit]]
+id = "vuln_scanner_toolkit"
+description = "Vulnerability scanning and reporting tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8034/mcp"
+tags = ["vuln", "recon"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "vuln_scanner"
+
+[[toolkit]]
+id = "agent_control_toolkit"
+description = "Agent control/mutation and stateful prompt tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8035/mcp"
+tags = ["agent", "control"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "agent_control"
+
+[[toolkit]]
+id = "c2_callback_toolkit"
+description = "Mock C2 callback and local command execution tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8036/mcp"
+tags = ["c2", "execution"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "c2_callback"
+
+[[toolkit]]
+id = "project_toolkit"
+description = "Project scaffolding and build/test helper tools."
+transport = "sse"
+endpoint = "http://127.0.0.1:8037/mcp"
+tags = ["dev", "project"]
+attack_tags = ["extras"]
+execution_modes = ["simulated", "bounded_real"]
+tool_prefix = "project"

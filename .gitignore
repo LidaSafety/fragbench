@@ -9,3 +9,7 @@ results/
 attacks/generated_*.toml
 .claude/
 .DS_Store
+.mcp-run/*
+*.log
+logs
+*.lock

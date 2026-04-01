@@ -1,0 +1,210 @@
+x-server-base: &server-base
+  networks:
+    - internal_mgmt
+  restart: unless-stopped
+  environment:
+    - MCP_TEST_MODE=true
+
+services:
+  # ── Orchestrator ─────────────────────────────────────────────
+  mcp-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: mcp-client
+    networks: [internal_mgmt, egress_pipe]
+    environment:
+      - OPENROUTER_API_KEY
+      - OPENAI_API_KEY
+      # Default to host Ollama from inside the container (override with OLLAMA_BASE_URL)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - VLLM_BASE_URL
+      - VLLM_API_KEY
+      # Reach sibling MCP servers by Compose service name (not 127.0.0.1)
+      - MCP_REGISTRY_PATH=fragbench_mcp/registry/toolkits.docker.toml
+      - MCP_SERVER_URL=http://server-filesystem:8001/mcp
+    volumes:
+      - ./logs:/app/logs
+      - ./seeds:/app/seeds:ro
+      - ./attacks:/app/attacks:ro
+
+  # ── Frontend viewer ──────────────────────────────────────────
+  viewer:
+    build:
+      context: .
+      target: viewer
+    container_name: fragbench-viewer
+    command:
+      - --host=0.0.0.0
+      - --port=8787
+    ports:
+      - "${VIEWER_PORT:-8787}:8787"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32M
+    volumes:
+      - ./logs:/app/logs:ro
+      - ./seeds:/app/seeds:ro
+      - ./attacks:/app/attacks:ro
+    networks:
+      - viewer-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  # ── Core servers ─────────────────────────────────────────────
+  server-filesystem:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/filesystem/Dockerfile
+    volumes:
+      - ./fragbench_mcp/servers/filesystem/data/mock_fs:/workspace:ro
+
+  server-shell:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/shell/Dockerfile
+
+  server-archive:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/archive/Dockerfile
+
+  server-exfil:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/exfil/Dockerfile
+    networks: [internal_mgmt, egress_pipe]
+
+  server-network-recon:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/network_recon/Dockerfile
+
+  # ── Recon servers ────────────────────────────────────────────
+  server-recon-osint:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/recon_osint/Dockerfile
+
+  server-recon-network:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/recon_network/Dockerfile
+
+  server-recon-subdomain:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/recon_subdomain/Dockerfile
+
+  server-recon-web:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/recon_web/Dockerfile
+
+  server-cloud-recon:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/cloud_recon/Dockerfile
+
+  # ── Dev servers ──────────────────────────────────────────────
+  server-git:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/git/Dockerfile
+
+  server-code:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/code/Dockerfile
+
+  server-packages:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/packages/Dockerfile
+
+  server-project:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/project/Dockerfile
+
+  # ── Security / credential servers ────────────────────────────
+  server-credential:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/credential/Dockerfile
+
+  server-crypto:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/crypto/Dockerfile
+
+  # ── Execution servers ────────────────────────────────────────
+  server-terminal:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/terminal/Dockerfile
+
+  server-ssh-bruteforce:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/ssh_bruteforce/Dockerfile
+
+  server-c2-callback:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/c2_callback/Dockerfile
+
+  # ── Reporting / evasion / scanning ───────────────────────────
+  server-report:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/report/Dockerfile
+
+  server-payload-evasion:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/payload_evasion/Dockerfile
+
+  server-vuln-scanner:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/vuln_scanner/Dockerfile
+
+  server-agent-control:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/agent_control/Dockerfile
+
+networks:
+  internal_mgmt:
+    internal: true
+  egress_pipe:
+    driver: bridge
+  viewer-net:
+    driver: bridge

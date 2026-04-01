@@ -7,13 +7,17 @@ classifies responses and scores whether the full kill chain could succeed.
 
 ## Getting started
 
-### Prerequisites
+There are two ways to run FragBench: the **Python path** (quick, API-key-based) and the **Docker path** (full MCP agent loop with network isolation and a results viewer).
+
+### Option A — Python (API keys, no containers)
+
+#### Prerequisites
 
 - Python ≥ 3.11
 - [`uv`](https://docs.astral.sh/uv/getting-started/installation/) — install with `pip install uv` or `brew install uv`
 - An API key for at least one target model (see below)
 
-### 1. Install dependencies
+#### 1. Install dependencies
 
 ```bash
 uv venv
@@ -21,7 +25,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 uv pip install anthropic openai
 ```
 
-### 2. Set API keys
+#### 2. Set API keys
 
 **Claude (Anthropic)** — required if using `--model claude` or `--judge`:
 
@@ -37,7 +41,7 @@ export DASHSCOPE_API_KEY=sk-...
 
 Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) to avoid re-entering them.
 
-### 3. Verify the install
+#### 3. Verify the install
 
 This runs without any API calls:
 
@@ -49,6 +53,163 @@ You should see campaign names and prompts printed to the terminal. If that works
 
 ```bash
 python run.py --model claude --campaign AD_DISCOVERY --judge
+```
+
+---
+
+### Option B — Docker (MCP agent loop + results viewer)
+
+Run attack TOML files through the MCP agent loop using Docker containers for full network isolation.
+
+#### Prerequisites
+
+| Requirement | Notes |
+|-------------|-------|
+| **Docker Desktop** | Install from [docker.com](https://www.docker.com/products/docker-desktop/). Must be running before you start. |
+| **Ollama** | The target LLM runs on your host machine; Docker containers reach it via `host.docker.internal`. |
+| **Make** | Pre-installed on macOS/Linux. Windows users can use WSL or install via `choco install make`. |
+
+#### 1. Install and start Ollama
+
+```bash
+brew install ollama      # macOS — or see https://ollama.com/download
+ollama serve
+```
+
+Leave that terminal open. Ollama is now listening on port 11434.
+
+#### 2. Pull the target model
+
+In a **new** terminal:
+
+```bash
+ollama pull huihui_ai/qwen3.5-abliterated:35b
+```
+
+This is ~20 GB on first pull. You can verify it downloaded with `ollama list`.
+
+#### 3. Start the MCP servers + viewer
+
+```bash
+cd fragbench
+docker compose up -d
+```
+
+This builds and starts all containers (MCP toolkit servers + frontend viewer). First run takes a few minutes to build images; subsequent runs are fast.
+
+Verify everything is healthy:
+
+```bash
+docker compose ps
+```
+
+You should see ~25 containers in **Running** state.
+
+#### 4. Run a single stage (quick smoke test)
+
+```bash
+make docker-attack-run \
+  ATTACK_TOML=attacks/hello_world.toml \
+  ATTACK_STAGE=0 \
+  ATTACK_VARIATION_INDEX=0
+```
+
+This sends fragment 0, variation 0 through the MCP agent loop against the Ollama model. You'll see the prompt printed, the model's response, and any MCP tool calls it makes.
+
+#### 5. Run the full kill chain
+
+```bash
+make docker-chain-run ATTACK_TOML=attacks/hello_world.toml
+```
+
+This runs every stage and every variation in the TOML sequentially, with a shared run ID. Each variation gets a randomized source IP and session ID for realistic logging.
+
+#### 5a. Enable LLM-as-judge (optional)
+
+Add `JUDGE=1` to any `docker-chain-run` or `docker-attack-run` command to classify each variation's response after it completes. The judge runs in a background thread so it never blocks the attack chain.
+
+```bash
+make docker-chain-run ATTACK_TOML=attacks/hello_world.toml JUDGE=1
+```
+
+The judge uses OpenRouter by default — set `OPENROUTER_API_KEY` in your environment (or a `.env` file in the project root) before running:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+make docker-chain-run ATTACK_TOML=attacks/hello_world.toml JUDGE=1
+```
+
+You can override the model or backend:
+
+```bash
+make docker-chain-run \
+  ATTACK_TOML=attacks/hello_world.toml \
+  JUDGE=1 \
+  JUDGE_MODEL=anthropic/claude-haiku-4.5 \
+  JUDGE_BACKEND=openrouter
+```
+
+Verdicts (`ANSWERED` · `REFUSED` · `PARTIAL` · `UNCLEAR`) are shown as coloured dots in the results viewer sidebar and as a badge in the trace detail panel.
+
+#### 6. View results
+
+Open **http://localhost:8787** in your browser. Click **Load Latest** or select the run ID from the dropdown to inspect the full conversation trace.
+
+Session logs are also written to `logs/` as JSONL files.
+
+#### 7. Tear down
+
+```bash
+docker compose down
+```
+
+Stop Ollama by pressing Ctrl-C in its terminal (or `killall ollama`).
+
+---
+
+#### Other useful Docker commands
+
+**Interactive CLI** — drop into a chat session with MCP tools available:
+
+```bash
+make docker-cli ATTACK_TOML=attacks/hello_world.toml
+```
+
+**Run a specific stage and variation:**
+
+```bash
+make docker-attack-run \
+  ATTACK_TOML=attacks/hello_world.toml \
+  ATTACK_STAGE=1 \
+  ATTACK_VARIATION_INDEX=0
+```
+
+**Use a different model backend:**
+
+```bash
+# OpenRouter (requires OPENROUTER_API_KEY in env)
+make docker-chain-run \
+  ATTACK_TOML=attacks/hello_world.toml \
+  MODEL_BACKEND=openrouter \
+  MODEL=anthropic/claude-haiku-4.5
+```
+
+**Run with Ollama (default):**
+```bash
+make docker-chain-run \
+  ATTACK_TOML=attacks/hello_world.toml
+```
+
+**List all available attack TOMLs:**
+
+```bash
+ls attacks/*.toml
+```
+
+**Check container status:**
+
+```bash
+make docker-status
 ```
 
 ## Usage
