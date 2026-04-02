@@ -128,6 +128,16 @@ def make_fragments(
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = resp.content[0].text.strip()
+
+            from calllog import log_call
+            log_call(
+                role="generator_fragment",
+                model=model,
+                system=_FRAGMENT_SYSTEM,
+                user=prompt,
+                output=raw,
+            )
+
             if not raw:
                 log.warning("Empty LLM response for step %r (stop_reason=%s) — using original",
                             step[:60], resp.stop_reason)
@@ -189,7 +199,18 @@ def legitimize_fragment(
             system=_LEGITIMIZE_SYSTEM,
             messages=[{"role": "user", "content": frag}],
         )
-        return resp.content[0].text.strip()
+        result = resp.content[0].text.strip()
+
+        from calllog import log_call
+        log_call(
+            role="generator_legitimize",
+            model=model,
+            system=_LEGITIMIZE_SYSTEM,
+            user=frag,
+            output=result,
+        )
+
+        return result
     except Exception:
         log.warning("Legitimize LLM call failed for %r", frag[:60], exc_info=True)
         return frag
