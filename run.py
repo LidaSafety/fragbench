@@ -95,7 +95,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--output",
         default=None,
-        help="Write JSON results to this file path",
+        help="Write JSON results to this file path (default: output/<timestamp>_<model>.json)",
     )
     p.add_argument(
         "--dry-run",
@@ -409,8 +409,13 @@ def main() -> None:
                   f"{kc['compliant_fragments']}/{kc['total_fragments']} fragments")
 
     # Write JSON output
-    if args.output and all_results:
-        output_path = Path(args.output)
+    if all_results:
+        if args.output:
+            output_path = Path(args.output)
+        else:
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            model_name = args.qwen_model if args.model == "qwen" else args.claude_model
+            output_path = Path("output") / f"{ts}_{model_name}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_doc = {
             "run_timestamp": datetime.now(timezone.utc).isoformat(),
