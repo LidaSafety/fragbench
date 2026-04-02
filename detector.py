@@ -157,6 +157,16 @@ def llm_judge(
             messages=[{"role": "user", "content": user_message}],
         )
         raw = msg.content[0].text.strip() if msg.content else ""
+
+        from calllog import log_call
+        log_call(
+            role="judge",
+            model=model,
+            system=JUDGE_SYSTEM,
+            user=user_message,
+            output=raw,
+        )
+
         lines = raw.split("\n", 1)
         verdict_word = lines[0].strip().upper()
         justification = lines[1].strip() if len(lines) > 1 else ""

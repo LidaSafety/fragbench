@@ -93,6 +93,11 @@ def parse_args() -> argparse.Namespace:
         help="List available campaigns and exit",
     )
     p.add_argument(
+        "--style",
+        default=None,
+        help="Comma-separated list of styles to run (e.g. direct,ctf,sysadmin). Omit to run all.",
+    )
+    p.add_argument(
         "--attacks-dir",
         default="attacks",
         help="Directory containing attack TOML files (default: attacks/)",
@@ -106,6 +111,11 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Print prompts without calling any model APIs",
+    )
+    p.add_argument(
+        "--log-verbose",
+        action="store_true",
+        help="Log all LLM calls (judge, generator) in addition to target calls",
     )
 
     # --- Dataset generation mode -------------------------------------------
@@ -166,11 +176,11 @@ def build_runner(args: argparse.Namespace):
 
 def print_result_row(style: str, verdict: str, justification: str = "") -> None:
     color = {
-        "ANSWERED": "\033[91m",  # red — model complied (bad)
-        "REFUSED":  "\033[92m",  # green — model refused (good)
+        "ANSWERED": "\033[92m",  # green
+        "REFUSED":  "\033[91m",  # red
         "PARTIAL":  "\033[93m",  # yellow
-        "UNCLEAR":  "\033[90m",  # gray
-    }.get(verdict, "")
+        "UNCLEAR":  "\033[93m",  # yellow
+    }.get(verdict, "\033[91m")
     reset = "\033[0m"
     just = f"  [{justification}]" if justification else ""
     print(f"  {color}{verdict:8s}{reset}  {style}{just}")
@@ -190,7 +200,12 @@ def run_campaign(spec, runner, args) -> dict:
         print(f"\nFragment {fragment.index}: {fragment.description}")
         frag_results = []
 
-        for variation in fragment.variations:
+        style_filter = set(s.strip() for s in args.style.split(",")) if args.style else None
+        variations = fragment.variations
+        if style_filter:
+            variations = [v for v in variations if v.style in style_filter]
+
+        for variation in variations:
             if args.dry_run:
                 print(f"  [DRY RUN] {variation.style}: {variation.prompt[:80]}...")
                 continue
@@ -264,7 +279,7 @@ def run_campaign(spec, runner, args) -> dict:
     )
 
     # Print kill-chain summary
-    kc_color = "\033[91m" if kc.kill_chain_complete else "\033[92m"
+    kc_color = "\033[92m" if kc.kill_chain_complete else "\033[91m"
     reset = "\033[0m"
     print(f"\nKill-chain: {kc_color}{'COMPLETE' if kc.kill_chain_complete else 'BLOCKED'}{reset}")
     print(f"  Fragments compliant: {kc.compliant_fragments}/{kc.total_fragments}")
@@ -367,6 +382,13 @@ def main() -> None:
         format="%(levelname)s [%(name)s] %(message)s",
         level=logging.WARNING,
     )
+
+    if not args.dry_run:
+        from calllog import init_log, set_verbose
+        log_path = init_log()
+        if args.log_verbose:
+            set_verbose(True)
+        print(f"LLM call log: {log_path}")
 
     if args.generate:
         run_generate(args)

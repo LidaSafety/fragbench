@@ -190,6 +190,17 @@ class QwenRunner(ModelRunner):
             response = ""
             error = str(exc)
 
+        from calllog import log_call
+        log_call(
+            role="target",
+            model=self._model,
+            user=variation.prompt,
+            output=response,
+            error=error,
+            meta={"campaign_id": campaign_id, "fragment_index": fragment_index,
+                   "style": variation.style},
+        )
+
         return VariationResult(
             campaign_id=campaign_id,
             fragment_index=fragment_index,
@@ -257,6 +268,17 @@ class ClaudeRunner(ModelRunner):
         except Exception as exc:
             response = ""
             error = str(exc)
+
+        from calllog import log_call
+        log_call(
+            role="target",
+            model=self._model,
+            user=variation.prompt,
+            output=response,
+            error=error,
+            meta={"campaign_id": campaign_id, "fragment_index": fragment_index,
+                   "style": variation.style},
+        )
 
         return VariationResult(
             campaign_id=campaign_id,
