@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fragguard-chain"
+name = "fragbench"
 version = "0.1.0"
 description = "Attack prompt variation harness with kill-chain detection"
 requires-python = ">=3.11"
@@ -13,8 +13,8 @@ dependencies = [
 ]
 
 [project.scripts]
-fragguard-chain = "run:main"
+fragbench = "run:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["fragguard_chain*"]
+include = ["fragbench*"]
