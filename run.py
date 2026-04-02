@@ -88,6 +88,11 @@ def parse_args() -> argparse.Namespace:
         help="Run a single campaign by ID (e.g. DPRK_FRAUD). Omit to run all.",
     )
     p.add_argument(
+        "--list-campaigns",
+        action="store_true",
+        help="List available campaigns and exit",
+    )
+    p.add_argument(
         "--attacks-dir",
         default="attacks",
         help="Directory containing attack TOML files (default: attacks/)",
@@ -379,6 +384,13 @@ def main() -> None:
     if not all_specs:
         print(f"ERROR: no *.toml files found in {attacks_dir}", file=sys.stderr)
         sys.exit(1)
+
+    # List campaigns and exit
+    if args.list_campaigns:
+        for spec in all_specs:
+            m = spec.metadata
+            print(f"  {m.id:25s}  {m.technique:6s}  {m.technique_name}")
+        return
 
     # Filter to single campaign if requested
     if args.campaign:
