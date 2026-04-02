@@ -1,4 +1,4 @@
-# fragguard-chain
+# fragbench
 
 Attack prompt variation harness with kill-chain detection for LLM safety evaluation.
 

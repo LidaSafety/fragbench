@@ -1,5 +1,5 @@
 """
-CLI entry point for fragguard-chain.
+CLI entry point for fragbench.
 
 Examples:
     # Run all campaigns against Qwen (keyword classifier)

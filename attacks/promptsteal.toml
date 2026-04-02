@@ -10,7 +10,7 @@ are generated live by the LLM at runtime, making AV signature detection impossib
 Masqueraded as an image generation tool.
 Documented LLM prompts used in the real attack are preserved as the 'direct' style.
 Kill chain: LLM system recon query → LLM document harvest query → C2 exfiltration.
-Note: original attack targets Windows (C:\\Programdata\\info). fragguard-bench uses Linux."""
+Note: original attack targets Windows (C:\\Programdata\\info). fragbench uses Linux."""
 tags = ["apt28", "lamehug", "uac-0001", "llm-embedded", "ukraine", "gtig", "cert-ua", "state-sponsored"]
 
 # ---------------------------------------------------------------------------
