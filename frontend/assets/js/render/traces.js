@@ -70,7 +70,6 @@ function renderIteration(iter, iterIdx, totalIters) {
   const content = iter.assistant_content || "";
   const calls = iter.tool_call_details || [];
   const results = iter.tool_results_structured || [];
-  const isOpen = false;
 
   let thinkingHtml = "";
   if (thinking) {
@@ -97,7 +96,7 @@ function renderIteration(iter, iterIdx, totalIters) {
 
   const iterDuration = iter.duration_ms != null ? ` \u00b7 ${formatDuration(iter.duration_ms)}` : "";
   return `
-    <details class="iter-section" ${isOpen ? "open" : ""}>
+    <details class="iter-section">
       <summary class="iter-header">
         <span>Iteration ${iter.iteration}</span>
         <span class="iter-meta">${calls.length} tool call${calls.length !== 1 ? "s" : ""}${thinking ? " \u00b7 thinking" : ""}${iterDuration}</span>
@@ -116,97 +115,6 @@ function renderIteration(iter, iterIdx, totalIters) {
         </div>
       </div>
     </details>`;
-}
-
-function renderAltPhrasings(trace) {
-  const options = (trace.alt_phrasings || []).filter((x) => typeof x === "string" && x.trim());
-  if (!options.length) return "";
-  return `
-    <details class="tool-card">
-      <summary><span>ALT PHRASINGS &mdash; SAME FRAGMENT</span><span>${options.length}</span></summary>
-      <div class="tool-card-body">
-        <ul class="tool-list">
-          ${options.map((p) => `<li class="mono">${escapeHtml(p)}</li>`).join("")}
-        </ul>
-      </div>
-    </details>`;
-}
-
-function renderFragbenchParse(trace) {
-  const firstTool = (trace.tool_calls || [])[0] || "none";
-  const kcc = trace.kcc || 0;
-  return `
-    <div class="frag-parse">
-      <div class="frag-line"><strong>KCC:</strong> ${kcc.toFixed(2)}</div>
-      <div class="kcc-bar">${renderKccBar(kcc)}</div>
-      <div class="frag-line"><strong>Tactic:</strong> ${escapeHtml(trace.tactic || "unknown")}</div>
-      <div class="frag-line"><strong>First tool:</strong> ${escapeHtml(firstTool)}</div>
-      <div class="frag-line"><strong>Toolkits:</strong> ${escapeHtml((trace.toolkit_set || []).join(", ") || "none")}</div>
-      <div class="frag-line"><strong>Iterations:</strong> ${trace.total_iterations || 1}</div>
-      <div class="frag-line"><strong>Tool calls:</strong> ${trace.total_tool_calls || (trace.tool_calls || []).length}</div>
-      <div class="frag-line"><strong>Status:</strong> ${trace.alert ? "ALERT" : "MONITORING"}</div>
-      ${trace.duration_ms != null ? `<div class="frag-line"><strong>Duration:</strong> ${formatDuration(trace.duration_ms)}</div>` : ""}
-    </div>`;
-}
-
-function finalAssistant(trace) {
-  const messages = trace?.assistant_messages || [];
-  const finalMsg = messages.find((m) => m.is_final);
-  return finalMsg?.content_full || finalMsg?.content_preview || trace.assistant_full || "";
-}
-
-export function renderTraces(container, data) {
-  const traces = data?.traces || [];
-  if (!traces.length) {
-    container.innerHTML = "<div class='panel'><div class='panel-body muted-line'>No trace data found for this run.</div></div>";
-    return;
-  }
-
-  container.innerHTML = traces
-    .map((t) => {
-      const iters = t.iterations_detail || [];
-      const hasIters = iters.length > 0;
-
-      const iterationsHtml = hasIters
-        ? iters.map((it, i) => renderIteration(it, i, iters.length)).join("")
-        : renderFallbackColumns(t);
-
-      const stepDuration = t.duration_ms != null ? formatDuration(t.duration_ms) : null;
-      return `
-      <div class="turn-card">
-        <div class="turn-header">
-          <div class="turn-header-left">
-            <span class="turn-label">TURN ${t.step}</span>
-            <span class="badge badge-tactic">${escapeHtml(t.tactic)}</span>
-            ${stepDuration ? `<span class="badge badge-duration">${stepDuration}</span>` : ""}
-            <span class="turn-prompt-preview mono">${escapeHtml(truncate(t.prompt, 90))}</span>
-          </div>
-          <span class="turn-kcc">KCC ${t.kcc.toFixed(2)}</span>
-        </div>
-        <div class="turn-detail">
-          <div class="turn-detail-top">
-            <div class="turn-col col-attacker">
-              <div class="turn-col-title"><span class="col-num">1</span> ATTACKER PROMPT</div>
-              <div class="prompt-quote"><pre class="mono">${escapeHtml(t.prompt || "(none)")}</pre></div>
-              ${renderAltPhrasings(t)}
-            </div>
-            <div class="turn-col col-parse">
-              <div class="turn-col-title"><span class="col-num">2</span> FRAGBENCH PARSES FRAGMENT</div>
-              ${renderFragbenchParse(t)}
-              <div class="trace-subtitle">Final response</div>
-              <div class="parse-block"><pre class="mono">${escapeHtml(truncate(finalAssistant(t), 600) || "(none)")}</pre></div>
-            </div>
-          </div>
-          <div class="turn-iterations-header">
-            <span>Agent Loop &mdash; ${hasIters ? iters.length : 1} iteration${(hasIters ? iters.length : 1) !== 1 ? "s" : ""}, ${t.total_tool_calls || (t.tool_calls || []).length} tool calls${t.duration_ms != null ? ` \u00b7 ${formatDuration(t.duration_ms)}` : ""}</span>
-          </div>
-          <div class="turn-iterations">
-            ${iterationsHtml}
-          </div>
-        </div>
-      </div>`;
-    })
-    .join("");
 }
 
 function renderFallbackColumns(t) {
@@ -249,4 +157,163 @@ function renderFallbackColumns(t) {
         </div>
       </div>
     </details>`;
+}
+
+function finalAssistant(trace) {
+  const messages = trace?.assistant_messages || [];
+  const finalMsg = messages.find((m) => m.is_final);
+  return finalMsg?.content_full || finalMsg?.content_preview || trace.assistant_full || "";
+}
+
+function allCalledToolNames(trace) {
+  const details = trace.tool_call_details || [];
+  const names = details.map((d) => d.name).filter(Boolean);
+  return [...new Set(names)];
+}
+
+function renderSummarySection(t) {
+  const kcc = t.kcc || 0;
+  const calledTools = allCalledToolNames(t);
+  return `
+    <div class="frag-parse">
+      <div class="frag-line"><strong>KCC:</strong> ${kcc.toFixed(2)}</div>
+      <div class="kcc-bar">${renderKccBar(kcc)}</div>
+      <div class="frag-line"><strong>Tactic:</strong> ${escapeHtml(t.tactic || "unknown")}</div>
+      <div class="frag-line"><strong>Available toolkits:</strong> ${escapeHtml((t.toolkit_set || []).join(", ") || "none")}</div>
+      <div class="frag-line"><strong>Tools called:</strong> ${calledTools.length ? escapeHtml(calledTools.join(", ")) : "none"}</div>
+      <div class="frag-line"><strong>Iterations:</strong> ${t.total_iterations || 1}</div>
+      <div class="frag-line"><strong>Total tool calls:</strong> ${t.total_tool_calls || (t.tool_calls || []).length}</div>
+      <div class="frag-line"><strong>Status:</strong> ${t.alert ? "ALERT" : "MONITORING"}</div>
+      ${t.duration_ms != null ? `<div class="frag-line"><strong>Duration:</strong> ${formatDuration(t.duration_ms)}</div>` : ""}
+      ${t.session_id ? `<div class="frag-line"><strong>Session:</strong> <span class="mono">${escapeHtml(t.session_id)}</span></div>` : ""}
+      ${t.source_ip ? `<div class="frag-line"><strong>IP:</strong> <span class="mono">${escapeHtml(t.source_ip)}</span></div>` : ""}
+    </div>`;
+}
+
+function renderResultsPane(t) {
+  const iters = t.iterations_detail || [];
+  const hasIters = iters.length > 0;
+  const iterationsHtml = hasIters
+    ? iters.map((it, i) => renderIteration(it, i, iters.length)).join("")
+    : renderFallbackColumns(t);
+  const totalCalls = t.total_tool_calls || (t.tool_calls || []).length;
+  const durationStr = t.duration_ms != null ? ` \u00b7 ${formatDuration(t.duration_ms)}` : "";
+
+  return `
+    <details class="result-section" open>
+      <summary class="result-section-header">Summary</summary>
+      <div class="result-section-body">
+        ${renderSummarySection(t)}
+      </div>
+    </details>
+    <details class="result-section">
+      <summary class="result-section-header">Agent Loop &mdash; ${hasIters ? iters.length : 1} iteration${(hasIters ? iters.length : 1) !== 1 ? "s" : ""}, ${totalCalls} tool call${totalCalls !== 1 ? "s" : ""}${durationStr}</summary>
+      <div class="result-section-body">
+        ${iterationsHtml}
+      </div>
+    </details>
+    <details class="result-section">
+      <summary class="result-section-header">Final Result</summary>
+      <div class="result-section-body">
+        <div class="parse-block"><pre class="mono">${escapeHtml(finalAssistant(t) || "(none)")}</pre></div>
+      </div>
+    </details>`;
+}
+
+function groupTracesByStage(traces) {
+  const groups = new Map();
+  for (const t of traces) {
+    const key = t.fragment_index ?? t.step;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        stageIndex: key,
+        description: t.fragment_description || "",
+        tactic: t.tactic || "",
+        fragments: [],
+      });
+    }
+    groups.get(key).fragments.push(t);
+  }
+  return [...groups.values()].sort((a, b) => a.stageIndex - b.stageIndex);
+}
+
+function fragmentLabel(t, idx) {
+  const varIdx = t.variation_index != null ? t.variation_index : idx;
+  return `Variation ${varIdx}`;
+}
+
+export function renderTraces(container, data) {
+  const traces = data?.traces || [];
+  if (!traces.length) {
+    container.innerHTML = "<div class='panel'><div class='panel-body muted-line'>No trace data found for this run.</div></div>";
+    return;
+  }
+
+  const stages = groupTracesByStage(traces);
+
+  container.innerHTML = stages
+    .map((stage) => {
+      const maxKcc = Math.max(...stage.fragments.map((f) => f.kcc || 0));
+
+      const variationItems = stage.fragments
+        .map(
+          (t, i) =>
+            `<button class="variation-item${i === 0 ? " active" : ""}" data-stage="${stage.stageIndex}" data-frag="${i}">
+              <span class="variation-item-label">${escapeHtml(fragmentLabel(t, i))}</span>
+              <div class="variation-item-prompt">${escapeHtml(truncate(t.prompt || "(no prompt)", 120))}</div>
+            </button>`
+        )
+        .join("");
+
+      const resultPanels = stage.fragments
+        .map(
+          (t, i) =>
+            `<div class="results-panel" data-stage="${stage.stageIndex}" data-frag="${i}" ${i === 0 ? "" : 'style="display:none"'}>
+              ${renderResultsPane(t)}
+            </div>`
+        )
+        .join("");
+
+      return `
+      <div class="turn-card" data-stage-card="${stage.stageIndex}">
+        <div class="turn-header">
+          <div class="turn-header-left">
+            <span class="turn-label">STAGE ${stage.stageIndex}</span>
+            <span class="badge badge-tactic">${escapeHtml(stage.tactic)}</span>
+            ${stage.description ? `<span class="stage-description">${escapeHtml(stage.description)}</span>` : ""}
+          </div>
+          <span class="turn-kcc">KCC ${maxKcc.toFixed(2)}</span>
+        </div>
+        <div class="stage-splitpane">
+          <div class="splitpane-left">
+            <div class="splitpane-left-header">Attacker Prompt</div>
+            <div class="variation-list-container">${variationItems}</div>
+          </div>
+          <div class="splitpane-right">
+            <div class="splitpane-right-header">Results</div>
+            <div class="results-container">${resultPanels}</div>
+          </div>
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  bindVariationClicks(container);
+}
+
+function bindVariationClicks(container) {
+  container.querySelectorAll(".variation-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      const fragIdx = item.dataset.frag;
+      const card = item.closest(".turn-card");
+      if (!card) return;
+
+      card.querySelectorAll(".variation-item").forEach((v) => v.classList.remove("active"));
+      item.classList.add("active");
+
+      card.querySelectorAll(".results-panel").forEach((panel) => {
+        panel.style.display = panel.dataset.frag === fragIdx ? "" : "none";
+      });
+    });
+  });
 }

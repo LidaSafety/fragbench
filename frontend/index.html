@@ -30,54 +30,20 @@
   <div class="layout">
     <aside class="sidebar">
       <div class="sidebar-group open">
-        <div class="sidebar-header" data-section="sec-fv">
-          <span class="chevron">▾</span> FRAGMENT VARIATIONS
+        <div class="sidebar-header" data-section="sec-campaigns">
+          <span class="chevron">▾</span> CAMPAIGNS
         </div>
-        <div class="sidebar-body" id="sec-fv">
-          <button class="sidebar-item active" data-view="campaigns">
-            <span class="item-dot"></span> Campaigns
-          </button>
-          <button class="sidebar-item" data-view="fragments">
-            <span class="item-dot"></span> Fragments
-          </button>
+        <div class="sidebar-body" id="sec-campaigns">
           <div id="sidebar-campaigns-list"></div>
         </div>
       </div>
 
       <div class="sidebar-group open">
         <div class="sidebar-header" data-section="sec-traces">
-          <span class="chevron">▾</span> MCP FRAGMENT TRACES
+          <span class="chevron">▾</span> FRAGMENT TRACES
         </div>
         <div class="sidebar-body" id="sec-traces">
-          <button class="sidebar-item" data-view="traces">
-            <span class="item-dot"></span> All Traces
-          </button>
           <div id="sidebar-traces-list"></div>
-        </div>
-      </div>
-
-      <div class="sidebar-group open">
-        <div class="sidebar-header" data-section="sec-gnn">
-          <span class="chevron">▾</span> GNN PIPELINE
-        </div>
-        <div class="sidebar-body" id="sec-gnn">
-          <button class="sidebar-item" data-view="gnn">
-            <span class="item-dot"></span> Graph Classification
-          </button>
-          <button class="sidebar-item" data-view="demo">
-            <span class="item-dot"></span> Interactive Demo
-          </button>
-        </div>
-      </div>
-
-      <div class="sidebar-group open">
-        <div class="sidebar-header" data-section="sec-mitre">
-          <span class="chevron">▾</span> MITRE ATTACK
-        </div>
-        <div class="sidebar-body" id="sec-mitre">
-          <button class="sidebar-item" data-view="mitre">
-            <span class="item-dot"></span> Coverage Matrix
-          </button>
         </div>
       </div>
 
@@ -86,11 +52,7 @@
 
     <main class="content">
       <section id="view-campaigns" class="view active"></section>
-      <section id="view-fragments" class="view"></section>
       <section id="view-traces" class="view"></section>
-      <section id="view-gnn" class="view"></section>
-      <section id="view-mitre" class="view"></section>
-      <section id="view-demo" class="view"></section>
     </main>
   </div>
 

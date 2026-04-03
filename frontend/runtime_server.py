@@ -343,8 +343,19 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             q["iteration_order"].append(iteration)
         return iters[iteration]
 
+    current_session_meta: dict[str, Any] = {}
+
     for event in events:
         kind = str(event.get("event") or "")
+
+        if kind == "session_start":
+            current_session_meta = {
+                "session_id": event.get("session_id"),
+                "source_ip": event.get("source_ip"),
+                "stage_index": event.get("stage_index"),
+                "variation_index": event.get("variation_index"),
+            }
+            continue
 
         if kind == "user_query":
             if current_query is not None:
@@ -355,6 +366,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "iteration_order": [],
                 "ts_start": _parse_ts(event.get("ts")),
                 "ts_end": None,
+                **current_session_meta,
             }
             latest_iter = 0
             continue
@@ -464,6 +476,10 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         merged["iterations_detail"] = []
         merged["ts_start"] = q.get("ts_start")
         merged["ts_end"] = q.get("ts_end")
+        merged["session_id"] = q.get("session_id")
+        merged["source_ip"] = q.get("source_ip")
+        merged["stage_index"] = q.get("stage_index")
+        merged["variation_index"] = q.get("variation_index")
 
         for it in order:
             turn = q["iterations"][it]
@@ -631,8 +647,8 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
     traces: list[dict[str, Any]] = []
     tactics_seen: list[str] = []
 
-    # Map runtime turns to fragment metadata by ordinal order.
     ordered_fragment_rows = sorted(fragment_rows, key=lambda row: int(row.get("index", 0)))
+    fragment_by_index = {int(r.get("index", i)): r for i, r in enumerate(ordered_fragment_rows)}
 
     for idx, query in enumerate(grouped_queries, start=1):
         prompt = str(query.get("prompt") or "")
@@ -643,7 +659,11 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
         tool_results_structured = [
             x for x in query.get("tool_results_structured", []) if isinstance(x, dict)
         ]
-        stage_meta = ordered_fragment_rows[idx - 1] if idx - 1 < len(ordered_fragment_rows) else {}
+        query_stage_idx = query.get("stage_index")
+        if query_stage_idx is not None:
+            stage_meta = fragment_by_index.get(int(query_stage_idx), {})
+        else:
+            stage_meta = ordered_fragment_rows[idx - 1] if idx - 1 < len(ordered_fragment_rows) else {}
         tactic = str(stage_meta.get("mitre_tactic") or detect_tactic(prompt))
         if tactic not in tactics_seen:
             tactics_seen.append(tactic)
@@ -653,6 +673,8 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
             x for x in query.get("iterations_detail", []) if isinstance(x, dict)
         ]
         step_duration_ms = _ms_between(query.get("ts_start"), query.get("ts_end"))
+        effective_fragment_index = query_stage_idx if query_stage_idx is not None else stage_meta.get("index")
+
         traces.append(
             {
                 "step": idx,
@@ -674,7 +696,7 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
                 "kcc": kcc,
                 "toolkit_set": extract_tool_names(tool_call_details or tool_calls),
                 "alert": kcc > 0.7 or risk > 0.85,
-                "fragment_index": stage_meta.get("index"),
+                "fragment_index": effective_fragment_index,
                 "fragment_description": str(stage_meta.get("description") or ""),
                 "mitre_technique": str(stage_meta.get("mitre_technique") or ""),
                 "mitre_technique_name": str(stage_meta.get("mitre_technique_name") or ""),
@@ -687,6 +709,10 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
                 "started_at": query.get("ts_start"),
                 "ended_at": query.get("ts_end"),
                 "duration_ms": step_duration_ms,
+                "session_id": query.get("session_id"),
+                "source_ip": query.get("source_ip"),
+                "stage_index": query.get("stage_index"),
+                "variation_index": query.get("variation_index"),
             }
         )
 
@@ -736,6 +762,8 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
             "server": session_start.get("server"),
             "attack_id": attack_id or campaign_name,
             "campaign": session_start.get("campaign"),
+            "session_id": session_start.get("session_id"),
+            "source_ip": session_start.get("source_ip"),
             "events": len(events),
             "alerts": latest_alert,
             "kcc": latest_kcc,

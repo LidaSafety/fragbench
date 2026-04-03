@@ -11,6 +11,7 @@ import os
 import re
 import signal
 import time
+import uuid
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +45,8 @@ class ConversationLogger:
         toolkit_set: Optional[List[str]] = None,
         source_ip: Optional[str] = None,
         session_id: Optional[str] = None,
+        stage_index: Optional[int] = None,
+        variation_index: Optional[int] = None,
     ):
         log_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -59,7 +62,7 @@ class ConversationLogger:
         self._tool_results_this_iter: int = 0
         self.toolkit_set: List[str] = list(toolkit_set or [])
         self.source_ip = source_ip
-        self.external_session_id = session_id
+        self.external_session_id = session_id or str(uuid.uuid4())
 
         self._emit("session_start", {
             "schema_version": "2.0",
@@ -73,6 +76,8 @@ class ConversationLogger:
             "pid": os.getpid(),
             "source_ip": self.source_ip,
             "session_id": self.external_session_id,
+            "stage_index": stage_index,
+            "variation_index": variation_index,
         })
 
     def _emit(self, event: str, data: Dict[str, Any]) -> None:
@@ -447,6 +452,8 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     p.add_argument("--source-ip", default=None, help="Synthetic source IP for this session.")
     p.add_argument("--session-id", default=None, help="External session id for this run.")
+    p.add_argument("--stage-index", type=int, default=None, help="TOML fragment/stage index for this run.")
+    p.add_argument("--variation-index", type=int, default=None, help="Variation index within the stage.")
     return p.parse_args(argv)
 
 
@@ -489,6 +496,8 @@ async def main(argv: Optional[List[str]] = None) -> None:
             log_dir=Path(args.log_dir),
             model=args.model,
             server=args.server_name,
+            stage_index=args.stage_index,
+            variation_index=args.variation_index,
             run_id=args.run_id,
             campaign=args.campaign,
             attack_id=args.attack_id,

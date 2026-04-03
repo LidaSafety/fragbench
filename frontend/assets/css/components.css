@@ -544,14 +544,171 @@ pre.mono {
 }
 
 /* =========================================
+   Stage description
+   ========================================= */
+.stage-description {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 480px;
+}
+
+/* =========================================
+   Split-pane layout (variations left, results right)
+   ========================================= */
+.stage-splitpane {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 200px;
+}
+
+.splitpane-left {
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 700px;
+}
+
+.splitpane-left-header,
+.splitpane-right-header {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.65rem;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.splitpane-left-header { color: var(--red); }
+.splitpane-right-header { color: var(--cyan); }
+
+.variation-list-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Individual clickable variation item */
+.variation-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s;
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+
+.variation-item:hover {
+  background: rgba(56,182,255,0.06);
+}
+
+.variation-item.active {
+  background: var(--cyan-dim);
+  border-left: 3px solid var(--cyan);
+}
+
+.variation-item-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--cyan);
+  margin-bottom: 0.2rem;
+}
+
+.variation-item-prompt {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.variation-item.active .variation-item-prompt { color: var(--text); }
+
+/* Right side: results container */
+.splitpane-right {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 700px;
+}
+
+.results-container {
+  flex: 1;
+  padding: 0.55rem 0.65rem;
+  overflow-y: auto;
+}
+
+/* =========================================
+   Collapsible result sections (Summary, Agent Loop, Final Result)
+   ========================================= */
+.result-section {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.result-section-header {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+
+.result-section-header:hover { background: var(--panel3); }
+.result-section:not([open]) .result-section-header { border-bottom: none; }
+.result-section summary::-webkit-details-marker { display: none; }
+
+.result-section-body {
+  padding: 0.5rem 0.6rem;
+}
+
+/* Thin scrollbar for split panes */
+.splitpane-left::-webkit-scrollbar,
+.splitpane-right::-webkit-scrollbar { width: 4px; }
+.splitpane-left::-webkit-scrollbar-track,
+.splitpane-right::-webkit-scrollbar-track { background: transparent; }
+.splitpane-left::-webkit-scrollbar-thumb,
+.splitpane-right::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* =========================================
    Responsive
    ========================================= */
 @media (max-width: 1280px) {
   .turn-detail-top { grid-template-columns: 1fr; }
   .turn-detail-top > .turn-col:first-child { border-right: none; }
+  .stage-splitpane { grid-template-columns: 220px 1fr; }
   .iter-columns { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) {
+  .stage-splitpane { grid-template-columns: 1fr; }
+  .splitpane-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 250px;
+  }
   .iter-columns { grid-template-columns: 1fr; }
 }

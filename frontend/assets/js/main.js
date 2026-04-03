@@ -11,6 +11,8 @@ function updateRunSummary(data) {
   byId("run-summary").innerHTML = `
     <div><strong>Attack:</strong> ${escapeHtml(run.attack_id || "n/a")}</div>
     <div><strong>Model:</strong> ${escapeHtml(run.model || "n/a")}</div>
+    ${run.session_id ? `<div><strong>Session:</strong> <span class="mono">${escapeHtml(run.session_id)}</span></div>` : ""}
+    ${run.source_ip ? `<div><strong>IP:</strong> <span class="mono">${escapeHtml(run.source_ip)}</span></div>` : ""}
     <div><strong>Events:</strong> ${run.events || 0}</div>
     <div><strong>KCC:</strong> ${(run.kcc ?? 0).toFixed(2)}</div>
     <div><strong>Duration:</strong> ${formatDuration(run.total_duration_ms)}</div>
@@ -32,25 +34,42 @@ function populateSidebarItems(data) {
     .join("");
 
   const traces = data?.traces || [];
-  tracesList.innerHTML = traces
-    .map(
-      (t, i) => {
-        const iters = t.total_iterations || 1;
-        const calls = t.total_tool_calls || (t.tool_calls || []).length;
-        return `<button class="sidebar-sub" data-view="traces" data-idx="${i}">Turn ${
-          t.step || i + 1
-        } \u2014 ${escapeHtml(t.tactic)} (${iters}i/${calls}t)</button>`;
-      }
-    )
+  const campaignName = campaigns.length ? campaigns[0].id : "Campaign";
+
+  const seenStages = new Set();
+  const stageButtons = traces
+    .map((t) => {
+      const stageIdx = t.fragment_index ?? t.step;
+      if (seenStages.has(stageIdx)) return "";
+      seenStages.add(stageIdx);
+      const stageTraces = traces.filter((x) => (x.fragment_index ?? x.step) === stageIdx);
+      const totalCalls = stageTraces.reduce((s, x) => s + (x.total_tool_calls || (x.tool_calls || []).length), 0);
+      return `<button class="sidebar-stage" data-view="traces" data-stage="${stageIdx}">Stage ${stageIdx} \u2014 ${escapeHtml(t.tactic)} (${stageTraces.length} frag${stageTraces.length !== 1 ? "s" : ""}/${totalCalls}t)</button>`;
+    })
     .join("");
+
+  tracesList.innerHTML =
+    `<button class="sidebar-sub" data-view="traces">${escapeHtml(campaignName)}</button>` +
+    `<div class="sidebar-stage-list">${stageButtons}</div>`;
 
   document.querySelectorAll(".sidebar-sub").forEach((btn) => {
     btn.addEventListener("click", () => {
       const view = btn.dataset.view;
       store.set({ activeView: view });
       setActiveView(view);
-      document.querySelectorAll(".sidebar-item, .sidebar-sub").forEach((el) => el.classList.remove("active"));
+      document.querySelectorAll(".sidebar-sub, .sidebar-stage").forEach((el) => el.classList.remove("active"));
       btn.classList.add("active");
+    });
+  });
+
+  document.querySelectorAll(".sidebar-stage").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      store.set({ activeView: "traces" });
+      setActiveView("traces");
+      document.querySelectorAll(".sidebar-sub, .sidebar-stage").forEach((el) => el.classList.remove("active"));
+      btn.classList.add("active");
+      const stageCard = document.querySelector(`.turn-card[data-stage-card="${btn.dataset.stage}"]`);
+      if (stageCard) stageCard.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 }

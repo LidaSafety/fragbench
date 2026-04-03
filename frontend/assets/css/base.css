@@ -192,6 +192,30 @@ select:focus { outline: 1px solid var(--cyan); }
 .sidebar-sub:hover { color: var(--text); background: rgba(56,182,255,0.05); }
 .sidebar-sub.active { color: var(--cyan); border-left-color: var(--cyan); }
 
+.sidebar-stage-list {
+  padding-left: 0.5rem;
+}
+
+.sidebar-stage {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  padding: 0.2rem 0.5rem 0.2rem 2.1rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-stage:hover { color: var(--text); background: rgba(56,182,255,0.05); }
+.sidebar-stage.active { color: var(--cyan); border-left-color: var(--cyan); }
+
 .sidebar-meta {
   margin-top: auto;
   padding: 0.6rem 0.7rem;

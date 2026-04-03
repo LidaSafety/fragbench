@@ -263,10 +263,12 @@ v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATT
 		--attack-id "$$ATTACK_ID" \
 		$${SOURCE_IP:+--source-ip "$$SOURCE_IP"} \
 		$${SESSION_ID:+--session-id "$$SESSION_ID"} \
+		--stage-index "$(ATTACK_STAGE)" \
+		--variation-index "$(ATTACK_VARIATION_INDEX)" \
 		--prompt "$$PROMPT"
 
 chain-run: stack-ready
-	@RUN_ID="chain_$$(date +%Y%m%d_%H%M%S)"; \
+	@RUN_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
 	ATTACK_ID="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )"; \
 	STAGE_LIST="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs=sorted({int(f.get("index",i)) for i,f in enumerate(frags)}); print(" ".join(str(i) for i in idxs))' "$(ATTACK_TOML)" )"; \
 	NUM_STAGES="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs={int(f.get("index",i)) for i,f in enumerate(frags)}; print(len(idxs))' "$(ATTACK_TOML)" )"; \
@@ -283,7 +285,7 @@ chain-run: stack-ready
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 		for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
 			SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
-			SESSION_ID="$$RUN_ID""_s$$STAGE""_v$$VAR_IDX"; \
+			SESSION_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
 			$(MAKE) --no-print-directory attack-run \
 				ATTACK_TOML="$(ATTACK_TOML)" \
 				ATTACK_STAGE="$$STAGE" \
@@ -323,11 +325,20 @@ DOCKER_REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.docker.toml
 DOCKER_OLLAMA_URL ?= http://host.docker.internal:11434
 DOCKER_VLLM_URL ?= http://host.docker.internal:8000/v1
 
-.PHONY: docker-up docker-down docker-status docker-cli docker-attack-run docker-chain-run
+.PHONY: docker-up docker-down docker-status docker-ensure-up docker-cli docker-attack-run docker-chain-run
 
 docker-up:
 	@$(DOCKER_COMPOSE) up -d
 	@echo "MCP servers + viewer running. Viewer: http://localhost:8787"
+
+docker-ensure-up:
+	@RUNNING=$$($(DOCKER_COMPOSE) ps --status running -q 2>/dev/null | wc -l | tr -d ' '); \
+	if [ "$$RUNNING" -lt 5 ]; then \
+	  echo "Starting services..."; $(DOCKER_COMPOSE) up -d; \
+	  echo "MCP servers + viewer running. Viewer: http://localhost:8787"; \
+	else \
+	  echo "Services already running ($$RUNNING containers)."; \
+	fi
 
 docker-down:
 	@$(DOCKER_COMPOSE) down
@@ -340,7 +351,7 @@ EFFECTIVE_MODEL="$(MODEL)"; \
 if [ "$(MODEL_BACKEND)" = "ollama" ]; then \
   case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
 fi; \
-$(DOCKER_COMPOSE) run --rm \
+$(DOCKER_COMPOSE) run --rm --build \
 	-e OPENROUTER_API_KEY \
 	-e OPENAI_API_KEY \
 	-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
@@ -360,7 +371,7 @@ endef
 docker-cli: docker-up
 	$(DOCKER_CLIENT_CMD)
 
-docker-attack-run: docker-up
+docker-attack-run: $(if $(filter 1,$(SKIP_UP)),,docker-up)
 	@PROMPT="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); v_idx=int(sys.argv[3]); data=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(data.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; assert vals, f"No prompt variations found for stage index {stage} in {p}"; \
 v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATTACK_STAGE)" "$(ATTACK_VARIATION_INDEX)" )"; \
 	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )}"; \
@@ -371,7 +382,7 @@ v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATT
 	echo "TOML: $(ATTACK_TOML) | stage: $(ATTACK_STAGE) | variation: $(ATTACK_VARIATION_INDEX)"; \
 	echo "Session: $${SESSION_ID:-auto} | source_ip: $${SOURCE_IP:-auto}"; \
 	echo "Prompt: $$PROMPT"; \
-	$(DOCKER_COMPOSE) run --rm \
+	$(DOCKER_COMPOSE) run --rm --build \
 		-e OPENROUTER_API_KEY \
 		-e OPENAI_API_KEY \
 		-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
@@ -391,10 +402,12 @@ v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATT
 			--attack-id "$$ATTACK_ID" \
 			$${SOURCE_IP:+--source-ip "$$SOURCE_IP"} \
 			$${SESSION_ID:+--session-id "$$SESSION_ID"} \
+			--stage-index "$(ATTACK_STAGE)" \
+			--variation-index "$(ATTACK_VARIATION_INDEX)" \
 			--prompt "$$PROMPT"
 
-docker-chain-run: docker-up
-	@RUN_ID="chain_$$(date +%Y%m%d_%H%M%S)"; \
+docker-chain-run: docker-ensure-up
+	@RUN_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
 	ATTACK_ID="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )"; \
 	STAGE_LIST="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs=sorted({int(f.get("index",i)) for i,f in enumerate(frags)}); print(" ".join(str(i) for i in idxs))' "$(ATTACK_TOML)" )"; \
 	NUM_STAGES="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs={int(f.get("index",i)) for i,f in enumerate(frags)}; print(len(idxs))' "$(ATTACK_TOML)" )"; \
@@ -411,8 +424,9 @@ docker-chain-run: docker-up
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 		for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
 			SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
-			SESSION_ID="$$RUN_ID""_s$$STAGE""_v$$VAR_IDX"; \
+			SESSION_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
 			$(MAKE) --no-print-directory docker-attack-run \
+				SKIP_UP=1 \
 				ATTACK_TOML="$(ATTACK_TOML)" \
 				ATTACK_STAGE="$$STAGE" \
 				ATTACK_VARIATION_INDEX="$$VAR_IDX" \
