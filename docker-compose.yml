@@ -32,10 +32,27 @@ services:
   viewer:
     build:
       context: .
-      dockerfile: Dockerfile
       target: viewer
-    networks: [internal_mgmt]
-    ports: ["8787:8787"]
+    container_name: fragbench-viewer
+    command:
+      - --host=0.0.0.0
+      - --port=8787
+    ports:
+      - "${VIEWER_PORT:-8787}:8787"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32M
+    volumes:
+      - ./logs:/app/logs:ro
+      - ./seeds:/app/seeds:ro
+      - ./attacks:/app/attacks:ro
+    networks:
+      - viewer-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
 
   # ── Core servers ─────────────────────────────────────────────
   server-filesystem:
@@ -188,4 +205,6 @@ networks:
   internal_mgmt:
     internal: true
   egress_pipe:
+    driver: bridge
+  viewer-net:
     driver: bridge

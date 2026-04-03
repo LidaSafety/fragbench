@@ -208,42 +208,6 @@ stack-up-all: stack-up $(PID_DIR)
 	@sleep 2
 	@echo "All 23 servers started."
 
-maple-check:
-	@echo "Running maple preflight checks..."
-	@command -v uv >/dev/null 2>&1 || (echo "ERROR: uv not found in PATH"; exit 1)
-	@command -v $(PY) >/dev/null 2>&1 || (echo "ERROR: $(PY) not found in PATH"; exit 1)
-	@[ -f "$(ATTACK_TOML)" ] || (echo "ERROR: ATTACK_TOML file not found: $(ATTACK_TOML)"; exit 1)
-	@[ -f "$(REGISTRY_PATH)" ] || (echo "ERROR: REGISTRY_PATH file not found: $(REGISTRY_PATH)"; exit 1)
-	@if [ "$(MODEL_BACKEND)" = "openrouter" ]; then \
-		[ -n "$$OPENROUTER_API_KEY" ] || (echo "ERROR: OPENROUTER_API_KEY is required for MODEL_BACKEND=openrouter"; exit 1); \
-	fi
-	@if [ "$(MODEL_BACKEND)" = "ollama" ]; then \
-		URL="$(OLLAMA_BASE_URL)"; \
-		$(PY) -c 'import socket,sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); host=u.hostname or "127.0.0.1"; port=u.port or 80; s=socket.socket(); s.settimeout(2); s.connect((host,port)); s.close(); print(f"OK: ollama reachable at {host}:{port}")' "$$URL" || \
-		(echo "ERROR: Ollama endpoint unreachable: $(OLLAMA_BASE_URL)"; exit 1); \
-		$(PY) -c 'import sys,urllib.request; base=sys.argv[1].rstrip("/"); url=f"{base}/api/tags"; r=urllib.request.urlopen(url, timeout=3); print(f"OK: ollama API responds at {url} (status={r.getcode()})")' "$$URL" || \
-		(echo "ERROR: Ollama API did not respond at /api/tags; check base URL/version"; exit 1); \
-		$(PY) -c 'import json,sys,urllib.request; base=sys.argv[1].rstrip("/"); model=sys.argv[2]; data=json.load(urllib.request.urlopen(f"{base}/api/tags", timeout=3)); names={m.get("name","") for m in data.get("models",[])}; \
-ok=(model in names) or any(str(n).startswith(model + ":") for n in names); \
-print(f"OK: ollama model available: {model}" if ok else f"MISSING: ollama model {model}. Available: {sorted(names)[:20]}"); \
-raise SystemExit(0 if ok else 1)' "$$URL" "$(MODEL)" || \
-		(echo "ERROR: Requested MODEL not found in Ollama. Run: ollama pull $(MODEL)"; exit 1); \
-	fi
-	@if [ "$(MODEL_BACKEND)" = "vllm" ]; then \
-		URL="$(VLLM_BASE_URL)"; \
-		$(PY) -c 'import socket,sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); host=u.hostname or "127.0.0.1"; port=u.port or 80; s=socket.socket(); s.settimeout(2); s.connect((host,port)); s.close(); print(f"OK: vLLM reachable at {host}:{port}")' "$$URL" || \
-		(echo "ERROR: vLLM endpoint unreachable: $(VLLM_BASE_URL)"; exit 1); \
-	fi
-	@for URL in $(TOOLKIT_ENDPOINTS); do \
-		$(PY) -c 'import socket,sys; from urllib.parse import urlparse; u=urlparse(sys.argv[1]); host=u.hostname or "127.0.0.1"; port=u.port or 80; s=socket.socket(); s.settimeout(2); s.connect((host,port)); s.close()' "$$URL" || \
-		(echo "ERROR: toolkit endpoint unreachable: $$URL (start with: make stack-ready)"; exit 1); \
-		echo "OK: toolkit endpoint reachable $$URL"; \
-	done
-	@echo "Maple preflight checks passed."
-
-maple-ready: stack-ready maple-check
-	@echo "Maple stack is ready for attack runs."
-
 cli:
 	@$(UV) $(PY) fragbench_mcp/mcp_cli.py \
 		--model-backend "$(MODEL_BACKEND)" \
