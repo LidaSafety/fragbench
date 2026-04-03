@@ -120,20 +120,77 @@ def _fix_json_escapes(text: str) -> str:
     """
     def _fix_string(m: re.Match) -> str:
         s = m.group(0)
-        # Collapse any run of backslashes to the chars they represent,
-        # then re-escape for JSON.  e.g. \\P -> \P -> \\P,  \P -> \P -> \\P
-        # First: unescape valid JSON escapes to their real chars
-        # Then: re-escape all backslashes
-        # Simplest correct approach: replace \\ with a placeholder,
-        # then escape remaining \, then restore placeholder.
         placeholder = "\x00BKSL\x00"
         s = s.replace("\\\\", placeholder)
         s = s.replace("\\", "\\\\")
         s = s.replace(placeholder, "\\\\")
         return s
 
-    # Match JSON string values (between double quotes, handling escaped quotes)
     return re.sub(r'"(?:[^"\\]|\\.)*"', _fix_string, text)
+
+
+# ---------------------------------------------------------------------------
+# Template-based fragmentation (no LLM needed)
+# ---------------------------------------------------------------------------
+
+# Splitting patterns: regex → how to break the prompt at that point.
+# Each pattern captures a natural "and then do this" boundary.
+_SPLIT_PATTERNS: list[re.Pattern] = [
+    re.compile(r'\band\b\s+(?:to\s+)?gather\b', re.IGNORECASE),
+    re.compile(r'\band\b\s+(?:to\s+)?(?:upload|send|transfer|exfiltrat)', re.IGNORECASE),
+    re.compile(r'\band\b\s+(?:to\s+)?(?:save|add|write|log|redirect)\b', re.IGNORECASE),
+    re.compile(r'\band\b\s+(?:to\s+)?(?:copy|move|stage|collect|harvest)', re.IGNORECASE),
+    re.compile(r'\bdocuments?\b\s+from\b', re.IGNORECASE),
+    re.compile(r'\.\s+(?:Include|The email|Also|Then|Save|Write|Upload)\b'),
+    re.compile(r',\s+(?:then|and then)\b', re.IGNORECASE),
+    re.compile(r'\band\b\s+uploads?\b', re.IGNORECASE),
+]
+
+
+def _template_fragment(step: str) -> list[str]:
+    """
+    Split a prompt into 2-3 coherent sub-fragments using pattern matching.
+    Each fragment looks innocent alone but together they reconstruct the attack.
+    """
+    def _clean(text: str) -> str:
+        """Strip leading/trailing punctuation and whitespace, capitalize."""
+        text = text.strip()
+        text = re.sub(r'^[.,;:\s]+', '', text)
+        text = re.sub(r'^and\s+(?:to\s+)?', '', text, flags=re.IGNORECASE)
+        # Capitalize unless it starts with a file extension like .csv
+        if text and not text.startswith('.'):
+            text = text[0].upper() + text[1:]
+        return text
+
+    # Try each split pattern
+    for pat in _SPLIT_PATTERNS:
+        m = pat.search(step)
+        if m:
+            part_a = _clean(step[:m.start()])
+            part_b = _clean(step[m.start():])
+            if part_a and part_b:
+                return [part_a, part_b]
+
+    # Fallback: split on sentence boundaries
+    sentences = re.split(r'(?<=[.!?])\s+', step)
+    if len(sentences) >= 2:
+        mid = len(sentences) // 2
+        return [
+            _clean(' '.join(sentences[:mid])),
+            _clean(' '.join(sentences[mid:])),
+        ]
+
+    # Last resort: split at roughly the middle comma or conjunction
+    comma_split = re.split(r',\s+', step)
+    if len(comma_split) >= 2:
+        mid = len(comma_split) // 2
+        return [
+            _clean(', '.join(comma_split[:mid])),
+            _clean(', '.join(comma_split[mid:])),
+        ]
+
+    # Cannot split — return as single fragment
+    return [step]
 
 
 def make_fragments(
@@ -142,17 +199,23 @@ def make_fragments(
     model: str = "claude-haiku-4-5-20251001",
 ) -> list[FragmentGroup]:
     """
-    Use an LLM to split each step in *var* into two innocuous-sounding sub-steps.
+    Split each step in *var* into coherent sub-fragments.
+
+    With api_key: uses LLM for creative splitting.
+    Without api_key: uses pattern-based template splitting (deterministic).
+
     Returns a list of FragmentGroup objects, each linking sub-fragments to the
     parent step and its MITRE tactic.
-
-    Falls back to the original step text if api_key is None (dry-run).
     """
     import json as _json
 
     if api_key is None:
         return [
-            FragmentGroup(parent_step=step, parent_tactic=tactic, sub_fragments=[step])
+            FragmentGroup(
+                parent_step=step,
+                parent_tactic=tactic,
+                sub_fragments=_template_fragment(step),
+            )
             for step, tactic in var
         ]
 
@@ -160,9 +223,13 @@ def make_fragments(
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
-        log.error("anthropic package not installed — returning steps unchanged")
+        log.error("anthropic package not installed — falling back to template fragmentation")
         return [
-            FragmentGroup(parent_step=step, parent_tactic=tactic, sub_fragments=[step])
+            FragmentGroup(
+                parent_step=step,
+                parent_tactic=tactic,
+                sub_fragments=_template_fragment(step),
+            )
             for step, tactic in var
         ]
 
@@ -180,9 +247,9 @@ def make_fragments(
             )
             raw = resp.content[0].text.strip()
             if not raw:
-                log.warning("Empty LLM response for step %r (stop_reason=%s) — using original",
-                            step[:60], resp.stop_reason)
-                group.sub_fragments = [step]
+                log.warning("Empty LLM response for step %r — using template split",
+                            step[:60])
+                group.sub_fragments = _template_fragment(step)
                 fallbacks += 1
             else:
                 cleaned = _fix_json_escapes(_strip_code_fence(raw))
@@ -190,17 +257,17 @@ def make_fragments(
                 if isinstance(parts, list) and len(parts) >= 2:
                     group.sub_fragments = [str(p) for p in parts[:2]]
                 else:
-                    log.warning("Unexpected LLM response for step %r — using original", step[:60])
-                    group.sub_fragments = [step]
+                    log.warning("Unexpected LLM response for step %r — using template split", step[:60])
+                    group.sub_fragments = _template_fragment(step)
                     fallbacks += 1
         except Exception:
-            log.warning("Fragment LLM call failed for step %r", step[:60], exc_info=True)
-            group.sub_fragments = [step]
+            log.warning("Fragment LLM call failed for step %r — using template split", step[:60], exc_info=True)
+            group.sub_fragments = _template_fragment(step)
             fallbacks += 1
         groups.append(group)
 
     if fallbacks:
-        log.warning("make_fragments: %d/%d steps fell back to originals", fallbacks, len(var))
+        log.warning("make_fragments: %d/%d steps fell back to template splitting", fallbacks, len(var))
     return groups
 
 
@@ -451,3 +518,61 @@ def generate_toml(
                 ]
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# JSON serialization
+# ---------------------------------------------------------------------------
+
+def generate_json(
+    metadata: dict,
+    fragments: list[StyledFragmentGroup] | list[FragmentGroup],
+    seed: int,
+) -> dict:
+    """
+    Build a JSON-serializable dict with full fragment traceability.
+
+    Includes: metadata, seed, and per-fragment parent→sub-fragment→style mapping.
+    Suitable for network simulation and attack detection research.
+    """
+    campaign_id = f"{metadata['id']}_{seed}"
+
+    frag_list = []
+    for frag_idx, frag in enumerate(fragments):
+        if isinstance(frag, StyledFragmentGroup):
+            frag_list.append({
+                "fragment_index": frag_idx,
+                "parent_prompt": frag.parent_step,
+                "parent_tactic": str(frag.parent_tactic),
+                "variations": [
+                    {"style": sv.style, "prompt": sv.prompt}
+                    for sv in frag.variations
+                ],
+            })
+        elif isinstance(frag, FragmentGroup):
+            frag_list.append({
+                "fragment_index": frag_idx,
+                "parent_prompt": frag.parent_step,
+                "parent_tactic": str(frag.parent_tactic),
+                "sub_fragments": frag.sub_fragments,
+            })
+        else:
+            # Legacy: list[str]
+            frag_list.append({
+                "fragment_index": frag_idx,
+                "sub_fragments": frag,
+            })
+
+    return {
+        "campaign_id": campaign_id,
+        "seed": seed,
+        "metadata": {
+            "id": metadata.get("id"),
+            "technique": metadata.get("technique"),
+            "technique_name": metadata.get("technique_name"),
+            "description": metadata.get("description"),
+            "tags": metadata.get("tags", []),
+        },
+        "total_fragments": len(frag_list),
+        "fragments": frag_list,
+    }

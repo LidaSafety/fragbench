@@ -151,6 +151,12 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated list of styles to generate (default: all 10). "
              "E.g. --styles direct,sysadmin,ctf",
     )
+    p.add_argument(
+        "--output-json",
+        default=None,
+        help="Write generated fragments to a JSON file (with full traceability). "
+             "E.g. --output-json results/promptsteal_fragments.json",
+    )
 
     return p.parse_args()
 
@@ -311,6 +317,7 @@ def run_generate(args) -> None:
     from generator import (
         STYLES,
         VARIATION_REGISTRY,
+        generate_json,
         generate_toml,
         legitimize_fragment,
         make_fragments,
@@ -397,16 +404,30 @@ def run_generate(args) -> None:
     attacks_dir.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
+    json_docs: list[dict] = []
     for i, frags in enumerate(final_frag_list):
         seed = base_seed + i
         toml_text = generate_toml(seed_data["metadata"], frags, seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)
+        json_docs.append(generate_json(seed_data["metadata"], frags, seed))
 
     print(f"\nWrote {len(written)} TOML file(s) to {attacks_dir}/")
     for p in written:
         print(f"  {p.name}")
+
+    if args.output_json:
+        json_out = Path(args.output_json)
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        output = {
+            "campaign": campaign_id,
+            "base_seed": base_seed,
+            "num_variations": len(json_docs),
+            "variations": json_docs,
+        }
+        json_out.write_text(_json.dumps(output, indent=2, ensure_ascii=False))
+        print(f"\nWrote JSON output to {json_out}")
 
 
 def main() -> None:
