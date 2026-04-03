@@ -182,6 +182,7 @@ class OllamaBackend(ChatBackend):
         parallel_tool_calls: bool = True,
         provider_preferences: Optional[Dict[str, Any]] = None,
         use_transform: bool = False,
+        request_metadata: Optional[Dict[str, Any]] = None,
     ) -> Any:
         if stream:
             raise RuntimeError("Ollama streaming path is not enabled in this client.")
@@ -200,6 +201,8 @@ class OllamaBackend(ChatBackend):
             payload["tools"] = tools
         if tool_choice:
             payload["tool_choice"] = tool_choice
+        if request_metadata:
+            payload["metadata"] = request_metadata
 
         async def _request() -> Dict[str, Any]:
             async with httpx.AsyncClient(timeout=120.0) as client:

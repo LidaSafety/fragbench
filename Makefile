@@ -3,14 +3,16 @@ SHELL := /bin/bash
 UV ?= uv run
 PY ?= python3
 
-MODEL_BACKEND ?= openrouter
+MODEL_BACKEND ?= ollama
 # Host Ollama (reachable from Docker via host.docker.internal on Mac/Windows Desktop)
 OLLAMA_BASE_URL ?= http://host.docker.internal:11434
 VLLM_BASE_URL ?= http://127.0.0.1:8000/v1
 VLLM_API_KEY ?= EMPTY
 ATTACK_SEED ?= seeds/hello_world.json
+ATTACK_TOML ?= attacks/hello_world.toml
 ATTACK_VARIATION_SEED ?= 42
 ATTACK_STAGE ?= 0
+ATTACK_VARIATION_INDEX ?= 0
 REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.toml
 EXEC_MODE ?= simulated
 LOG_DIR ?= logs
@@ -39,11 +41,12 @@ ARCHIVE_URL := http://127.0.0.1:8012/mcp
 EXFIL_URL := http://127.0.0.1:8013/mcp
 NETWORK_URL := http://127.0.0.1:8014/mcp
 
-.PHONY: help stack-up stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run chain-run clean-runtime
+.PHONY: help stack-up stack-up-all stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run chain-run clean-runtime
 
 help:
 	@echo "Targets (bare-metal):"
-	@echo "  make stack-up       - Start all MCP toolkit servers"
+	@echo "  make stack-up       - Start 5 core MCP toolkit servers"
+	@echo "  make stack-up-all   - Start ALL 23 MCP toolkit servers"
 	@echo "  make stack-down     - Stop all MCP toolkit servers"
 	@echo "  make stack-status   - Show server process status"
 	@echo "  make stack-ready    - Start stack and verify status"
@@ -51,8 +54,8 @@ help:
 	@echo "  make maple-ready    - Start stack then run maple-check"
 	@echo "  make cli            - Run interactive MCP CLI (auto toolkits)"
 	@echo "  make hello-run      - Generate hello prompt and run one-shot CLI"
-	@echo "  make attack-run     - Generate attack prompt from ATTACK_SEED and run one-shot CLI"
-	@echo "  make chain-run      - Run ALL stages of ATTACK_SEED sequentially with shared run-id"
+	@echo "  make attack-run     - Run one TOML stage/variation from ATTACK_TOML"
+	@echo "  make chain-run      - Run ALL TOML stages/variations with shared run-id"
 	@echo "  make clean-runtime  - Remove pid/log runtime artifacts"
 	@echo ""
 	@echo "Targets (Docker-isolated):"
@@ -60,8 +63,8 @@ help:
 	@echo "  make docker-down       - Stop all containers"
 	@echo "  make docker-status     - Show container status"
 	@echo "  make docker-cli        - Interactive MCP CLI inside container"
-	@echo "  make docker-attack-run - Single-stage attack in container"
-	@echo "  make docker-chain-run  - Full kill-chain in container (all stages)"
+	@echo "  make docker-attack-run - Single TOML stage/variation in container"
+	@echo "  make docker-chain-run  - Full TOML kill-chain in container (all stages/variations)"
 	@echo ""
 	@echo "Targets (Docker dataset pipeline - TOML generation + eval):"
 	@echo "  make docker-dataset-up                  - Reminder: host Ollama at host.docker.internal:11434"
@@ -80,7 +83,8 @@ help:
 	@echo "Config overrides (both bare-metal and Docker):"
 	@echo "  MODEL_BACKEND=$(MODEL_BACKEND) MODEL=$(MODEL) EXEC_MODE=$(EXEC_MODE)"
 	@echo "  OLLAMA_BASE_URL=$(OLLAMA_BASE_URL) VLLM_BASE_URL=$(VLLM_BASE_URL)"
-	@echo "  ATTACK_SEED=$(ATTACK_SEED) ATTACK_VARIATION_SEED=$(ATTACK_VARIATION_SEED) ATTACK_STAGE=$(ATTACK_STAGE)"
+	@echo "  ATTACK_TOML=$(ATTACK_TOML) ATTACK_STAGE=$(ATTACK_STAGE) ATTACK_VARIATION_INDEX=$(ATTACK_VARIATION_INDEX)"
+	@echo "  ATTACK_SEED=$(ATTACK_SEED) ATTACK_VARIATION_SEED=$(ATTACK_VARIATION_SEED)   # legacy dataset flow"
 	@echo "  REGISTRY_PATH=$(REGISTRY_PATH)"
 	@echo ""
 	@echo "Dataset config (Docker TOML pipeline):"
@@ -104,11 +108,11 @@ define START_IF_NEEDED
 endef
 
 stack-up: $(PID_DIR)
-	$(call START_IF_NEEDED,$(FS_URL),filesystem,fragbench_mcp/servers/filesystem_server.py --transport sse --port 8001,$(SERVER_LOG_DIR)/filesystem.log,$(FS_PID))
-	$(call START_IF_NEEDED,$(SHELL_URL),shell,fragbench_mcp/servers/shell_server.py --transport sse --port 8011,$(SERVER_LOG_DIR)/shell.log,$(SHELL_PID))
-	$(call START_IF_NEEDED,$(ARCHIVE_URL),archive,fragbench_mcp/servers/archive_server.py --transport sse --port 8012,$(SERVER_LOG_DIR)/archive.log,$(ARCHIVE_PID))
-	$(call START_IF_NEEDED,$(EXFIL_URL),exfil,fragbench_mcp/servers/exfil_server.py --transport sse --port 8013,$(SERVER_LOG_DIR)/exfil.log,$(EXFIL_PID))
-	$(call START_IF_NEEDED,$(NETWORK_URL),network,fragbench_mcp/servers/network_recon_server.py --transport sse --port 8014,$(SERVER_LOG_DIR)/network.log,$(NETWORK_PID))
+	$(call START_IF_NEEDED,$(FS_URL),filesystem,fragbench_mcp/servers/filesystem/server.py --transport sse --port 8001,$(SERVER_LOG_DIR)/filesystem.log,$(FS_PID))
+	$(call START_IF_NEEDED,$(SHELL_URL),shell,fragbench_mcp/servers/shell/server.py --transport sse --port 8011,$(SERVER_LOG_DIR)/shell.log,$(SHELL_PID))
+	$(call START_IF_NEEDED,$(ARCHIVE_URL),archive,fragbench_mcp/servers/archive/server.py --transport sse --port 8012,$(SERVER_LOG_DIR)/archive.log,$(ARCHIVE_PID))
+	$(call START_IF_NEEDED,$(EXFIL_URL),exfil,fragbench_mcp/servers/exfil/server.py --transport sse --port 8013,$(SERVER_LOG_DIR)/exfil.log,$(EXFIL_PID))
+	$(call START_IF_NEEDED,$(NETWORK_URL),network,fragbench_mcp/servers/network_recon/server.py --transport sse --port 8014,$(SERVER_LOG_DIR)/network.log,$(NETWORK_PID))
 	@sleep 2
 	@$(MAKE) stack-status
 
@@ -162,11 +166,53 @@ stack-down:
 stack-ready: stack-up
 	@echo "MCP stack is ready."
 
+# All 23 servers (core + extras)
+RECON_OSINT_PID := $(PID_DIR)/recon_osint.pid
+RECON_NETWORK_PID := $(PID_DIR)/recon_network.pid
+RECON_SUBDOMAIN_PID := $(PID_DIR)/recon_subdomain.pid
+RECON_WEB_PID := $(PID_DIR)/recon_web.pid
+CLOUD_RECON_PID := $(PID_DIR)/cloud_recon.pid
+GIT_PID := $(PID_DIR)/git.pid
+CODE_PID := $(PID_DIR)/code.pid
+PACKAGES_PID := $(PID_DIR)/packages.pid
+CREDENTIAL_PID := $(PID_DIR)/credential.pid
+CRYPTO_PID := $(PID_DIR)/crypto.pid
+REPORT_PID := $(PID_DIR)/report.pid
+TERMINAL_PID := $(PID_DIR)/terminal.pid
+SSH_BF_PID := $(PID_DIR)/ssh_bruteforce.pid
+PAYLOAD_PID := $(PID_DIR)/payload_evasion.pid
+VULN_PID := $(PID_DIR)/vuln_scanner.pid
+AGENT_PID := $(PID_DIR)/agent_control.pid
+C2_PID := $(PID_DIR)/c2_callback.pid
+PROJECT_PID := $(PID_DIR)/project.pid
+
+stack-up-all: stack-up $(PID_DIR)
+	$(call START_IF_NEEDED,http://127.0.0.1:8020/mcp,recon-osint,fragbench_mcp/servers/recon_osint/server.py --transport sse --port 8020,$(SERVER_LOG_DIR)/recon_osint.log,$(RECON_OSINT_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8021/mcp,recon-network,fragbench_mcp/servers/recon_network/server.py --transport sse --port 8021,$(SERVER_LOG_DIR)/recon_network.log,$(RECON_NETWORK_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8022/mcp,recon-subdomain,fragbench_mcp/servers/recon_subdomain/server.py --transport sse --port 8022,$(SERVER_LOG_DIR)/recon_subdomain.log,$(RECON_SUBDOMAIN_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8023/mcp,recon-web,fragbench_mcp/servers/recon_web/server.py --transport sse --port 8023,$(SERVER_LOG_DIR)/recon_web.log,$(RECON_WEB_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8024/mcp,cloud-recon,fragbench_mcp/servers/cloud_recon/server.py --transport sse --port 8024,$(SERVER_LOG_DIR)/cloud_recon.log,$(CLOUD_RECON_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8025/mcp,git,fragbench_mcp/servers/git/server.py --transport sse --port 8025,$(SERVER_LOG_DIR)/git.log,$(GIT_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8026/mcp,code,fragbench_mcp/servers/code/server.py --transport sse --port 8026,$(SERVER_LOG_DIR)/code.log,$(CODE_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8027/mcp,packages,fragbench_mcp/servers/packages/server.py --transport sse --port 8027,$(SERVER_LOG_DIR)/packages.log,$(PACKAGES_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8028/mcp,credential,fragbench_mcp/servers/credential/server.py --transport sse --port 8028,$(SERVER_LOG_DIR)/credential.log,$(CREDENTIAL_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8029/mcp,crypto,fragbench_mcp/servers/crypto/server.py --transport sse --port 8029,$(SERVER_LOG_DIR)/crypto.log,$(CRYPTO_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8030/mcp,report,fragbench_mcp/servers/report/server.py --transport sse --port 8030,$(SERVER_LOG_DIR)/report.log,$(REPORT_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8031/mcp,terminal,fragbench_mcp/servers/terminal/server.py --transport sse --port 8031,$(SERVER_LOG_DIR)/terminal.log,$(TERMINAL_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8032/mcp,ssh-bruteforce,fragbench_mcp/servers/ssh_bruteforce/server.py --transport sse --port 8032,$(SERVER_LOG_DIR)/ssh_bruteforce.log,$(SSH_BF_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8033/mcp,payload-evasion,fragbench_mcp/servers/payload_evasion/server.py --transport sse --port 8033,$(SERVER_LOG_DIR)/payload_evasion.log,$(PAYLOAD_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8034/mcp,vuln-scanner,fragbench_mcp/servers/vuln_scanner/server.py --transport sse --port 8034,$(SERVER_LOG_DIR)/vuln_scanner.log,$(VULN_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8035/mcp,agent-control,fragbench_mcp/servers/agent_control/server.py --transport sse --port 8035,$(SERVER_LOG_DIR)/agent_control.log,$(AGENT_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8036/mcp,c2-callback,fragbench_mcp/servers/c2_callback/server.py --transport sse --port 8036,$(SERVER_LOG_DIR)/c2_callback.log,$(C2_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8037/mcp,project,fragbench_mcp/servers/project/server.py --transport sse --port 8037,$(SERVER_LOG_DIR)/project.log,$(PROJECT_PID))
+	@sleep 2
+	@echo "All 23 servers started."
+
 maple-check:
 	@echo "Running maple preflight checks..."
 	@command -v uv >/dev/null 2>&1 || (echo "ERROR: uv not found in PATH"; exit 1)
 	@command -v $(PY) >/dev/null 2>&1 || (echo "ERROR: $(PY) not found in PATH"; exit 1)
-	@[ -f "$(ATTACK_SEED)" ] || (echo "ERROR: ATTACK_SEED file not found: $(ATTACK_SEED)"; exit 1)
+	@[ -f "$(ATTACK_TOML)" ] || (echo "ERROR: ATTACK_TOML file not found: $(ATTACK_TOML)"; exit 1)
 	@[ -f "$(REGISTRY_PATH)" ] || (echo "ERROR: REGISTRY_PATH file not found: $(REGISTRY_PATH)"; exit 1)
 	@if [ "$(MODEL_BACKEND)" = "openrouter" ]; then \
 		[ -n "$$OPENROUTER_API_KEY" ] || (echo "ERROR: OPENROUTER_API_KEY is required for MODEL_BACKEND=openrouter"; exit 1); \
@@ -207,7 +253,7 @@ cli:
 		--vllm-api-key "$(VLLM_API_KEY)" \
 		--auto-toolkits \
 		--registry-path "$(REGISTRY_PATH)" \
-		--attack-seed "$(ATTACK_SEED)" \
+		--attack-toml "$(ATTACK_TOML)" \
 		--execution-mode "$(EXEC_MODE)" \
 		--log-dir "$(LOG_DIR)"
 
@@ -222,7 +268,7 @@ hello-run:
 		--vllm-api-key "$(VLLM_API_KEY)" \
 		--auto-toolkits \
 		--registry-path "$(REGISTRY_PATH)" \
-		--attack-seed "$(ATTACK_SEED)" \
+		--attack-toml "$(ATTACK_TOML)" \
 		--execution-mode "$(EXEC_MODE)" \
 		--log-dir "$(LOG_DIR)" \
 		--prompt "$$PROMPT"
@@ -231,9 +277,11 @@ RUN_ID ?=
 ATTACK_ID_OVERRIDE ?=
 
 attack-run: stack-ready
-	@PROMPT="$$( $(UV) $(PY) -c 'import json; from pathlib import Path; from generator import VARIATION_REGISTRY; seed_file=Path("$(ATTACK_SEED)"); data=json.loads(seed_file.read_text()); key=str(data.get("metadata",{}).get("id","")).lower(); cls=VARIATION_REGISTRY.get(key); assert cls is not None, f"No variation registered for {key}"; gen=cls(str(seed_file)); detailed=gen.make_variation_detailed(seed=int("$(ATTACK_VARIATION_SEED)")); idx=max(0,min(int("$(ATTACK_STAGE)"), len(detailed)-1)); print(detailed[idx]["prompt"])' )"; \
-	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(UV) $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )}"; \
-	echo "Seed: $(ATTACK_SEED) | variation-seed: $(ATTACK_VARIATION_SEED) | stage: $(ATTACK_STAGE)"; \
+	@PROMPT="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); v_idx=int(sys.argv[3]); data=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(data.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; assert vals, f"No prompt variations found for stage index {stage} in {p}"; \
+v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATTACK_STAGE)" "$(ATTACK_VARIATION_INDEX)" )"; \
+	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )}"; \
+	echo "TOML: $(ATTACK_TOML) | stage: $(ATTACK_STAGE) | variation: $(ATTACK_VARIATION_INDEX)"; \
+	echo "Session: $${SESSION_ID:-auto} | source_ip: $${SOURCE_IP:-auto}"; \
 	echo "Prompt: $$PROMPT"; \
 	$(UV) $(PY) fragbench_mcp/mcp_cli.py \
 		--model-backend "$(MODEL_BACKEND)" \
@@ -243,37 +291,47 @@ attack-run: stack-ready
 		--vllm-api-key "$(VLLM_API_KEY)" \
 		--auto-toolkits \
 		--registry-path "$(REGISTRY_PATH)" \
-		--attack-seed "$(ATTACK_SEED)" \
+		--attack-toml "$(ATTACK_TOML)" \
 		--execution-mode "$(EXEC_MODE)" \
 		--log-dir "$(LOG_DIR)" \
 		$${RUN_ID:+--run-id "$(RUN_ID)"} \
 		--campaign "$$ATTACK_ID" \
 		--attack-id "$$ATTACK_ID" \
+		$${SOURCE_IP:+--source-ip "$$SOURCE_IP"} \
+		$${SESSION_ID:+--session-id "$$SESSION_ID"} \
 		--prompt "$$PROMPT"
 
 chain-run: stack-ready
 	@RUN_ID="chain_$$(date +%Y%m%d_%H%M%S)"; \
-	ATTACK_ID="$$( $(UV) $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )"; \
-	NUM_STAGES="$$( $(UV) $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(len(data.get("attack_stages",[])))' )"; \
+	ATTACK_ID="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )"; \
+	STAGE_LIST="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs=sorted({int(f.get("index",i)) for i,f in enumerate(frags)}); print(" ".join(str(i) for i in idxs))' "$(ATTACK_TOML)" )"; \
+	NUM_STAGES="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs={int(f.get("index",i)) for i,f in enumerate(frags)}; print(len(idxs))' "$(ATTACK_TOML)" )"; \
 	echo ""; \
 	echo "╔══════════════════════════════════════════════════════════════╗"; \
 	echo "║  CHAIN RUN: $$ATTACK_ID"; \
-	echo "║  Stages: $$NUM_STAGES | Variation seed: $(ATTACK_VARIATION_SEED) | Run ID: $$RUN_ID"; \
+	echo "║  Stages: $$NUM_STAGES | Run ID: $$RUN_ID"; \
 	echo "╚══════════════════════════════════════════════════════════════╝"; \
 	echo ""; \
-	for STAGE in $$(seq 0 $$((NUM_STAGES - 1))); do \
+	for STAGE in $$STAGE_LIST; do \
+		VAR_COUNT="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); d=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(d.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; print(len(vals))' "$(ATTACK_TOML)" "$$STAGE" )"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		echo "  Stage $$STAGE / $$((NUM_STAGES - 1))"; \
+		echo "  Stage $$STAGE | Variations: $$VAR_COUNT"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		$(MAKE) --no-print-directory attack-run \
-			ATTACK_SEED="$(ATTACK_SEED)" \
-			ATTACK_VARIATION_SEED="$(ATTACK_VARIATION_SEED)" \
-			ATTACK_STAGE="$$STAGE" \
-			MODEL_BACKEND="$(MODEL_BACKEND)" \
-			MODEL="$(MODEL)" \
-			RUN_ID="$$RUN_ID" \
-			ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
-			LOG_DIR="$(LOG_DIR)"; \
+		for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
+			SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
+			SESSION_ID="$$RUN_ID""_s$$STAGE""_v$$VAR_IDX"; \
+			$(MAKE) --no-print-directory attack-run \
+				ATTACK_TOML="$(ATTACK_TOML)" \
+				ATTACK_STAGE="$$STAGE" \
+				ATTACK_VARIATION_INDEX="$$VAR_IDX" \
+				MODEL_BACKEND="$(MODEL_BACKEND)" \
+				MODEL="$(MODEL)" \
+				RUN_ID="$$RUN_ID" \
+				ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
+				SOURCE_IP="$$SOURCE_IP" \
+				SESSION_ID="$$SESSION_ID" \
+				LOG_DIR="$(LOG_DIR)"; \
+		done; \
 		echo ""; \
 	done; \
 	echo "╔══════════════════════════════════════════════════════════════╗"; \
@@ -293,11 +351,11 @@ clean-runtime:
 # Prerequisite: docker compose up -d  (starts MCP servers + viewer)
 #
 # Config overrides work the same way:
-#   make docker-chain-run ATTACK_SEED=seeds/promptsteal.json MODEL_BACKEND=ollama ATTACK_VARIATION_SEED=99
+#   make docker-chain-run ATTACK_TOML=attacks/promptsteal.toml MODEL_BACKEND=ollama
 # =========================================================================
 
 DOCKER_COMPOSE ?= docker compose
-DOCKER_REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.toml
+DOCKER_REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.docker.toml
 DOCKER_OLLAMA_URL ?= http://host.docker.internal:11434
 DOCKER_VLLM_URL ?= http://host.docker.internal:8000/v1
 
@@ -323,12 +381,14 @@ $(DOCKER_COMPOSE) run --rm \
 	-e OPENAI_API_KEY \
 	-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
 	-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
+	-e MCP_REGISTRY_PATH="$(DOCKER_REGISTRY_PATH)" \
+	-e MCP_SERVER_URL=http://server-filesystem:8001/mcp \
 	mcp-client \
 		--model-backend "$(MODEL_BACKEND)" \
 		--model "$$EFFECTIVE_MODEL" \
 		--auto-toolkits \
 		--registry-path "$(DOCKER_REGISTRY_PATH)" \
-		--attack-seed "$(ATTACK_SEED)" \
+		--attack-toml "$(ATTACK_TOML)" \
 		--execution-mode "$(EXEC_MODE)" \
 		--log-dir "$(LOG_DIR)"
 endef
@@ -337,55 +397,69 @@ docker-cli: docker-up
 	$(DOCKER_CLIENT_CMD)
 
 docker-attack-run: docker-up
-	@PROMPT="$$( $(PY) -c 'import json; from pathlib import Path; from generator import VARIATION_REGISTRY; seed_file=Path("$(ATTACK_SEED)"); data=json.loads(seed_file.read_text()); key=str(data.get("metadata",{}).get("id","")).lower(); cls=VARIATION_REGISTRY.get(key); assert cls is not None, f"No variation registered for {key}"; gen=cls(str(seed_file)); detailed=gen.make_variation_detailed(seed=int("$(ATTACK_VARIATION_SEED)")); idx=max(0,min(int("$(ATTACK_STAGE)"), len(detailed)-1)); print(detailed[idx]["prompt"])' )"; \
-	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )}"; \
+	@PROMPT="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); v_idx=int(sys.argv[3]); data=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(data.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; assert vals, f"No prompt variations found for stage index {stage} in {p}"; \
+v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATTACK_STAGE)" "$(ATTACK_VARIATION_INDEX)" )"; \
+	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )}"; \
 	EFFECTIVE_MODEL="$(MODEL)"; \
 	if [ "$(MODEL_BACKEND)" = "ollama" ]; then \
 	  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
 	fi; \
-	echo "Seed: $(ATTACK_SEED) | variation-seed: $(ATTACK_VARIATION_SEED) | stage: $(ATTACK_STAGE)"; \
+	echo "TOML: $(ATTACK_TOML) | stage: $(ATTACK_STAGE) | variation: $(ATTACK_VARIATION_INDEX)"; \
+	echo "Session: $${SESSION_ID:-auto} | source_ip: $${SOURCE_IP:-auto}"; \
 	echo "Prompt: $$PROMPT"; \
 	$(DOCKER_COMPOSE) run --rm \
 		-e OPENROUTER_API_KEY \
 		-e OPENAI_API_KEY \
 		-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
 		-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
+		-e MCP_REGISTRY_PATH="$(DOCKER_REGISTRY_PATH)" \
+		-e MCP_SERVER_URL=http://server-filesystem:8001/mcp \
 		mcp-client \
 			--model-backend "$(MODEL_BACKEND)" \
 			--model "$$EFFECTIVE_MODEL" \
 			--auto-toolkits \
 			--registry-path "$(DOCKER_REGISTRY_PATH)" \
-			--attack-seed "$(ATTACK_SEED)" \
+			--attack-toml "$(ATTACK_TOML)" \
 			--execution-mode "$(EXEC_MODE)" \
 			--log-dir "$(LOG_DIR)" \
 			$${RUN_ID:+--run-id "$(RUN_ID)"} \
 			--campaign "$$ATTACK_ID" \
 			--attack-id "$$ATTACK_ID" \
+			$${SOURCE_IP:+--source-ip "$$SOURCE_IP"} \
+			$${SESSION_ID:+--session-id "$$SESSION_ID"} \
 			--prompt "$$PROMPT"
 
 docker-chain-run: docker-up
 	@RUN_ID="chain_$$(date +%Y%m%d_%H%M%S)"; \
-	ATTACK_ID="$$( $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(data.get("metadata",{}).get("id","UNKNOWN"))' )"; \
-	NUM_STAGES="$$( $(PY) -c 'import json; data=json.loads(open("$(ATTACK_SEED)").read()); print(len(data.get("attack_stages",[])))' )"; \
+	ATTACK_ID="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )"; \
+	STAGE_LIST="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs=sorted({int(f.get("index",i)) for i,f in enumerate(frags)}); print(" ".join(str(i) for i in idxs))' "$(ATTACK_TOML)" )"; \
+	NUM_STAGES="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs={int(f.get("index",i)) for i,f in enumerate(frags)}; print(len(idxs))' "$(ATTACK_TOML)" )"; \
 	echo ""; \
 	echo "╔══════════════════════════════════════════════════════════════╗"; \
 	echo "║  DOCKER CHAIN RUN: $$ATTACK_ID"; \
-	echo "║  Stages: $$NUM_STAGES | Variation seed: $(ATTACK_VARIATION_SEED) | Run ID: $$RUN_ID"; \
+	echo "║  Stages: $$NUM_STAGES | Run ID: $$RUN_ID"; \
 	echo "╚══════════════════════════════════════════════════════════════╝"; \
 	echo ""; \
-	for STAGE in $$(seq 0 $$((NUM_STAGES - 1))); do \
+	for STAGE in $$STAGE_LIST; do \
+		VAR_COUNT="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); d=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(d.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; print(len(vals))' "$(ATTACK_TOML)" "$$STAGE" )"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		echo "  Stage $$STAGE / $$((NUM_STAGES - 1))"; \
+		echo "  Stage $$STAGE | Variations: $$VAR_COUNT"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		$(MAKE) --no-print-directory docker-attack-run \
-			ATTACK_SEED="$(ATTACK_SEED)" \
-			ATTACK_VARIATION_SEED="$(ATTACK_VARIATION_SEED)" \
-			ATTACK_STAGE="$$STAGE" \
-			MODEL_BACKEND="$(MODEL_BACKEND)" \
-			MODEL="$(MODEL)" \
-			RUN_ID="$$RUN_ID" \
-			ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
-			LOG_DIR="$(LOG_DIR)"; \
+		for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
+			SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
+			SESSION_ID="$$RUN_ID""_s$$STAGE""_v$$VAR_IDX"; \
+			$(MAKE) --no-print-directory docker-attack-run \
+				ATTACK_TOML="$(ATTACK_TOML)" \
+				ATTACK_STAGE="$$STAGE" \
+				ATTACK_VARIATION_INDEX="$$VAR_IDX" \
+				MODEL_BACKEND="$(MODEL_BACKEND)" \
+				MODEL="$(MODEL)" \
+				RUN_ID="$$RUN_ID" \
+				ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
+				SOURCE_IP="$$SOURCE_IP" \
+				SESSION_ID="$$SESSION_ID" \
+				LOG_DIR="$(LOG_DIR)"; \
+		done; \
 		echo ""; \
 	done; \
 	echo "╔══════════════════════════════════════════════════════════════╗"; \
@@ -417,7 +491,7 @@ docker-toml-mcp-chain-run: docker-up
 	echo "╔══════════════════════════════════════════════════════════════╗"; \
 	echo "║  DOCKER TOML→MCP CHAIN RUN"; \
 	echo "║  TOMLs: $(TOML_GLOB)"; \
-	echo "║  Routing seed (toolkit selection): $(ATTACK_SEED)"; \
+	echo "║  Routing attack TOML: $(ATTACK_TOML)"; \
 	echo "║  Model backend: $(MODEL_BACKEND) | Model: $(MODEL)"; \
 	echo "║  Run ID: $$RUN_ID"; \
 	echo "╚══════════════════════════════════════════════════════════════╝"; \
@@ -447,12 +521,14 @@ frags=d.get("fragments") or []; \
 				-e OPENAI_API_KEY \
 				-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
 				-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
+				-e MCP_REGISTRY_PATH="$(DOCKER_REGISTRY_PATH)" \
+				-e MCP_SERVER_URL=http://server-filesystem:8001/mcp \
 				mcp-client \
 					--model-backend "$(MODEL_BACKEND)" \
 					--model "$(MODEL)" \
 					--auto-toolkits \
 					--registry-path "$(DOCKER_REGISTRY_PATH)" \
-					--attack-seed "$(ATTACK_SEED)" \
+					--attack-toml "$(ATTACK_TOML)" \
 					--execution-mode "$(EXEC_MODE)" \
 					--log-dir "$(LOG_DIR)" \
 					--run-id "$$RUN_ID" \

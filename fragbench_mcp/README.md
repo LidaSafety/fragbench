@@ -151,7 +151,7 @@ make maple-ready MODEL_BACKEND=openrouter
 Run interactive CLI with attack-aware toolkit routing:
 
 ```bash
-make cli ATTACK_SEED=seeds/hello_world.json MODEL_BACKEND=openrouter
+make cli ATTACK_TOML=attacks/hello_world.toml MODEL_BACKEND=openrouter
 ```
 
 When using Ollama backend, set an Ollama model name (not OpenRouter model ids):
@@ -163,13 +163,19 @@ make cli MODEL_BACKEND=ollama MODEL=huihui_ai/qwen3.5-abliterated:35b
 Run one-shot hello-world variation:
 
 ```bash
-make hello-run ATTACK_SEED=seeds/hello_world.json MODEL_BACKEND=openrouter
+make hello-run ATTACK_TOML=attacks/hello_world.toml MODEL_BACKEND=openrouter
 ```
 
-Run one-shot attack stage generated from any registered variation:
+Run one-shot attack stage/variation from TOML:
 
 ```bash
-make attack-run ATTACK_SEED=seeds/promptsteal.json ATTACK_VARIATION_SEED=42 ATTACK_STAGE=1 MODEL_BACKEND=openrouter
+make attack-run ATTACK_TOML=attacks/hello_world.toml ATTACK_STAGE=1 ATTACK_VARIATION_INDEX=0 MODEL_BACKEND=openrouter
+```
+
+Run a full TOML chain with isolated per-variation sessions (each gets a synthetic source IP):
+
+```bash
+make docker-chain-run ATTACK_TOML=attacks/hello_world.toml MODEL_BACKEND=openrouter
 ```
 
 Stop everything:
@@ -178,9 +184,11 @@ Stop everything:
 make stack-down
 ```
 
-The `ATTACK_SEED` argument is passed to `mcp_cli.py --attack-seed`, which triggers
-`AttackProfileBuilder` to derive tactics/tags from the seed and lets `ToolkitRouter`
+The `ATTACK_TOML` argument is passed to `mcp_cli.py --attack-toml`, which triggers
+`AttackProfileBuilder` to derive techniques/tags from the TOML and lets `ToolkitRouter`
 choose the relevant toolkits from `mcp/registry/toolkits.toml`.
+
+During chain runs, `SOURCE_IP` and `SESSION_ID` metadata are attached per request and included in JSONL logs for attribution.
 
 ### Backend portability (OpenRouter + Ollama + vLLM)
 
@@ -205,9 +213,13 @@ Use `mcp/registry/toolkits.toml` to define toolkits and connect the selected set
 uv run mcp/mcp_cli.py \
   --auto-toolkits \
   --registry-path mcp/registry/toolkits.toml \
-  --attack-seed seeds/promptsteal.json \
+  --attack-toml attacks/promptsteal.toml \
   --execution-mode simulated
 ```
+
+Filesystem mock data for `server-filesystem` now lives at:
+
+`fragbench_mcp/servers/filesystem/data/mock_fs`
 
 ### New simulation toolkit servers
 

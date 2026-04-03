@@ -117,6 +117,58 @@ box = None  # type: ignore
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
+# When the MCP client runs inside Docker, toolkit registries that use loopback URLs
+# (from host-oriented toolkits.toml) must target Compose service DNS names instead.
+_DOCKER_MCP_SERVICE_BY_PORT: Dict[int, str] = {
+    8001: "server-filesystem",
+    8011: "server-shell",
+    8012: "server-archive",
+    8013: "server-exfil",
+    8014: "server-network-recon",
+    8020: "server-recon-osint",
+    8021: "server-recon-network",
+    8022: "server-recon-subdomain",
+    8023: "server-recon-web",
+    8024: "server-cloud-recon",
+    8025: "server-git",
+    8026: "server-code",
+    8027: "server-packages",
+    8028: "server-credential",
+    8029: "server-crypto",
+    8030: "server-report",
+    8031: "server-terminal",
+    8032: "server-ssh-bruteforce",
+    8033: "server-payload-evasion",
+    8034: "server-vuln-scanner",
+    8035: "server-agent-control",
+    8036: "server-c2-callback",
+    8037: "server-project",
+}
+
+
+def _rewrite_localhost_mcp_url_for_docker(url: str) -> str:
+    """Map http://127.0.0.1:<port>/mcp to the matching Compose service on the internal network."""
+    if not url:
+        return url
+    try:
+        if not Path("/.dockerenv").exists():
+            return url
+    except OSError:
+        return url
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        return url
+    port = parsed.port
+    if port is None:
+        return url
+    service = _DOCKER_MCP_SERVICE_BY_PORT.get(port)
+    if not service:
+        return url
+    return urlunparse(parsed._replace(netloc=f"{service}:{port}"))
+
 
 # ---------------------------------------------------------------------------
 # Environment helpers
@@ -1306,8 +1358,10 @@ class MCPOpenRouterClientV1:
         execution_mode: str = "simulated",
         execution_root: Optional[str] = None,
         allowed_egress_hosts: Optional[Iterable[str]] = None,
-        attack_seed_path: Optional[str] = None,
+        attack_toml_path: Optional[str] = None,
         registry_path: Optional[str] = None,
+        source_ip: Optional[str] = None,
+        external_session_id: Optional[str] = None,
     ) -> None:
         self.model = model
         self.base_url = base_url
@@ -1361,13 +1415,23 @@ class MCPOpenRouterClientV1:
         self.toolkit_registry: Optional[ToolkitRegistry] = None
         self.toolkit_router: Optional[ToolkitRouter] = None
         self.attack_profile_builder = AttackProfileBuilder()
-        self.attack_seed_path: Optional[Path] = Path(attack_seed_path).expanduser() if attack_seed_path else None
-        default_registry = Path(registry_path).expanduser() if registry_path else (PROJECT_ROOT / "registry" / "toolkits.toml")
+        self.attack_toml_path: Optional[Path] = Path(attack_toml_path).expanduser() if attack_toml_path else None
+        if registry_path:
+            default_registry = Path(registry_path).expanduser()
+        else:
+            env_registry = os.getenv("MCP_REGISTRY_PATH") or os.getenv("FRAGBENCH_TOOLKIT_REGISTRY")
+            default_registry = (
+                Path(env_registry).expanduser()
+                if env_registry
+                else (PROJECT_ROOT / "registry" / "toolkits.toml")
+            )
         if default_registry.exists():
             self.toolkit_registry = ToolkitRegistry.from_toml(default_registry)
             self.toolkit_router = ToolkitRouter(self.toolkit_registry)
-        if self.attack_seed_path:
-            self._refresh_attack_profile(self.attack_seed_path)
+        if self.attack_toml_path:
+            self._refresh_attack_profile(self.attack_toml_path)
+        self.source_ip = source_ip
+        self.external_session_id = external_session_id
         # Initialize Tool Context Manager or fallback to basic retriever
         self.tool_context: Optional[Any] = None
         self.tool_retriever: Optional[Any] = None
@@ -1443,7 +1507,12 @@ class MCPOpenRouterClientV1:
             vllm_api_key=vllm_api_key,
         )
         # Backward compatibility for legacy codepaths that reference self.openai.
-        self.openai = getattr(self.model_backend_router.get("openrouter"), "client", None)
+        # Do not instantiate OpenRouter when using ollama/vllm (avoids requiring API keys).
+        self.openai = (
+            getattr(self.model_backend_router.get("openrouter"), "client", None)
+            if model_backend == "openrouter"
+            else None
+        )
 
         # Image handling configuration/state
         self._images_dir: Path = (Path.cwd() / "images").resolve()
@@ -1467,11 +1536,11 @@ class MCPOpenRouterClientV1:
             return capability_name.lower() in self.capabilities
         return True
 
-    def _refresh_attack_profile(self, seed_path: Path) -> None:
+    def _refresh_attack_profile(self, attack_toml_path: Path) -> None:
         """Load and cache attack profile for toolkit routing."""
         try:
-            self.attack_profile = self.attack_profile_builder.from_seed_file(seed_path)
-            self.attack_seed_path = seed_path
+            self.attack_profile = self.attack_profile_builder.from_seed_file(attack_toml_path)
+            self.attack_toml_path = attack_toml_path
             logger.info(
                 "Loaded attack profile: id=%s tactics=%s techniques=%s tags=%s",
                 self.attack_profile.attack_id,
@@ -1480,11 +1549,19 @@ class MCPOpenRouterClientV1:
                 sorted(self.attack_profile.attack_tags),
             )
         except Exception as exc:
-            logger.warning("Failed to load attack seed profile '%s': %s", seed_path, exc)
+            logger.warning("Failed to load attack TOML profile '%s': %s", attack_toml_path, exc)
 
-    def set_attack_seed(self, seed_path: str) -> None:
-        """Public API for callers to update attack profile routing seed."""
-        self._refresh_attack_profile(Path(seed_path).expanduser())
+    def set_attack_toml(self, attack_toml_path: str) -> None:
+        """Public API for callers to update attack profile routing TOML."""
+        self._refresh_attack_profile(Path(attack_toml_path).expanduser())
+
+    def _build_request_metadata(self) -> Optional[Dict[str, Any]]:
+        metadata: Dict[str, Any] = {}
+        if self.source_ip:
+            metadata["source_ip"] = self.source_ip
+        if self.external_session_id:
+            metadata["session_id"] = self.external_session_id
+        return metadata or None
 
     def _init_database(self) -> None:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2013,6 +2090,7 @@ class MCPOpenRouterClientV1:
         Returns:
             Resolved server name used for namespacing tools.
         """
+        url = _rewrite_localhost_mcp_url_for_docker(url)
         if not SSE_AVAILABLE:
             raise RuntimeError("SSE client not available. Install mcp[sse] or upgrade mcp package.")
 
@@ -2064,6 +2142,8 @@ class MCPOpenRouterClientV1:
             raise RuntimeError(
                 "Streamable HTTP client not available. Install a newer mcp package with streamable_http support."
             )
+
+        url = _rewrite_localhost_mcp_url_for_docker(url)
 
         if not server_name:
             from urllib.parse import urlparse
@@ -2144,7 +2224,7 @@ class MCPOpenRouterClientV1:
         self,
         *,
         mode: Optional[str] = None,
-        attack_seed_path: Optional[str] = None,
+        attack_toml_path: Optional[str] = None,
     ) -> List[str]:
         """
         Connect to toolkits selected by the registry/router.
@@ -2152,11 +2232,11 @@ class MCPOpenRouterClientV1:
         This keeps onboarding config-driven: adding a new toolkit in registry TOML
         is sufficient to expose it to the client.
         """
-        if attack_seed_path:
-            self.set_attack_seed(attack_seed_path)
-        elif self.attack_seed_path and self.attack_profile.attack_id == "default":
+        if attack_toml_path:
+            self.set_attack_toml(attack_toml_path)
+        elif self.attack_toml_path and self.attack_profile.attack_id == "default":
             # If caller passed seed in constructor but profile wasn't loaded yet, load now.
-            self._refresh_attack_profile(self.attack_seed_path)
+            self._refresh_attack_profile(self.attack_toml_path)
 
         if not self.toolkit_registry:
             return []
@@ -2197,6 +2277,7 @@ class MCPOpenRouterClientV1:
         This fetches tools via tools/list and registers them for local execution.
         Tool calls are proxied to the remote server.
         """
+        mcp_url = _rewrite_localhost_mcp_url_for_docker(mcp_url)
         import httpx as httpx_lib
 
         async with httpx_lib.AsyncClient(timeout=30.0) as client:
@@ -3040,6 +3121,7 @@ class MCPOpenRouterClientV1:
             parallel_tool_calls=parallel_tool_calls,
             provider_preferences=provider_preferences,
             use_transform=use_transform and self.enable_middle_out,
+            request_metadata=self._build_request_metadata(),
         )
 
     async def _call_openrouter_streaming(
@@ -3094,6 +3176,9 @@ class MCPOpenRouterClientV1:
             # Provider routing preferences
             if provider_preferences:
                 params["provider"] = provider_preferences
+            request_metadata = self._build_request_metadata()
+            if request_metadata:
+                params["metadata"] = request_metadata
 
             stream = chat_client.chat.completions.create(**params)
 
@@ -3608,9 +3693,13 @@ class MCPOpenRouterClientV1:
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Unified MCP ↔ OpenRouter client.")
     parser.add_argument("--workspace", default=os.getcwd(), help="Workspace directory for filesystem MCP server.")
-    parser.add_argument("--model", default="anthropic/claude-haiku-4.5", help="Model identifier for OpenRouter.")
+    parser.add_argument(
+        "--model",
+        default="huihui_ai/qwen3.5-abliterated:35b",
+        help="Model id (Ollama when --model-backend ollama; OpenRouter-compatible when openrouter).",
+    )
     parser.add_argument("--base-url", default="https://openrouter.ai/api/v1", help="OpenRouter-compatible base URL.")
-    parser.add_argument("--model-backend", choices=["openrouter", "ollama", "vllm"], default="openrouter")
+    parser.add_argument("--model-backend", choices=["openrouter", "ollama", "vllm"], default="ollama")
     parser.add_argument("--ollama-base-url", default="http://127.0.0.1:11434")
     parser.add_argument("--vllm-base-url", default="http://127.0.0.1:8000/v1")
     parser.add_argument("--vllm-api-key", default="EMPTY")
@@ -3662,8 +3751,10 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--http-mcp", action="append", metavar="URL",
                        help="Connect to an HTTP/SSE MCP server (can be specified multiple times).")
     parser.add_argument("--auto-toolkits", action="store_true", help="Connect toolkit set from registry profile.")
-    parser.add_argument("--attack-seed", default=None, help="Seed JSON path for attack-aware toolkit routing.")
+    parser.add_argument("--attack-toml", default=None, help="Attack TOML path for attack-aware toolkit routing.")
     parser.add_argument("--registry-path", default=None, help="Toolkit registry TOML path.")
+    parser.add_argument("--source-ip", default=None, help="Synthetic source IP metadata for this run.")
+    parser.add_argument("--session-id", default=None, help="External session id metadata for this run.")
     parser.add_argument("--execution-mode", choices=["simulated", "bounded_real"], default="simulated")
     parser.add_argument("--execution-root", default=None, help="Root directory for bounded-real mode.")
     parser.add_argument("--allow-egress-host", action="append", default=[], help="Allowlisted outbound host.")
@@ -3861,8 +3952,10 @@ async def main(argv: Optional[List[str]] = None) -> None:
         execution_mode=args.execution_mode,
         execution_root=args.execution_root,
         allowed_egress_hosts=args.allow_egress_host,
-        attack_seed_path=args.attack_seed,
+        attack_toml_path=args.attack_toml,
         registry_path=args.registry_path,
+        source_ip=args.source_ip,
+        external_session_id=args.session_id,
     )
 
     # Default: connect only to tools.distributed.systems (the unified tool registry)
@@ -3885,7 +3978,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
 
     async with client:
         if args.auto_toolkits:
-            connected_toolkits = await client.connect_registered_toolkits(attack_seed_path=args.attack_seed)
+            connected_toolkits = await client.connect_registered_toolkits(attack_toml_path=args.attack_toml)
             logger.info("Connected to %d toolkit(s) from registry", len(connected_toolkits))
             print(f"Connected toolkit(s): {connected_toolkits}")
         else:

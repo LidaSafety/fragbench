@@ -27,6 +27,7 @@ class VLLMBackend(ChatBackend):
         parallel_tool_calls: bool = True,
         provider_preferences: Optional[Dict[str, Any]] = None,
         use_transform: bool = False,
+        request_metadata: Optional[Dict[str, Any]] = None,
     ) -> Any:
         params: Dict[str, Any] = {
             "model": model,
@@ -39,4 +40,6 @@ class VLLMBackend(ChatBackend):
         }
         if tools and parallel_tool_calls:
             params["parallel_tool_calls"] = True
+        if request_metadata:
+            params["metadata"] = request_metadata
         return await asyncio.to_thread(self.client.chat.completions.create, **params)

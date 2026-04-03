@@ -31,6 +31,7 @@ class OpenRouterBackend(ChatBackend):
         parallel_tool_calls: bool = True,
         provider_preferences: Optional[Dict[str, Any]] = None,
         use_transform: bool = False,
+        request_metadata: Optional[Dict[str, Any]] = None,
     ) -> Any:
         params: Dict[str, Any] = {
             "model": model,
@@ -49,4 +50,6 @@ class OpenRouterBackend(ChatBackend):
             params["provider"] = provider_preferences
         if use_transform:
             params.setdefault("extra_body", {})["transforms"] = ["middle-out"]
+        if request_metadata:
+            params["metadata"] = request_metadata
         return await asyncio.to_thread(self.client.chat.completions.create, **params)

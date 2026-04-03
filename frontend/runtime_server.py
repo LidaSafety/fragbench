@@ -872,9 +872,17 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self.wfile.write(raw)
 
 
+def _default_bind_host() -> str:
+    """127.0.0.1 on the host is fine; in Docker, bind 0.0.0.0 or port publishes never connect."""
+    try:
+        return "0.0.0.0" if Path("/.dockerenv").exists() else "127.0.0.1"
+    except OSError:
+        return "127.0.0.1"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Serve runtime-backed FragGuard viewer")
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default=_default_bind_host())
     parser.add_argument("--port", type=int, default=8787)
     return parser.parse_args()
 

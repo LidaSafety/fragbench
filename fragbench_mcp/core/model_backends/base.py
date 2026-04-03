@@ -23,5 +23,6 @@ class ChatBackend(ABC):
         parallel_tool_calls: bool = True,
         provider_preferences: Optional[Dict[str, Any]] = None,
         use_transform: bool = False,
+        request_metadata: Optional[Dict[str, Any]] = None,
     ) -> Any:
         raise NotImplementedError

@@ -23,7 +23,6 @@ from mcp_client_v1 import (
     _load_env_file,
 )
 
-SERVER_URL = "http://127.0.0.1:8001/mcp"
 SERVER_NAME = "filesystem"
 
 LOG_DIR = Path("logs")
@@ -43,6 +42,8 @@ class ConversationLogger:
         attack_id: Optional[str] = None,
         backend: Optional[str] = None,
         toolkit_set: Optional[List[str]] = None,
+        source_ip: Optional[str] = None,
+        session_id: Optional[str] = None,
     ):
         log_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -57,6 +58,8 @@ class ConversationLogger:
         self._tool_calls_this_iter: int = 0
         self._tool_results_this_iter: int = 0
         self.toolkit_set: List[str] = list(toolkit_set or [])
+        self.source_ip = source_ip
+        self.external_session_id = session_id
 
         self._emit("session_start", {
             "schema_version": "2.0",
@@ -68,6 +71,8 @@ class ConversationLogger:
             "attack_id": attack_id,
             "toolkit_set": self.toolkit_set,
             "pid": os.getpid(),
+            "source_ip": self.source_ip,
+            "session_id": self.external_session_id,
         })
 
     def _emit(self, event: str, data: Dict[str, Any]) -> None:
@@ -78,6 +83,10 @@ class ConversationLogger:
             "event": event,
             **data,
         }
+        if self.source_ip:
+            record["source_ip"] = self.source_ip
+        if self.external_session_id:
+            record["session_id"] = self.external_session_id
         line = json.dumps(record, default=str, ensure_ascii=False)
         with open(self.path, "a") as f:
             f.write(line + "\n")
@@ -399,13 +408,21 @@ class ConversationLogger:
 
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MCP CLI - filesystem server on 8001")
-    p.add_argument("--model", default="anthropic/claude-haiku-4.5")
+    p.add_argument(
+        "--model",
+        default="huihui_ai/qwen3.5-abliterated:35b",
+        help="Model id (Ollama tag when --model-backend ollama; OpenRouter id when openrouter).",
+    )
     p.add_argument("--base-url", default="https://openrouter.ai/api/v1")
-    p.add_argument("--model-backend", choices=["openrouter", "ollama", "vllm"], default="openrouter")
+    p.add_argument("--model-backend", choices=["openrouter", "ollama", "vllm"], default="ollama")
     p.add_argument("--ollama-base-url", default=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"))
     p.add_argument("--vllm-base-url", default=os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8000/v1"))
     p.add_argument("--vllm-api-key", default="EMPTY")
-    p.add_argument("--server-url", default=SERVER_URL)
+    p.add_argument(
+        "--server-url",
+        default=os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8001/mcp"),
+        help="MCP server URL (after _load_env_file; use MCP_SERVER_URL in Docker).",
+    )
     p.add_argument("--server-name", default=SERVER_NAME)
     p.add_argument("--transport", choices=["sse", "streamable-http"], default="sse")
     p.add_argument("--auto-toolkits", action="store_true", help="Connect toolkits selected from registry profile.")
@@ -422,8 +439,14 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--execution-mode", choices=["simulated", "bounded_real"], default="simulated")
     p.add_argument("--execution-root", default=None)
     p.add_argument("--allow-egress-host", action="append", default=[])
-    p.add_argument("--attack-seed", default=None, help="Path to a seed JSON for attack-aware toolkit routing.")
-    p.add_argument("--registry-path", default=None, help="Path to toolkit registry TOML.")
+    p.add_argument("--attack-toml", default=None, help="Path to an attack TOML for attack-aware toolkit routing.")
+    p.add_argument(
+        "--registry-path",
+        default=os.getenv("MCP_REGISTRY_PATH") or os.getenv("FRAGBENCH_TOOLKIT_REGISTRY"),
+        help="Path to toolkit registry TOML (default: env MCP_REGISTRY_PATH, or toolkits.toml).",
+    )
+    p.add_argument("--source-ip", default=None, help="Synthetic source IP for this session.")
+    p.add_argument("--session-id", default=None, help="External session id for this run.")
     return p.parse_args(argv)
 
 
@@ -455,7 +478,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
         execution_mode=args.execution_mode,
         execution_root=args.execution_root,
         allowed_egress_hosts=args.allow_egress_host,
-        attack_seed_path=args.attack_seed,
+        attack_toml_path=args.attack_toml,
         registry_path=args.registry_path,
     )
 
@@ -471,6 +494,8 @@ async def main(argv: Optional[List[str]] = None) -> None:
             attack_id=args.attack_id,
             backend=args.model_backend,
             toolkit_set=connected_toolkits,
+            source_ip=args.source_ip,
+            session_id=args.session_id,
         )
         conv_logger.register(client)
         print(f"Logging to {conv_logger.path}")
@@ -479,7 +504,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
         try:
             if args.auto_toolkits:
                 connected_toolkits.extend(
-                    await client.connect_registered_toolkits(attack_seed_path=args.attack_seed)
+                    await client.connect_registered_toolkits(attack_toml_path=args.attack_toml)
                 )
                 print(f"Connected toolkit set: {connected_toolkits if connected_toolkits else '[none]'}")
                 if conv_logger:
