@@ -60,6 +60,7 @@ class ConversationLogger:
         self._current_iteration: int = 0
         self._tool_calls_this_iter: int = 0
         self._tool_results_this_iter: int = 0
+        self._total_tool_calls: int = 0
         self.toolkit_set: List[str] = list(toolkit_set or [])
         self.source_ip = source_ip
         self.external_session_id = session_id or str(uuid.uuid4())
@@ -265,6 +266,7 @@ class ConversationLogger:
                     }
                 )
             self._tool_calls_this_iter = len(tool_calls)
+            self._total_tool_calls += len(tool_calls)
             self._tool_results_this_iter = 0
 
             content_bits = self._extract_assistant_content(
@@ -404,6 +406,7 @@ class ConversationLogger:
     def close(self) -> None:
         self._emit("session_end", {
             "total_events": self.seq,
+            "total_tool_calls": self._total_tool_calls,
         })
 
     def update_toolkits(self, toolkits: List[str]) -> None:

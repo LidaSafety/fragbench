@@ -46,7 +46,7 @@ class ModelBackendRouter:
                 base_url=self._openrouter_base_url,
             )
         elif name == "ollama":
-            self.backends[name] = OllamaBackend(base_url=self._ollama_base_url)
+            self.backends[name] = OllamaBackend(base_url=self._ollama_base_url, think=None)
         elif name == "vllm":
             self.backends[name] = VLLMBackend(
                 base_url=self._vllm_base_url,
