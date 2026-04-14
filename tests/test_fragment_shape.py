@@ -74,11 +74,26 @@ class FragmentShapeTests(unittest.TestCase):
         self.assertEqual(
             fragments,
             [
-                GeneratedFragment("Discovery step (fragment 1/2)", ["LEGIT::frag-a"]),
-                GeneratedFragment("Discovery step (fragment 2/2)", ["LEGIT::frag-b"]),
+                GeneratedFragment("Discovery step", ["LEGIT::frag-a", "LEGIT::frag-b"]),
                 GeneratedFragment("Collection step", ["LEGIT::frag-c"]),
             ],
         )
+
+        toml_text = generate_toml(
+            {
+                "id": "TEST",
+                "technique": "T0000",
+                "technique_name": "Generated",
+                "description": "Test attack",
+                "tags": ["generated"],
+            },
+            fragments,
+            7,
+        )
+        self.assertEqual(toml_text.count("[[fragments]]"), 2)
+        self.assertEqual(toml_text.count("[[fragments.variations]]"), 3)
+        self.assertIn("index = 0", toml_text)
+        self.assertIn("index = 1", toml_text)
 
 
 if __name__ == "__main__":

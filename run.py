@@ -183,7 +183,8 @@ def _shape_generated_fragments(
 ) -> list:
     """
     Convert one generated variation into TOML-ready fragment blocks while
-    preserving the original stage boundary and human-meaningful descriptions.
+    preserving the original stage boundary, stage-aligned fragment indices,
+    and human-meaningful descriptions.
     """
     from generator import GeneratedFragment
 
@@ -201,24 +202,20 @@ def _shape_generated_fragments(
     shaped: list[GeneratedFragment] = []
     for idx, (group, description) in enumerate(zip(fragment_groups, stage_descriptions)):
         if not group:
-            continue
-        base_description = description or f"Stage {idx}"
-        total_parts = len(group)
-        for part_idx, frag_text in enumerate(group, start=1):
+            group = [var[idx][0]]
+
+        variations = []
+        for frag_text in group:
             if legitimize:
                 frag_text = legitimize_fragment_fn(frag_text, api_key=api_key)
+            variations.append(frag_text)
 
-            if total_parts == 1:
-                fragment_description = base_description
-            else:
-                fragment_description = f"{base_description} (fragment {part_idx}/{total_parts})"
-
-            shaped.append(
-                GeneratedFragment(
-                    description=fragment_description,
-                    variations=[frag_text],
-                )
+        shaped.append(
+            GeneratedFragment(
+                description=description or f"Stage {idx}",
+                variations=variations,
             )
+        )
 
     return shaped
 
