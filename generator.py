@@ -24,6 +24,7 @@ from dataclasses import dataclass
 import logging
 import sys
 
+from variations.gtg1002 import GTG1002Variation
 from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
 
@@ -51,6 +52,7 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
+    "gtg1002":        GTG1002Variation,
     "scope_creep":    ScopeCreepVariation,
     "vibe_extortion": VibeExtortionVariation,
 }

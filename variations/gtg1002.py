@@ -9,13 +9,12 @@ Usage:
     from variations.gtg1002 import GTG1002Variation
 
     gen = GTG1002Variation("seeds/gtg1002.json")
-    variation = gen.make_variation(seed=42)
+    variation = gen.make_variation(seed=13)
     for prompt, tactic in variation:
         print(f"[{tactic}] {prompt}")
 """
 
 import json
-import random
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -24,7 +23,7 @@ from variations.base import BaseVariation, MitreType
 
 class GTG1002Variation(BaseVariation):
     """
-    Custom make_variation for GTG-1002 campaign.
+    Variation generator for the GTG-1002 campaign.
 
     Deterministic: same seed always produces the same output.
     No remote LLM calls — pure Python string formatting.
@@ -34,14 +33,6 @@ class GTG1002Variation(BaseVariation):
         with open(seed_file) as f:
             self.data = json.load(f)
         self._validate_seed_tactics(self.data)
-
-    def _select_dimensions(self, rng: random.Random) -> Dict[str, str]:
-        """Select one value per variation dimension using the seeded RNG."""
-        dimensions = self.data.get("variation_dimensions", {})
-        return {
-            name: rng.choice(dim["values"])
-            for name, dim in dimensions.items()
-        }
 
     def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         """
@@ -53,6 +44,7 @@ class GTG1002Variation(BaseVariation):
         Returns:
             List of (prompt_text, MitreType) tuples — one per attack stage.
         """
+        import random
         rng = random.Random(seed)
         dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
@@ -76,6 +68,7 @@ class GTG1002Variation(BaseVariation):
         Returns list of dicts with: prompt, tactic, technique, description,
         resolved_variables, dimension_choices — useful for debugging and JSON export.
         """
+        import random
         rng = random.Random(seed)
         dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
@@ -101,57 +94,6 @@ class GTG1002Variation(BaseVariation):
 
         return result
 
-    def _resolve_variables(
-        self,
-        stage: dict,
-        rng: random.Random,
-        resolved_vars: Dict[int, Dict[str, Any]],
-        dimension_choices: Dict[str, str],
-    ) -> Dict[str, Any]:
-        """Resolve all variables for a stage, handling inheritance and types."""
-        result = {}
-        variables = stage.get("variables", {})
-
-        for var_name, var_def in variables.items():
-            var_type = var_def["type"]
-
-            if var_type == "inherit":
-                from_stage = var_def["from_stage"]
-                from_var = var_def["variable"]
-                result[var_name] = resolved_vars[from_stage][from_var]
-
-            elif var_type == "fixed":
-                result[var_name] = var_def["value"]
-
-            elif var_type == "choice":
-                result[var_name] = rng.choice(var_def["values"])
-
-            elif var_type == "subset":
-                count = rng.randint(var_def["min_count"], var_def["max_count"])
-                selected = rng.sample(var_def["all_values"], count)
-                result[var_name] = ", ".join(selected)
-
-            elif var_type == "path":
-                subdir = rng.choice(var_def["subdir_pool"])
-                result[var_name] = f"{var_def['base']}\\{subdir}"
-
-            elif var_type == "filename":
-                result[var_name] = rng.choice(var_def["name_pool"])
-
-            elif var_type == "dimension_driven":
-                dimension = var_def["dimension"]
-                chosen_value = dimension_choices[dimension]
-                lookup = var_def["values_by_dimension"]
-                result[var_name] = lookup[chosen_value]
-
-            else:
-                raise ValueError(
-                    f"Unknown variable type '{var_type}' for variable '{var_name}' "
-                    f"in stage {stage['index']}"
-                )
-
-        return result
-
 
 # ---------------------------------------------------------------------------
 # CLI: run standalone to inspect variations
@@ -172,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--seed",
         type=int,
-        default=42,
+        default=13,
         help="Random seed for variation generation",
     )
     parser.add_argument(
