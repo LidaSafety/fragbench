@@ -186,6 +186,55 @@ def print_result_row(style: str, verdict: str, justification: str = "") -> None:
     print(f"  {color}{verdict:8s}{reset}  {style}{just}")
 
 
+def _shape_generated_fragments(
+    var: list[tuple[str, str]],
+    stage_descriptions: list[str],
+    *,
+    fragment: bool,
+    legitimize: bool,
+    api_key: str | None,
+    make_fragment_groups_fn,
+    legitimize_fragment_fn,
+) -> list:
+    """
+    Convert one generated variation into TOML-ready fragment blocks while
+    preserving the original stage boundary, stage-aligned fragment indices,
+    and human-meaningful descriptions.
+    """
+    from generator import GeneratedFragment
+
+    if len(stage_descriptions) != len(var):
+        raise ValueError("stage_descriptions must have the same length as var")
+
+    if fragment:
+        fragment_groups = make_fragment_groups_fn(var, api_key=api_key)
+    else:
+        fragment_groups = [[step] for step, _ in var]
+
+    if len(fragment_groups) != len(var):
+        raise ValueError("fragment_groups must preserve one outer group per input stage")
+
+    shaped: list[GeneratedFragment] = []
+    for idx, (group, description) in enumerate(zip(fragment_groups, stage_descriptions)):
+        if not group:
+            group = [var[idx][0]]
+
+        variations = []
+        for frag_text in group:
+            if legitimize:
+                frag_text = legitimize_fragment_fn(frag_text, api_key=api_key)
+            variations.append(frag_text)
+
+        shaped.append(
+            GeneratedFragment(
+                description=description or f"Stage {idx}",
+                variations=variations,
+            )
+        )
+
+    return shaped
+
+
 def run_campaign(spec, runner, args) -> dict:
     from detector import JudgeResult, keyword_classify, killchain_score, llm_judge
 
@@ -313,7 +362,12 @@ def run_generate(args) -> None:
     import json as _json
     import random as _random
 
-    from generator import VARIATION_REGISTRY, generate_toml, legitimize_fragment, make_fragments
+    from generator import (
+        VARIATION_REGISTRY,
+        generate_toml,
+        legitimize_fragment,
+        make_fragment_groups,
+    )
 
     if not args.seed_file:
         print("ERROR: --seed-file <path> is required with --generate", file=sys.stderr)
@@ -339,7 +393,12 @@ def run_generate(args) -> None:
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
 
-    final_frag_list: list[list[str]] = []
+    stage_descriptions = [
+        stage.get("description", f"Stage {idx}")
+        for idx, stage in enumerate(seed_data.get("attack_stages", []))
+    ]
+
+    final_frag_list: list[list] = []
     for i in range(args.num_variations):
         seed = base_seed + i
         var = gen.make_variation(seed)  # list[tuple[str, str]]
@@ -350,12 +409,17 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        steps = [step for step, _ in var]
-        if args.fragment:
-            steps = make_fragments(var, api_key=api_key)
-        if args.legitimize:
-            steps = [legitimize_fragment(s, api_key=api_key) for s in steps]
-        final_frag_list.append(steps)
+        final_frag_list.append(
+            _shape_generated_fragments(
+                var,
+                stage_descriptions,
+                fragment=args.fragment,
+                legitimize=args.legitimize,
+                api_key=api_key,
+                make_fragment_groups_fn=make_fragment_groups,
+                legitimize_fragment_fn=legitimize_fragment,
+            )
+        )
 
     if args.dry_run:
         return
@@ -366,7 +430,7 @@ def run_generate(args) -> None:
     written: list[Path] = []
     for i, frags in enumerate(final_frag_list):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], [frags], seed)
+        toml_text = generate_toml(seed_data["metadata"], frags, seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)
