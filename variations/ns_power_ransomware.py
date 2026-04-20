@@ -25,10 +25,6 @@ class NsPowerRansomwareVariation(BaseVariation):
             self.data = json.load(f)
         self._validate_seed_tactics(self.data)
 
-    def _select_dimensions(self, rng: random.Random) -> Dict[str, str]:
-        dimensions = self.data.get("variation_dimensions", {})
-        return {name: rng.choice(dim["values"]) for name, dim in dimensions.items()}
-
     def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         rng = random.Random(seed)
         dimension_choices = self._select_dimensions(rng)
@@ -74,80 +70,6 @@ class NsPowerRansomwareVariation(BaseVariation):
 
         return result
 
-    def _resolve_variables(
-        self,
-        stage: dict,
-        rng: random.Random,
-        resolved_vars: Dict[int, Dict[str, Any]],
-        dimension_choices: Dict[str, str],
-    ) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
-        variables = stage.get("variables", {})
-
-        for var_name, var_def in variables.items():
-            var_type = var_def["type"]
-
-            if var_type == "inherit":
-                from_stage = var_def["from_stage"]
-                from_var = var_def["variable"]
-                result[var_name] = resolved_vars[from_stage][from_var]
-
-            elif var_type == "fixed":
-                result[var_name] = var_def["value"]
-
-            elif var_type == "choice":
-                result[var_name] = rng.choice(var_def["values"])
-
-            elif var_type == "subset":
-                count = rng.randint(var_def["min_count"], var_def["max_count"])
-                selected = rng.sample(var_def["all_values"], count)
-                result[var_name] = ", ".join(selected)
-
-            elif var_type == "path":
-                subdir = rng.choice(var_def["subdir_pool"])
-                result[var_name] = f"{var_def['base']}\\{subdir}"
-
-            elif var_type == "filename":
-                result[var_name] = rng.choice(var_def["name_pool"])
-
-            elif var_type == "dimension_driven":
-                dimension = var_def["dimension"]
-                chosen_value = dimension_choices[dimension]
-                result[var_name] = var_def["values_by_dimension"][chosen_value]
-
-            elif var_type == "ipv4":
-                result[var_name] = (
-                    f"10.{rng.randint(0, 255)}"
-                    f".{rng.randint(0, 255)}"
-                    f".{rng.randint(1, 254)}"
-                )
-
-            elif var_type == "port":
-                result[var_name] = rng.choice(var_def["range"])
-
-            elif var_type == "dollar_amount":
-                lo = var_def["range"][0]
-                hi = var_def["range"][1]
-                step = var_def.get("step", 1)
-                num_steps = (hi - lo) // step
-                amount = lo + rng.randint(0, num_steps) * step
-                result[var_name] = f"{amount:,}"
-
-            elif var_type == "integer_range":
-                result[var_name] = rng.randint(var_def["min"], var_def["max"])
-
-            elif var_type == "crypto_wallet":
-                alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-                prefix = rng.choice(["1", "3"])
-                body = "".join(rng.choices(alphabet, k=33))
-                result[var_name] = prefix + body
-
-            else:
-                raise ValueError(
-                    f"Unknown variable type '{var_type}' for variable '{var_name}' in stage {stage['index']}"
-                )
-
-        return result
 
 
 if __name__ == "__main__":
