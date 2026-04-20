@@ -131,6 +131,17 @@ class BaseVariation(ABC):
                 )
             elif var_type == "port":
                 result[var_name] = rng.choice(var_def["range"])
+            elif var_type == "dollar_amount":
+                lo, hi = var_def["range"][0], var_def["range"][1]
+                step = var_def.get("step", 1)
+                amount = lo + rng.randint(0, (hi - lo) // step) * step
+                result[var_name] = f"{amount:,}"
+            elif var_type == "integer_range":
+                result[var_name] = rng.randint(var_def["min"], var_def["max"])
+            elif var_type == "crypto_wallet":
+                alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+                prefix = rng.choice(["1", "3"])
+                result[var_name] = prefix + "".join(rng.choices(alphabet, k=33))
             else:
                 raise ValueError(
                     f"Unknown variable type '{var_type}' for '{var_name}' "
