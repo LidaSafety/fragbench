@@ -24,7 +24,7 @@ from variations.base import BaseVariation, MitreType
 
 class PromptFluxVariation(BaseVariation):
     """
-    Custom make_variation for PROMPTFLUX campaign.
+    Variation generator for PROMPTFLUX campaign.
 
     Deterministic: same seed always produces the same output.
     No remote LLM calls — pure Python string formatting.
@@ -87,12 +87,11 @@ class PromptFluxVariation(BaseVariation):
                 "mitre_technique": stage["mitre_technique"],
                 "mitre_technique_name": stage["mitre_technique_name"],
                 "description": stage["description"],
-                "resolved_variables": dict(stage_vars),
-                "dimension_choices": dict(dimension_choices),
+                "resolved_variables": stage_vars,
+                "dimension_choices": dimension_choices,
             })
 
         return result
-
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +114,7 @@ if __name__ == "__main__":
         "--seed",
         type=int,
         default=42,
-        help="Random seed for variation generation",
+        help="Random seed for variation generation (ignored if --count > 1)",
     )
     parser.add_argument(
         "--count",

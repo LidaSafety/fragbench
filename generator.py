@@ -27,9 +27,9 @@ from dataclasses import dataclass
 from variations.coinbait import CoinbaitVariation
 from variations.gtg1002 import GTG1002Variation
 from variations.ns_power_ransomware import NsPowerRansomwareVariation
+from variations.promptflux import PromptFluxVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
-from variations.ns_power_ransomware import NsPowerRansomwareVariation
 
 log = logging.getLogger(__name__)
 
@@ -56,11 +56,12 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
-    "gtg1002": GTG1002Variation,
-    "scope_creep": ScopeCreepVariation,
-    "vibe_extortion": VibeExtortionVariation,
+    "coinbait":            CoinbaitVariation,
+    "gtg1002":             GTG1002Variation,
     "ns_power_ransomware": NsPowerRansomwareVariation,
-    "coinbait": CoinbaitVariation,
+    "promptflux":          PromptFluxVariation,
+    "scope_creep":         ScopeCreepVariation,
+    "vibe_extortion":      VibeExtortionVariation,
 }
 
 

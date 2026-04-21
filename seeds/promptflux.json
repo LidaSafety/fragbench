@@ -205,7 +205,7 @@
         "source_script": {
           "type": "fixed",
           "source": "Derived from persistence stage output",
-          "value": "the current running script (WScript.ScriptFullName)"
+          "value": "itself (obtained via WScript.ScriptFullName)"
         },
         "spread_targets": {
           "type": "dimension_driven",
