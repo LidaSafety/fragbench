@@ -189,7 +189,7 @@
           "values_by_dimension": {
             "openai_gpt4":       "https://api.openai.com/v1/chat/completions",
             "anthropic_claude":  "https://api.anthropic.com/v1/messages",
-            "huggingface":       "https://api-inference.huggingface.co/models/{model_id}",
+            "huggingface":       "https://api-inference.huggingface.co/models/<model_id>",
             "local_ollama":      "http://localhost:11434/api/chat"
           }
         },
