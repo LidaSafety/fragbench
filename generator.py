@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from variations.coinbait import CoinbaitVariation
 from variations.gtg1002 import GTG1002Variation
 from variations.malterminal import MalTerminalVariation
+from variations.nocode_ransomware import NocodeRansomwareVariation
 from variations.ns_power_ransomware import NsPowerRansomwareVariation
 from variations.promptflux import PromptFluxVariation
 from variations.scope_creep import ScopeCreepVariation
@@ -60,6 +61,7 @@ VARIATION_REGISTRY: dict[str, type] = {
     "coinbait":            CoinbaitVariation,
     "gtg1002":             GTG1002Variation,
     "malterminal":         MalTerminalVariation,
+    "nocode_ransomware":   NocodeRansomwareVariation,
     "ns_power_ransomware": NsPowerRansomwareVariation,
     "promptflux":          PromptFluxVariation,
     "scope_creep":         ScopeCreepVariation,
