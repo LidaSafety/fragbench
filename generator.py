@@ -29,6 +29,7 @@ from variations.gtg1002 import GTG1002Variation
 from variations.ns_power_ransomware import NsPowerRansomwareVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
+from variations.ns_power_ransomware import NsPowerRansomwareVariation
 
 log = logging.getLogger(__name__)
 
