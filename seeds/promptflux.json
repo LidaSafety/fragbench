@@ -120,7 +120,7 @@
       "mitre_technique_name": "Obfuscated Files or Information: Indicator Removal from Tools",
       "description": "Core innovation: queries Gemini API for obfuscated rewrite of own source code",
       "evidence": "GTIG [1]: sends prompt to gemini-1.5-flash-latest; instructs model to output only code",
-      "baseline_prompt": "{obfuscation_prompt} The script must maintain identical functionality. {output_directive} Target model: {model_name}.",
+      "baseline_prompt": "{obfuscation_prompt} {obfuscation_request} The script must maintain identical functionality. {output_directive} Target model: {model_name}.",
       "variation_dimensions_used": ["prompt_framing", "obfuscation_technique"],
       "variables": {
         "model_name": {
