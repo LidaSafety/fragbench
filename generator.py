@@ -20,11 +20,13 @@ See variations/vibe_extortion.py for a complete working example.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import sys
+from dataclasses import dataclass
 
+from variations.coinbait import CoinbaitVariation
 from variations.gtg1002 import GTG1002Variation
+from variations.ns_power_ransomware import NsPowerRansomwareVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.vibe_extortion import VibeExtortionVariation
 from variations.ns_power_ransomware import NsPowerRansomwareVariation
@@ -38,6 +40,7 @@ class GeneratedFragment:
 
     description: str
     variations: list[str]
+
 
 # ---------------------------------------------------------------------------
 # Registry — maps the seed file's metadata.id (lowercased) to its class
@@ -53,10 +56,11 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
-    "gtg1002":        GTG1002Variation,
-    "scope_creep":    ScopeCreepVariation,
+    "gtg1002": GTG1002Variation,
+    "scope_creep": ScopeCreepVariation,
     "vibe_extortion": VibeExtortionVariation,
     "ns_power_ransomware": NsPowerRansomwareVariation,
+    "coinbait": CoinbaitVariation,
 }
 
 
@@ -148,6 +152,7 @@ def make_fragment_groups(
             raw = resp.content[0].text.strip()
 
             from calllog import log_call
+
             log_call(
                 role="generator_fragment",
                 model=model,
@@ -157,8 +162,11 @@ def make_fragment_groups(
             )
 
             if not raw:
-                log.warning("Empty LLM response for step %r (stop_reason=%s) — using original",
-                            step[:60], resp.stop_reason)
+                log.warning(
+                    "Empty LLM response for step %r (stop_reason=%s) — using original",
+                    step[:60],
+                    resp.stop_reason,
+                )
                 fragment_groups.append([step])
                 fallbacks += 1
                 continue
@@ -167,16 +175,22 @@ def make_fragment_groups(
             if isinstance(parts, list) and len(parts) >= 2:
                 fragment_groups.append([str(p) for p in parts[:2]])
             else:
-                log.warning("Unexpected LLM response for step %r — using original", step[:60])
+                log.warning(
+                    "Unexpected LLM response for step %r — using original", step[:60]
+                )
                 fragment_groups.append([step])
                 fallbacks += 1
         except Exception:
-            log.warning("Fragment LLM call failed for step %r", step[:60], exc_info=True)
+            log.warning(
+                "Fragment LLM call failed for step %r", step[:60], exc_info=True
+            )
             fragment_groups.append([step])
             fallbacks += 1
 
     if fallbacks:
-        log.warning("make_fragments: %d/%d steps fell back to originals", fallbacks, len(var))
+        log.warning(
+            "make_fragments: %d/%d steps fell back to originals", fallbacks, len(var)
+        )
     return fragment_groups
 
 
@@ -239,6 +253,7 @@ def legitimize_fragment(
         result = resp.content[0].text.strip()
 
         from calllog import log_call
+
         log_call(
             role="generator_legitimize",
             model=model,
