@@ -24,6 +24,10 @@ Examples:
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
+
+    # Generate with LLM style variations
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize --styles direct,sysadmin,ctf
 """
 
 from __future__ import annotations
@@ -150,6 +154,17 @@ def parse_args() -> argparse.Namespace:
         "--legitimize",
         action="store_true",
         help="Apply LLM legitimization (reframe steps with cover stories)",
+    )
+    p.add_argument(
+        "--stylize",
+        action="store_true",
+        help="Apply LLM style variations (rephrase each fragment into 10 styles)",
+    )
+    p.add_argument(
+        "--styles",
+        default=None,
+        help="Comma-separated list of styles to generate (default: all 10). "
+             "E.g. --styles direct,sysadmin,ctf",
     )
 
     return p.parse_args()
@@ -358,15 +373,18 @@ def run_campaign(spec, runner, args) -> dict:
 
 
 def run_generate(args) -> None:
-    """Dataset generation pipeline: seed file → vary → [fragment] → [legitimize] → TOML."""
+    """Dataset generation pipeline: seed file → vary → [fragment] → [stylize] → [legitimize] → TOML."""
     import json as _json
     import random as _random
 
     from generator import (
+        FragmentGroup,
+        STYLES,
         VARIATION_REGISTRY,
         generate_toml,
         legitimize_fragment,
         make_fragment_groups,
+        stylize_fragment_group,
     )
 
     if not args.seed_file:
@@ -390,8 +408,21 @@ def run_generate(args) -> None:
     api_key = args.claude_key if not args.dry_run else None
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
 
+    styles = None
+    if args.styles:
+        styles = [s.strip() for s in args.styles.split(",") if s.strip()]
+        invalid = [s for s in styles if s not in STYLES]
+        if invalid:
+            print(
+                f"ERROR: unknown styles: {', '.join(invalid)}. Available: {', '.join(STYLES)}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
+    if args.stylize:
+        print(f"  Styles: {', '.join(styles or STYLES)}")
 
     stage_descriptions = [
         stage.get("description", f"Stage {idx}")
@@ -409,17 +440,51 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        final_frag_list.append(
-            _shape_generated_fragments(
-                var,
-                stage_descriptions,
-                fragment=args.fragment,
-                legitimize=args.legitimize,
-                api_key=api_key,
-                make_fragment_groups_fn=make_fragment_groups,
-                legitimize_fragment_fn=legitimize_fragment,
+        if args.stylize:
+            if args.fragment:
+                raw_groups = make_fragment_groups(var, api_key=api_key)
+            else:
+                raw_groups = [[step] for step, _ in var]
+
+            styled_fragments = []
+            for idx, group in enumerate(raw_groups):
+                if not group:
+                    group = [var[idx][0]]
+
+                fragment_group = FragmentGroup(
+                    parent_step=var[idx][0],
+                    parent_tactic=var[idx][1],
+                    sub_fragments=group,
+                )
+                styled_fragments.extend(
+                    stylize_fragment_group(
+                        fragment_group,
+                        styles=styles,
+                        api_key=api_key,
+                    )
+                )
+
+            if args.legitimize:
+                for styled_group in styled_fragments:
+                    for variation in styled_group.variations:
+                        variation.prompt = legitimize_fragment(
+                            variation.prompt,
+                            api_key=api_key,
+                        )
+
+            final_frag_list.append(styled_fragments)
+        else:
+            final_frag_list.append(
+                _shape_generated_fragments(
+                    var,
+                    stage_descriptions,
+                    fragment=args.fragment,
+                    legitimize=args.legitimize,
+                    api_key=api_key,
+                    make_fragment_groups_fn=make_fragment_groups,
+                    legitimize_fragment_fn=legitimize_fragment,
+                )
             )
-        )
 
     if args.dry_run:
         return
