@@ -317,10 +317,10 @@ def run_generate(args) -> None:
     from generator import (
         STYLES,
         VARIATION_REGISTRY,
+        build_fragment_groups,
         generate_json,
         generate_toml,
         legitimize_fragment,
-        make_fragments,
         stylize_fragment_group,
     )
 
@@ -364,16 +364,20 @@ def run_generate(args) -> None:
     final_frag_list: list = []
     for i in range(args.num_variations):
         seed = base_seed + i
-        var = gen.make_variation(seed)  # list[tuple[str, str]]
+        detailed = gen.make_variation_detailed(seed)
 
         if args.dry_run:
             print(f"\n  [variation {i}  seed={seed}]")
-            for step, tactic in var:
-                print(f"    ({tactic})  {step}")
+            for stage in detailed:
+                print(f"    ({stage['mitre_tactic']})  {stage['prompt']}")
+                for f in stage.get("fragments", []):
+                    arrow = f"  -> [{f['role']}]"
+                    print(f"      {arrow} {f['prompt']}")
             continue
 
-        # Step 1: Fragment (split each step into sub-steps)
-        groups = make_fragments(var, api_key=api_key)
+        # Step 1: Build fragment groups — authored fragments take precedence;
+        # stages without them fall back to LLM/regex split via make_fragments.
+        groups = build_fragment_groups(detailed, api_key=api_key)
 
         if args.stylize:
             # Step 2: Stylize (rephrase each sub-fragment into 10 styles)

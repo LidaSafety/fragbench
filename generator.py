@@ -51,10 +51,19 @@ STYLES: list[str] = [
 
 @dataclass
 class FragmentGroup:
-    """Links sub-fragments back to their parent step."""
+    """Links sub-fragments back to their parent step.
+
+    When fragments are authored in the seed (not regex-split post-hoc),
+    ``roles``, ``produces``, and ``consumes`` carry the create/edit/dispatch
+    role and the shared-artifact wiring. They are parallel lists indexed the
+    same as ``sub_fragments``. For regex-split fragments these lists are empty.
+    """
     parent_step: str
     parent_tactic: str
     sub_fragments: list[str] = field(default_factory=list)
+    roles: list[str] = field(default_factory=list)
+    produces: list[list[str]] = field(default_factory=list)
+    consumes: list[list[str]] = field(default_factory=list)
 
 
 @dataclass
@@ -66,10 +75,17 @@ class StyledVariation:
 
 @dataclass
 class StyledFragmentGroup:
-    """A fragment with all 10 style variations, traceable to its parent."""
+    """A fragment with all 10 style variations, traceable to its parent.
+
+    ``role`` / ``produces`` / ``consumes`` carry the artifact-chain wiring
+    from the seed when available (empty for legacy regex-split fragments).
+    """
     parent_step: str
     parent_tactic: str
     variations: list[StyledVariation] = field(default_factory=list)
+    role: str = ""
+    produces: list[str] = field(default_factory=list)
+    consumes: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -392,16 +408,77 @@ def stylize_fragment_group(
     """
     Apply style variations to each sub-fragment in a FragmentGroup.
     Returns one StyledFragmentGroup per sub-fragment.
+
+    When ``group`` carries authored-fragment metadata (roles/produces/consumes),
+    it is forwarded onto the corresponding StyledFragmentGroup so the JSON
+    output preserves the artifact-chain wiring.
     """
     styled_groups: list[StyledFragmentGroup] = []
-    for sub_frag in group.sub_fragments:
+    for i, sub_frag in enumerate(group.sub_fragments):
         variations = stylize_fragment(sub_frag, styles=styles, api_key=api_key, model=model)
         styled_groups.append(StyledFragmentGroup(
             parent_step=group.parent_step,
             parent_tactic=group.parent_tactic,
             variations=variations,
+            role=group.roles[i] if i < len(group.roles) else "",
+            produces=group.produces[i] if i < len(group.produces) else [],
+            consumes=group.consumes[i] if i < len(group.consumes) else [],
         ))
     return styled_groups
+
+
+# ---------------------------------------------------------------------------
+# Variation → FragmentGroup builder
+# ---------------------------------------------------------------------------
+
+def build_fragment_groups(
+    detailed: list[dict],
+    api_key: str | None = None,
+    model: str = "claude-haiku-4-5-20251001",
+) -> list[FragmentGroup]:
+    """
+    Build FragmentGroups from a detailed variation (one entry per attack stage).
+
+    Preferred path: if a stage carries authored ``fragments`` (each with role,
+    prompt, produces, consumes), use those directly — they are coherent by
+    construction and share named artifacts.
+
+    Fallback: if a stage has no authored fragments, split its baseline prompt
+    via LLM (if api_key given) or the deterministic template regex. This keeps
+    legacy seeds (e.g. vibe_extortion) working while we migrate them.
+    """
+    groups: list[FragmentGroup] = []
+    fallback_pairs: list[tuple[int, tuple[str, str]]] = []
+
+    for idx, stage in enumerate(detailed):
+        parent = stage["prompt"]
+        tactic = stage["mitre_tactic"]
+        authored = stage.get("fragments")
+
+        if authored:
+            groups.append(FragmentGroup(
+                parent_step=parent,
+                parent_tactic=tactic,
+                sub_fragments=[f["prompt"] for f in authored],
+                roles=[f["role"] for f in authored],
+                produces=[list(f.get("produces", [])) for f in authored],
+                consumes=[list(f.get("consumes", [])) for f in authored],
+            ))
+        else:
+            # Placeholder; filled in below via the legacy splitter.
+            groups.append(FragmentGroup(parent_step=parent, parent_tactic=tactic))
+            fallback_pairs.append((idx, (parent, tactic)))
+
+    if fallback_pairs:
+        split = make_fragments(
+            [pair for _, pair in fallback_pairs],
+            api_key=api_key,
+            model=model,
+        )
+        for (idx, _), fg in zip(fallback_pairs, split):
+            groups[idx] = fg
+
+    return groups
 
 
 # ---------------------------------------------------------------------------
@@ -540,20 +617,27 @@ def generate_json(
     frag_list = []
     for frag_idx, frag in enumerate(fragments):
         if isinstance(frag, StyledFragmentGroup):
-            frag_list.append({
+            entry = {
                 "fragment_index": frag_idx,
                 "parent_prompt": frag.parent_step,
-                "parent_tactic": str(frag.parent_tactic),
+                "parent_tactic": getattr(frag.parent_tactic, "value", str(frag.parent_tactic)),
                 "variations": [
                     {"style": sv.style, "prompt": sv.prompt}
                     for sv in frag.variations
                 ],
-            })
+            }
+            if frag.role:
+                entry["role"] = frag.role
+            if frag.produces:
+                entry["produces"] = list(frag.produces)
+            if frag.consumes:
+                entry["consumes"] = list(frag.consumes)
+            frag_list.append(entry)
         elif isinstance(frag, FragmentGroup):
             frag_list.append({
                 "fragment_index": frag_idx,
                 "parent_prompt": frag.parent_step,
-                "parent_tactic": str(frag.parent_tactic),
+                "parent_tactic": getattr(frag.parent_tactic, "value", str(frag.parent_tactic)),
                 "sub_fragments": frag.sub_fragments,
             })
         else:
@@ -563,7 +647,19 @@ def generate_json(
                 "sub_fragments": frag,
             })
 
-    return {
+    # Artifact-chain summary: who produces each artifact, who consumes it.
+    artifact_chain: dict[str, dict] = {}
+    for entry in frag_list:
+        idx = entry["fragment_index"]
+        for a in entry.get("produces", []):
+            artifact_chain.setdefault(a, {"produced_by": None, "consumed_by": []})
+            if artifact_chain[a]["produced_by"] is None:
+                artifact_chain[a]["produced_by"] = idx
+        for a in entry.get("consumes", []):
+            artifact_chain.setdefault(a, {"produced_by": None, "consumed_by": []})
+            artifact_chain[a]["consumed_by"].append(idx)
+
+    result = {
         "campaign_id": campaign_id,
         "seed": seed,
         "metadata": {
@@ -576,3 +672,6 @@ def generate_json(
         "total_fragments": len(frag_list),
         "fragments": frag_list,
     }
+    if artifact_chain:
+        result["artifact_chain"] = artifact_chain
+    return result
