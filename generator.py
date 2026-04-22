@@ -25,6 +25,7 @@ import logging
 import sys
 
 from variations.scope_creep import ScopeCreepVariation
+from variations.quietvault import QuietVaultVariation
 from variations.vibe_extortion import VibeExtortionVariation
 
 log = logging.getLogger(__name__)
@@ -51,7 +52,8 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
-    "scope_creep":    ScopeCreepVariation,
+    "quietvault":    QuietVaultVariation,
+    "scope_creep":   ScopeCreepVariation,
     "vibe_extortion": VibeExtortionVariation,
 }
 
