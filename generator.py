@@ -31,7 +31,7 @@ from variations.nocode_ransomware import NocodeRansomwareVariation
 from variations.ns_power_ransomware import NsPowerRansomwareVariation
 from variations.promptflux import PromptFluxVariation
 from variations.scope_creep import ScopeCreepVariation
-from variations.quietvault import QuietVaultVariation
+from variations.dprk_fraud import DPRKFraudVariation
 from variations.vibe_extortion import VibeExtortionVariation
 
 log = logging.getLogger(__name__)
@@ -60,12 +60,12 @@ class GeneratedFragment:
 
 VARIATION_REGISTRY: dict[str, type] = {
     "coinbait":            CoinbaitVariation,
+    "dprk_fraud":          DPRKFraudVariation,
     "gtg1002":             GTG1002Variation,
     "malterminal":         MalTerminalVariation,
     "nocode_ransomware":   NocodeRansomwareVariation,
     "ns_power_ransomware": NsPowerRansomwareVariation,
     "promptflux":          PromptFluxVariation,
-    "quietvault":          QuietVaultVariation,
     "scope_creep":         ScopeCreepVariation,
     "vibe_extortion":      VibeExtortionVariation,
 }
