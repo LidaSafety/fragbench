@@ -320,16 +320,13 @@ _STYLE_TEMPLATES: dict[str, str] = {
 
 def _template_stylize(fragment: str, styles: list[str]) -> list[StyledVariation]:
     """Apply predefined templates to rephrase a fragment into each style (no LLM)."""
-
     results: list[StyledVariation] = []
     for style in styles:
         template = _STYLE_TEMPLATES.get(style, "{prompt}")
-        results.append(
-            StyledVariation(
-                style=style,
-                prompt=template.format(prompt=fragment),
-            )
-        )
+        results.append(StyledVariation(
+            style=style,
+            prompt=template.format(prompt=fragment),
+        ))
     return results
 
 
@@ -346,7 +343,6 @@ def stylize_fragment(
     With api_key: uses LLM for creative rephrasing.
     Without api_key: uses predefined templates (deterministic, no API calls).
     """
-
     styles = styles or STYLES
 
     if api_key is None:
@@ -354,7 +350,6 @@ def stylize_fragment(
 
     try:
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — falling back to templates")
@@ -387,12 +382,10 @@ def stylize_fragment(
             results.append(StyledVariation(style=style, prompt=rewritten))
         except Exception:
             log.warning("Stylize LLM call failed for style %r — using template", style, exc_info=True)
-            results.append(
-                StyledVariation(
-                    style=style,
-                    prompt=_STYLE_TEMPLATES.get(style, "{prompt}").format(prompt=fragment),
-                )
-            )
+            results.append(StyledVariation(
+                style=style,
+                prompt=_STYLE_TEMPLATES.get(style, "{prompt}").format(prompt=fragment),
+            ))
 
     return results
 
@@ -407,17 +400,14 @@ def stylize_fragment_group(
     Apply style variations to each sub-fragment in a FragmentGroup.
     Returns one StyledFragmentGroup per sub-fragment.
     """
-
     styled_groups: list[StyledFragmentGroup] = []
     for sub_frag in group.sub_fragments:
         variations = stylize_fragment(sub_frag, styles=styles, api_key=api_key, model=model)
-        styled_groups.append(
-            StyledFragmentGroup(
-                parent_step=group.parent_step,
-                parent_tactic=group.parent_tactic,
-                variations=variations,
-            )
-        )
+        styled_groups.append(StyledFragmentGroup(
+            parent_step=group.parent_step,
+            parent_tactic=group.parent_tactic,
+            variations=variations,
+        ))
     return styled_groups
 
 
