@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from variations.ai_phishing import AIPhishingVariation
 from variations.clickfix import ClickFixVariation
 from variations.coinbait import CoinbaitVariation
+from variations.deepfake_id_fraud import DeepfakeIdentityFraudVariation
 from variations.gtg1002 import GTG1002Variation
 from variations.hello_world import HelloWorldVariation
 from variations.honestcue import HonestCueVariation
@@ -112,6 +113,7 @@ VARIATION_REGISTRY: dict[str, type] = {
     "ai_phishing":         AIPhishingVariation,
     "clickfix_via_ai_chat": ClickFixVariation,
     "coinbait":            CoinbaitVariation,
+    "deepfake_id_fraud":   DeepfakeIdentityFraudVariation,
     "dprk_fraud":          DPRKFraudVariation,
     "gtg1002":             GTG1002Variation,
     "hello_world":         HelloWorldVariation,
