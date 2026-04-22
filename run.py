@@ -1,5 +1,5 @@
 """
-CLI entry point for fragbench.
+CLI entry point for fragguard-chain.
 
 Examples:
     # Run all campaigns against Qwen (keyword classifier)
@@ -24,6 +24,10 @@ Examples:
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
+
+    # Generate with LLM style variations (auto-generates all 10 styles per fragment)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize --styles direct,sysadmin,ctf
 """
 
 from __future__ import annotations
@@ -88,16 +92,6 @@ def parse_args() -> argparse.Namespace:
         help="Run a single campaign by ID (e.g. DPRK_FRAUD). Omit to run all.",
     )
     p.add_argument(
-        "--list-campaigns",
-        action="store_true",
-        help="List available campaigns and exit",
-    )
-    p.add_argument(
-        "--style",
-        default=None,
-        help="Comma-separated list of styles to run (e.g. direct,ctf,sysadmin). Omit to run all.",
-    )
-    p.add_argument(
         "--attacks-dir",
         default="attacks",
         help="Directory containing attack TOML files (default: attacks/)",
@@ -105,17 +99,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--output",
         default=None,
-        help="Write JSON results to this file path (default: output/<timestamp>_<model>.json)",
+        help="Write JSON results to this file path",
     )
     p.add_argument(
         "--dry-run",
         action="store_true",
         help="Print prompts without calling any model APIs",
-    )
-    p.add_argument(
-        "--log-verbose",
-        action="store_true",
-        help="Log all LLM calls (judge, generator) in addition to target calls",
     )
 
     # --- Dataset generation mode -------------------------------------------
@@ -151,6 +140,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Apply LLM legitimization (reframe steps with cover stories)",
     )
+    p.add_argument(
+        "--stylize",
+        action="store_true",
+        help="Apply LLM style variations (rephrase each fragment into 10 styles)",
+    )
+    p.add_argument(
+        "--styles",
+        default=None,
+        help="Comma-separated list of styles to generate (default: all 10). "
+             "E.g. --styles direct,sysadmin,ctf",
+    )
 
     return p.parse_args()
 
@@ -176,63 +176,14 @@ def build_runner(args: argparse.Namespace):
 
 def print_result_row(style: str, verdict: str, justification: str = "") -> None:
     color = {
-        "ANSWERED": "\033[92m",  # green
-        "REFUSED":  "\033[91m",  # red
+        "ANSWERED": "\033[91m",  # red — model complied (bad)
+        "REFUSED":  "\033[92m",  # green — model refused (good)
         "PARTIAL":  "\033[93m",  # yellow
-        "UNCLEAR":  "\033[93m",  # yellow
-    }.get(verdict, "\033[91m")
+        "UNCLEAR":  "\033[90m",  # gray
+    }.get(verdict, "")
     reset = "\033[0m"
     just = f"  [{justification}]" if justification else ""
     print(f"  {color}{verdict:8s}{reset}  {style}{just}")
-
-
-def _shape_generated_fragments(
-    var: list[tuple[str, str]],
-    stage_descriptions: list[str],
-    *,
-    fragment: bool,
-    legitimize: bool,
-    api_key: str | None,
-    make_fragment_groups_fn,
-    legitimize_fragment_fn,
-) -> list:
-    """
-    Convert one generated variation into TOML-ready fragment blocks while
-    preserving the original stage boundary, stage-aligned fragment indices,
-    and human-meaningful descriptions.
-    """
-    from generator import GeneratedFragment
-
-    if len(stage_descriptions) != len(var):
-        raise ValueError("stage_descriptions must have the same length as var")
-
-    if fragment:
-        fragment_groups = make_fragment_groups_fn(var, api_key=api_key)
-    else:
-        fragment_groups = [[step] for step, _ in var]
-
-    if len(fragment_groups) != len(var):
-        raise ValueError("fragment_groups must preserve one outer group per input stage")
-
-    shaped: list[GeneratedFragment] = []
-    for idx, (group, description) in enumerate(zip(fragment_groups, stage_descriptions)):
-        if not group:
-            group = [var[idx][0]]
-
-        variations = []
-        for frag_text in group:
-            if legitimize:
-                frag_text = legitimize_fragment_fn(frag_text, api_key=api_key)
-            variations.append(frag_text)
-
-        shaped.append(
-            GeneratedFragment(
-                description=description or f"Stage {idx}",
-                variations=variations,
-            )
-        )
-
-    return shaped
 
 
 def run_campaign(spec, runner, args) -> dict:
@@ -249,12 +200,7 @@ def run_campaign(spec, runner, args) -> dict:
         print(f"\nFragment {fragment.index}: {fragment.description}")
         frag_results = []
 
-        style_filter = set(s.strip() for s in args.style.split(",")) if args.style else None
-        variations = fragment.variations
-        if style_filter:
-            variations = [v for v in variations if v.style in style_filter]
-
-        for variation in variations:
+        for variation in fragment.variations:
             if args.dry_run:
                 print(f"  [DRY RUN] {variation.style}: {variation.prompt[:80]}...")
                 continue
@@ -328,7 +274,7 @@ def run_campaign(spec, runner, args) -> dict:
     )
 
     # Print kill-chain summary
-    kc_color = "\033[92m" if kc.kill_chain_complete else "\033[91m"
+    kc_color = "\033[91m" if kc.kill_chain_complete else "\033[92m"
     reset = "\033[0m"
     print(f"\nKill-chain: {kc_color}{'COMPLETE' if kc.kill_chain_complete else 'BLOCKED'}{reset}")
     print(f"  Fragments compliant: {kc.compliant_fragments}/{kc.total_fragments}")
@@ -358,15 +304,17 @@ def run_campaign(spec, runner, args) -> dict:
 
 
 def run_generate(args) -> None:
-    """Dataset generation pipeline: seed file → vary → [fragment] → [legitimize] → TOML."""
+    """Dataset generation pipeline: seed file → vary → [fragment] → [stylize] → [legitimize] → TOML."""
     import json as _json
     import random as _random
 
     from generator import (
+        STYLES,
         VARIATION_REGISTRY,
         generate_toml,
         legitimize_fragment,
-        make_fragment_groups,
+        make_fragments,
+        stylize_fragment_group,
     )
 
     if not args.seed_file:
@@ -390,15 +338,23 @@ def run_generate(args) -> None:
     api_key = args.claude_key if not args.dry_run else None
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
 
+    # Parse style filter
+    styles = None
+    if args.styles:
+        styles = [s.strip() for s in args.styles.split(",")]
+        invalid = [s for s in styles if s not in STYLES]
+        if invalid:
+            print(f"ERROR: unknown styles: {', '.join(invalid)}. Available: {', '.join(STYLES)}",
+                  file=sys.stderr)
+            sys.exit(1)
+
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
+    if args.stylize:
+        used_styles = styles or STYLES
+        print(f"  Styles: {', '.join(used_styles)}")
 
-    stage_descriptions = [
-        stage.get("description", f"Stage {idx}")
-        for idx, stage in enumerate(seed_data.get("attack_stages", []))
-    ]
-
-    final_frag_list: list[list] = []
+    final_frag_list: list = []
     for i in range(args.num_variations):
         seed = base_seed + i
         var = gen.make_variation(seed)  # list[tuple[str, str]]
@@ -409,17 +365,30 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        final_frag_list.append(
-            _shape_generated_fragments(
-                var,
-                stage_descriptions,
-                fragment=args.fragment,
-                legitimize=args.legitimize,
-                api_key=api_key,
-                make_fragment_groups_fn=make_fragment_groups,
-                legitimize_fragment_fn=legitimize_fragment,
-            )
-        )
+        # Step 1: Fragment (split each step into sub-steps)
+        groups = make_fragments(var, api_key=api_key)
+
+        if args.stylize:
+            # Step 2: Stylize (rephrase each sub-fragment into 10 styles)
+            styled_fragments = []
+            for group in groups:
+                styled_fragments.extend(
+                    stylize_fragment_group(group, styles=styles, api_key=api_key)
+                )
+            if args.legitimize:
+                # Legitimize each styled prompt in-place
+                for sfg in styled_fragments:
+                    for sv in sfg.variations:
+                        sv.prompt = legitimize_fragment(sv.prompt, api_key=api_key)
+            final_frag_list.append(styled_fragments)
+        else:
+            # Legacy path: flat list of strings
+            steps = []
+            for group in groups:
+                steps.extend(group.sub_fragments)
+            if args.legitimize:
+                steps = [legitimize_fragment(s, api_key=api_key) for s in steps]
+            final_frag_list.append(steps)
 
     if args.dry_run:
         return
@@ -447,13 +416,6 @@ def main() -> None:
         level=logging.WARNING,
     )
 
-    if not args.dry_run:
-        from calllog import init_log, set_verbose
-        log_path = init_log()
-        if args.log_verbose:
-            set_verbose(True)
-        print(f"LLM call log: {log_path}")
-
     if args.generate:
         run_generate(args)
         return
@@ -470,13 +432,6 @@ def main() -> None:
     if not all_specs:
         print(f"ERROR: no *.toml files found in {attacks_dir}", file=sys.stderr)
         sys.exit(1)
-
-    # List campaigns and exit
-    if args.list_campaigns:
-        for spec in all_specs:
-            m = spec.metadata
-            print(f"  {m.id:25s}  {m.technique:6s}  {m.technique_name}")
-        return
 
     # Filter to single campaign if requested
     if args.campaign:
@@ -507,13 +462,8 @@ def main() -> None:
                   f"{kc['compliant_fragments']}/{kc['total_fragments']} fragments")
 
     # Write JSON output
-    if all_results:
-        if args.output:
-            output_path = Path(args.output)
-        else:
-            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            model_name = args.qwen_model if args.model == "qwen" else args.claude_model
-            output_path = Path("output") / f"{ts}_{model_name}.json"
+    if args.output and all_results:
+        output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_doc = {
             "run_timestamp": datetime.now(timezone.utc).isoformat(),
