@@ -586,7 +586,14 @@ def generate_json(
                     {"style": sv.style, "prompt": sv.prompt}
                     for sv in frag.variations
                 ],
-            })
+            }
+            if frag.role:
+                entry["role"] = frag.role
+            if frag.produces:
+                entry["produces"] = list(frag.produces)
+            if frag.consumes:
+                entry["consumes"] = list(frag.consumes)
+            frag_list.append(entry)
         elif isinstance(frag, FragmentGroup):
             frag_list.append({
                 "fragment_index": frag_idx,
@@ -601,7 +608,19 @@ def generate_json(
                 "sub_fragments": frag,
             })
 
-    return {
+    # Artifact-chain summary: who produces each artifact, who consumes it.
+    artifact_chain: dict[str, dict] = {}
+    for entry in frag_list:
+        idx = entry["fragment_index"]
+        for a in entry.get("produces", []):
+            artifact_chain.setdefault(a, {"produced_by": None, "consumed_by": []})
+            if artifact_chain[a]["produced_by"] is None:
+                artifact_chain[a]["produced_by"] = idx
+        for a in entry.get("consumes", []):
+            artifact_chain.setdefault(a, {"produced_by": None, "consumed_by": []})
+            artifact_chain[a]["consumed_by"].append(idx)
+
+    result = {
         "campaign_id": campaign_id,
         "seed": seed,
         "metadata": {
@@ -614,3 +633,6 @@ def generate_json(
         "total_fragments": len(frag_list),
         "fragments": frag_list,
     }
+    if artifact_chain:
+        result["artifact_chain"] = artifact_chain
+    return result
