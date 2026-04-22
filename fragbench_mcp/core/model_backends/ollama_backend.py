@@ -205,7 +205,7 @@ class OllamaBackend(ChatBackend):
             payload["metadata"] = request_metadata
 
         async def _request() -> Dict[str, Any]:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=600.0) as client:
                 chat_url = f"{self.base_url}/api/chat"
                 response = await client.post(chat_url, json=payload)
                 if response.status_code == 404:

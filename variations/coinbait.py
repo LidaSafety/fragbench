@@ -1,14 +1,14 @@
 """
-PROMPTSTEAL / APT28 Campaign — make_variation implementation.
+COINBAIT / UNC5356 Campaign — make_variation implementation.
 
-Generates deterministic variations of the APT28 LAMEHUG kill chain where
-Qwen2.5-Coder generate recon + doc-harvest commands at runtime targeting
-Ukrainian government systems.
+Generates deterministic variations of the COINBAIT kill chain where
+Lovable AI builds a React SPA phishing kit masquerading as a crypto
+exchange for credential harvesting via Cloudflare + Supabase infrastructure.
 
 Usage:
-    from variations.promptsteal import PromptStealVariation
+    from variations.coinbait import CoinbaitVariation
 
-    gen = PromptStealVariation("seeds/promptsteal.json")
+    gen = CoinbaitVariation("seeds/coinbait.json")
     variation = gen.make_variation(seed=42)
     for prompt, tactic in variation:
         print(f"[{tactic}] {prompt}")
@@ -22,22 +22,22 @@ from typing import Any, Dict, List, Tuple
 from variations.base import BaseVariation, MitreType
 
 
-class PromptStealVariation(BaseVariation):
+class CoinbaitVariation(BaseVariation):
     """
-    Custom make_variation for PROMPTSTEAL / APT28 campaign.
+    Custom make_variation for COINBAIT / UNC5356 campaign.
 
     Deterministic: same seed always produces the same output.
     No remote LLM calls — pure Python string formatting.
     """
 
-    def __init__(self, seed_file: str = "seeds/promptsteal.json"):
+    def __init__(self, seed_file: str = "seeds/coinbait.json"):
         with open(seed_file) as f:
             self.data = json.load(f)
         self._validate_seed_tactics(self.data)
 
     def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         """
-        Generate one deterministic variation of the full PROMPTSTEAL kill chain.
+        Generate one deterministic variation of the full COINBAIT kill chain.
 
         Args:
             seed: Integer seed for deterministic randomness.
@@ -80,16 +80,18 @@ class PromptStealVariation(BaseVariation):
             )
             prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
-            result.append({
-                "index": stage["index"],
-                "prompt": prompt,
-                "mitre_tactic": stage["mitre_tactic"],
-                "mitre_technique": stage["mitre_technique"],
-                "mitre_technique_name": stage["mitre_technique_name"],
-                "description": stage["description"],
-                "resolved_variables": dict(stage_vars),
-                "dimension_choices": dict(dimension_choices),
-            })
+            result.append(
+                {
+                    "index": stage["index"],
+                    "prompt": prompt,
+                    "mitre_tactic": stage["mitre_tactic"],
+                    "mitre_technique": stage["mitre_technique"],
+                    "mitre_technique_name": stage["mitre_technique_name"],
+                    "description": stage["description"],
+                    "resolved_variables": dict(stage_vars),
+                    "dimension_choices": dict(dimension_choices),
+                }
+            )
 
         return result
 
@@ -103,11 +105,11 @@ if __name__ == "__main__":
     import sys
 
     parser = argparse.ArgumentParser(
-        description="Generate PROMPTSTEAL campaign variations"
+        description="Generate COINBAIT campaign variations"
     )
     parser.add_argument(
         "--seed-file",
-        default="seeds/promptsteal.json",
+        default="seeds/coinbait.json",
         help="Path to seed JSON file",
     )
     parser.add_argument(
@@ -136,7 +138,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        gen = PromptStealVariation(args.seed_file)
+        gen = CoinbaitVariation(args.seed_file)
     except FileNotFoundError:
         print(f"Error: seed file not found: {args.seed_file}", file=sys.stderr)
         sys.exit(1)
@@ -145,30 +147,36 @@ if __name__ == "__main__":
     seeds = range(args.count) if args.count > 1 else [args.seed]
 
     for s in seeds:
-        print(f"\n{'='*70}")
-        print(f"  PROMPTSTEAL Variation — seed={s}")
-        print(f"{'='*70}")
+        print(f"\n{'=' * 70}")
+        print(f"  COINBAIT Variation — seed={s}")
+        print(f"{'=' * 70}")
 
         if args.detailed:
             variation = gen.make_variation_detailed(s)
             for stage in variation:
                 print(f"\n  Stage {stage['index']} [{stage['mitre_tactic']}]")
-                print(f"  Technique: {stage['mitre_technique']} — {stage['mitre_technique_name']}")
-                print(f"  Variables: {json.dumps(stage['resolved_variables'], indent=4)}")
+                print(
+                    f"  Technique: {stage['mitre_technique']} — {stage['mitre_technique_name']}"
+                )
+                print(
+                    f"  Variables: {json.dumps(stage['resolved_variables'], indent=4)}"
+                )
                 print(f"  Prompt: {stage['prompt']}")
             all_variations.append({"seed": s, "stages": variation})
         else:
             variation = gen.make_variation(s)
             for prompt, tactic in variation:
                 print(f"\n  [{tactic}] {prompt}")
-            all_variations.append({
-                "seed": s,
-                "stages": [{"prompt": p, "mitre_tactic": t} for p, t in variation],
-            })
+            all_variations.append(
+                {
+                    "seed": s,
+                    "stages": [{"prompt": p, "mitre_tactic": t} for p, t in variation],
+                }
+            )
 
     if args.output:
         output_data = {
-            "campaign_id": "PROMPTSTEAL",
+            "campaign_id": "COINBAIT",
             "metadata": gen.data["metadata"],
             "variations": all_variations,
         }

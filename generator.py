@@ -20,10 +20,16 @@ See variations/vibe_extortion.py for a complete working example.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import sys
+from dataclasses import dataclass
 
+from variations.coinbait import CoinbaitVariation
+from variations.gtg1002 import GTG1002Variation
+from variations.malterminal import MalTerminalVariation
+from variations.nocode_ransomware import NocodeRansomwareVariation
+from variations.ns_power_ransomware import NsPowerRansomwareVariation
+from variations.promptflux import PromptFluxVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.dprk_fraud import DPRKFraudVariation
 from variations.vibe_extortion import VibeExtortionVariation
@@ -37,6 +43,7 @@ class GeneratedFragment:
 
     description: str
     variations: list[str]
+
 
 # ---------------------------------------------------------------------------
 # Registry — maps the seed file's metadata.id (lowercased) to its class
@@ -52,9 +59,15 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
-    "dprk_fraud":    DPRKFraudVariation,
-    "scope_creep":   ScopeCreepVariation,
-    "vibe_extortion": VibeExtortionVariation,
+    "coinbait":            CoinbaitVariation,
+    "dprk_fraud":          DPRKFraudVariation,
+    "gtg1002":             GTG1002Variation,
+    "malterminal":         MalTerminalVariation,
+    "nocode_ransomware":   NocodeRansomwareVariation,
+    "ns_power_ransomware": NsPowerRansomwareVariation,
+    "promptflux":          PromptFluxVariation,
+    "scope_creep":         ScopeCreepVariation,
+    "vibe_extortion":      VibeExtortionVariation,
 }
 
 
@@ -88,6 +101,7 @@ def _fix_json_escapes(text: str) -> str:
     all backslash sequences to single backslashes, then re-escaping them.
     This only operates inside JSON string values (between quotes).
     """
+
     def _fix_string(m: re.Match) -> str:
         s = m.group(0)
         # Collapse any run of backslashes to the chars they represent,
@@ -125,6 +139,7 @@ def make_fragment_groups(
 
     try:
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning steps unchanged")
@@ -144,6 +159,7 @@ def make_fragment_groups(
             raw = resp.content[0].text.strip()
 
             from calllog import log_call
+
             log_call(
                 role="generator_fragment",
                 model=model,
@@ -153,8 +169,11 @@ def make_fragment_groups(
             )
 
             if not raw:
-                log.warning("Empty LLM response for step %r (stop_reason=%s) — using original",
-                            step[:60], resp.stop_reason)
+                log.warning(
+                    "Empty LLM response for step %r (stop_reason=%s) — using original",
+                    step[:60],
+                    resp.stop_reason,
+                )
                 fragment_groups.append([step])
                 fallbacks += 1
                 continue
@@ -163,16 +182,22 @@ def make_fragment_groups(
             if isinstance(parts, list) and len(parts) >= 2:
                 fragment_groups.append([str(p) for p in parts[:2]])
             else:
-                log.warning("Unexpected LLM response for step %r — using original", step[:60])
+                log.warning(
+                    "Unexpected LLM response for step %r — using original", step[:60]
+                )
                 fragment_groups.append([step])
                 fallbacks += 1
         except Exception:
-            log.warning("Fragment LLM call failed for step %r", step[:60], exc_info=True)
+            log.warning(
+                "Fragment LLM call failed for step %r", step[:60], exc_info=True
+            )
             fragment_groups.append([step])
             fallbacks += 1
 
     if fallbacks:
-        log.warning("make_fragments: %d/%d steps fell back to originals", fallbacks, len(var))
+        log.warning(
+            "make_fragments: %d/%d steps fell back to originals", fallbacks, len(var)
+        )
     return fragment_groups
 
 
@@ -219,6 +244,7 @@ def legitimize_fragment(
 
     try:
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning fragment unchanged")
@@ -234,6 +260,7 @@ def legitimize_fragment(
         result = resp.content[0].text.strip()
 
         from calllog import log_call
+
         log_call(
             role="generator_legitimize",
             model=model,
@@ -251,6 +278,7 @@ def legitimize_fragment(
 # ---------------------------------------------------------------------------
 # TOML serialization
 # ---------------------------------------------------------------------------
+
 
 def _toml_str(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
@@ -273,10 +301,10 @@ def generate_toml(
     inside that fragment becomes one [[fragments.variations]] entry.
     """
     campaign_id = f"{metadata['id']}_{seed}"
-    technique   = metadata.get("technique", "T0000")
-    tech_name   = metadata.get("technique_name", "Generated")
+    technique = metadata.get("technique", "T0000")
+    tech_name = metadata.get("technique_name", "Generated")
     description = metadata.get("description", "Auto-generated attack scenario.")
-    tags        = metadata.get("tags", ["generated"])
+    tags = metadata.get("tags", ["generated"])
 
     lines: list[str] = [
         "[metadata]",
