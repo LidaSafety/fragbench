@@ -24,15 +24,24 @@ import logging
 import sys
 from dataclasses import dataclass
 
+from variations.ai_phishing import AIPhishingVariation
+from variations.clickfix import ClickFixVariation
 from variations.coinbait import CoinbaitVariation
 from variations.gtg1002 import GTG1002Variation
+from variations.hello_world import HelloWorldVariation
+from variations.honestcue import HonestCueVariation
+from variations.london_drugs_lockbit import LondonDrugsLockbitVariation
 from variations.malterminal import MalTerminalVariation
 from variations.nocode_ransomware import NocodeRansomwareVariation
 from variations.ns_power_ransomware import NsPowerRansomwareVariation
+from variations.operation_dream_job import OperationDreamJobVariation
 from variations.promptflux import PromptFluxVariation
+from variations.promptsteal import PromptStealVariation
+from variations.quietvault import QuietVaultVariation
 from variations.scope_creep import ScopeCreepVariation
 from variations.dprk_fraud import DPRKFraudVariation
 from variations.vibe_extortion import VibeExtortionVariation
+from variations.wormgpt_kawaiigpt import WormGptKawaiiGptVariation
 
 log = logging.getLogger(__name__)
 
@@ -59,15 +68,24 @@ class GeneratedFragment:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
+    "ai_phishing":         AIPhishingVariation,
+    "clickfix_via_ai_chat": ClickFixVariation,
     "coinbait":            CoinbaitVariation,
     "dprk_fraud":          DPRKFraudVariation,
     "gtg1002":             GTG1002Variation,
+    "hello_world":         HelloWorldVariation,
+    "honestcue":           HonestCueVariation,
+    "london_drugs_lockbit": LondonDrugsLockbitVariation,
     "malterminal":         MalTerminalVariation,
     "nocode_ransomware":   NocodeRansomwareVariation,
     "ns_power_ransomware": NsPowerRansomwareVariation,
+    "quietvault":          QuietVaultVariation,
+    "unc2970_operation_dream_job": OperationDreamJobVariation,
     "promptflux":          PromptFluxVariation,
+    "promptsteal":         PromptStealVariation,
     "scope_creep":         ScopeCreepVariation,
     "vibe_extortion":      VibeExtortionVariation,
+    "wormgpt_kawaiigpt":   WormGptKawaiiGptVariation,
 }
 
 
