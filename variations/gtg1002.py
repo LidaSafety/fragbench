@@ -1,43 +1,42 @@
 """
-PROMPTSTEAL / APT28 Campaign — make_variation implementation.
+GTG-1002 Campaign — make_variation implementation.
 
-Generates deterministic variations of the APT28 LAMEHUG kill chain where
-Qwen2.5-Coder generate recon + doc-harvest commands at runtime targeting
-Ukrainian government systems.
+Generates deterministic variations of the GTG-1002 AI-orchestrated espionage
+kill chain where a Chinese state-sponsored actor used Claude Code as an
+autonomous penetration testing engine against ~30 global organisations.
 
 Usage:
-    from variations.promptsteal import PromptStealVariation
+    from variations.gtg1002 import GTG1002Variation
 
-    gen = PromptStealVariation("seeds/promptsteal.json")
-    variation = gen.make_variation(seed=42)
+    gen = GTG1002Variation("seeds/gtg1002.json")
+    variation = gen.make_variation(seed=13)
     for prompt, tactic in variation:
         print(f"[{tactic}] {prompt}")
 """
 
 import json
-import random
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from variations.base import BaseVariation, MitreType
 
 
-class PromptStealVariation(BaseVariation):
+class GTG1002Variation(BaseVariation):
     """
-    Custom make_variation for PROMPTSTEAL / APT28 campaign.
+    Variation generator for the GTG-1002 campaign.
 
     Deterministic: same seed always produces the same output.
     No remote LLM calls — pure Python string formatting.
     """
 
-    def __init__(self, seed_file: str = "seeds/promptsteal.json"):
+    def __init__(self, seed_file: str = "seeds/gtg1002.json"):
         with open(seed_file) as f:
             self.data = json.load(f)
         self._validate_seed_tactics(self.data)
 
     def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         """
-        Generate one deterministic variation of the full PROMPTSTEAL kill chain.
+        Generate one deterministic variation of the full GTG-1002 kill chain.
 
         Args:
             seed: Integer seed for deterministic randomness.
@@ -45,6 +44,7 @@ class PromptStealVariation(BaseVariation):
         Returns:
             List of (prompt_text, MitreType) tuples — one per attack stage.
         """
+        import random
         rng = random.Random(seed)
         dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
@@ -66,8 +66,9 @@ class PromptStealVariation(BaseVariation):
         Generate a detailed variation with full metadata per stage.
 
         Returns list of dicts with: prompt, tactic, technique, description,
-        resolved_variables — useful for debugging and JSON export.
+        resolved_variables, dimension_choices — useful for debugging and JSON export.
         """
+        import random
         rng = random.Random(seed)
         dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
@@ -103,17 +104,17 @@ if __name__ == "__main__":
     import sys
 
     parser = argparse.ArgumentParser(
-        description="Generate PROMPTSTEAL campaign variations"
+        description="Generate GTG-1002 campaign variations"
     )
     parser.add_argument(
         "--seed-file",
-        default="seeds/promptsteal.json",
+        default="seeds/gtg1002.json",
         help="Path to seed JSON file",
     )
     parser.add_argument(
         "--seed",
         type=int,
-        default=42,
+        default=13,
         help="Random seed for variation generation",
     )
     parser.add_argument(
@@ -136,7 +137,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        gen = PromptStealVariation(args.seed_file)
+        gen = GTG1002Variation(args.seed_file)
     except FileNotFoundError:
         print(f"Error: seed file not found: {args.seed_file}", file=sys.stderr)
         sys.exit(1)
@@ -146,7 +147,7 @@ if __name__ == "__main__":
 
     for s in seeds:
         print(f"\n{'='*70}")
-        print(f"  PROMPTSTEAL Variation — seed={s}")
+        print(f"  GTG-1002 Variation — seed={s}")
         print(f"{'='*70}")
 
         if args.detailed:
@@ -168,7 +169,7 @@ if __name__ == "__main__":
 
     if args.output:
         output_data = {
-            "campaign_id": "PROMPTSTEAL",
+            "campaign_id": "GTG1002",
             "metadata": gen.data["metadata"],
             "variations": all_variations,
         }

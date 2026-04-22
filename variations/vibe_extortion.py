@@ -30,22 +30,12 @@ except ModuleNotFoundError:
     from base import BaseVariation, MitreType  # type: ignore[no-redef]
 
 
-# Base58 alphabet used for BTC-style addresses (no 0, O, I, l)
-_BTC_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-
-
 class VibeExtortionVariation(BaseVariation):
     """
     Custom make_variation for VIBE_EXTORTION / Claude Code "Vibe Hacking" campaign.
 
     Deterministic: same seed always produces the same output.
     No remote LLM calls — pure Python string formatting.
-
-    Supports all variable types from PROMPTSTEAL plus three new types
-    introduced by the extortion campaign's financial and cryptocurrency context:
-        dollar_amount  — formatted dollar figure within a range and step
-        integer_range  — integer drawn uniformly from [min, max]
-        crypto_wallet  — fake BTC-style Base58 address (not a real address)
     """
 
     def __init__(self, seed_file: str = "seeds/vibe_extortion.json"):
@@ -101,78 +91,6 @@ class VibeExtortionVariation(BaseVariation):
                 "description": stage["description"],
                 "resolved_variables": dict(stage_vars),
             })
-
-        return result
-
-    def _resolve_variables(
-        self,
-        stage: dict,
-        rng: random.Random,
-        resolved_vars: Dict[int, Dict[str, Any]],
-    ) -> Dict[str, Any]:
-        """Resolve all variables for a stage, handling inheritance and types."""
-        result = {}
-        variables = stage.get("variables", {})
-
-        for var_name, var_def in variables.items():
-            var_type = var_def["type"]
-
-            if var_type == "inherit":
-                from_stage = var_def["from_stage"]
-                from_var = var_def["variable"]
-                result[var_name] = resolved_vars[from_stage][from_var]
-
-            elif var_type == "fixed":
-                result[var_name] = var_def["value"]
-
-            elif var_type == "choice":
-                result[var_name] = rng.choice(var_def["values"])
-
-            elif var_type == "subset":
-                count = rng.randint(var_def["min_count"], var_def["max_count"])
-                selected = rng.sample(var_def["all_values"], count)
-                result[var_name] = ", ".join(selected)
-
-            elif var_type == "path":
-                subdir = rng.choice(var_def["subdir_pool"])
-                result[var_name] = f"{var_def['base']}\\{subdir}"
-
-            elif var_type == "filename":
-                result[var_name] = rng.choice(var_def["name_pool"])
-
-            elif var_type == "ipv4":
-                result[var_name] = (
-                    f"10.{rng.randint(0, 255)}"
-                    f".{rng.randint(0, 255)}"
-                    f".{rng.randint(1, 254)}"
-                )
-
-            elif var_type == "port":
-                result[var_name] = rng.choice(var_def["range"])
-
-            elif var_type == "dollar_amount":
-                lo = var_def["range"][0]
-                hi = var_def["range"][1]
-                step = var_def.get("step", 1)
-                num_steps = (hi - lo) // step
-                amount = lo + rng.randint(0, num_steps) * step
-                result[var_name] = f"{amount:,}"
-
-            elif var_type == "integer_range":
-                result[var_name] = rng.randint(var_def["min"], var_def["max"])
-
-            elif var_type == "crypto_wallet":
-                # Generate a plausible-looking but invalid BTC-style Base58 address.
-                # Prefix: "1" (P2PKH) or "3" (P2SH); total length 34 characters.
-                prefix = rng.choice(["1", "3"])
-                body = "".join(rng.choices(_BTC_ALPHABET, k=33))
-                result[var_name] = prefix + body
-
-            else:
-                raise ValueError(
-                    f"Unknown variable type '{var_type}' for variable '{var_name}' "
-                    f"in stage {stage['index']}"
-                )
 
         return result
 

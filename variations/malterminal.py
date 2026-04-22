@@ -1,14 +1,14 @@
 """
-PROMPTSTEAL / APT28 Campaign — make_variation implementation.
+MALTERMINAL Campaign — make_variation implementation.
 
-Generates deterministic variations of the APT28 LAMEHUG kill chain where
-Qwen2.5-Coder generate recon + doc-harvest commands at runtime targeting
-Ukrainian government systems.
+Generates deterministic variations of the MalTerminal kill chain where
+OpenAI GPT-4 is queried at runtime to generate ransomware or reverse shell
+Python code, executed via exec() with no static payload in the binary.
 
 Usage:
-    from variations.promptsteal import PromptStealVariation
+    from variations.malterminal import MalTerminalVariation
 
-    gen = PromptStealVariation("seeds/promptsteal.json")
+    gen = MalTerminalVariation("seeds/malterminal.json")
     variation = gen.make_variation(seed=42)
     for prompt, tactic in variation:
         print(f"[{tactic}] {prompt}")
@@ -22,22 +22,22 @@ from typing import Any, Dict, List, Tuple
 from variations.base import BaseVariation, MitreType
 
 
-class PromptStealVariation(BaseVariation):
+class MalTerminalVariation(BaseVariation):
     """
-    Custom make_variation for PROMPTSTEAL / APT28 campaign.
+    Custom make_variation for MalTerminal campaign.
 
     Deterministic: same seed always produces the same output.
     No remote LLM calls — pure Python string formatting.
     """
 
-    def __init__(self, seed_file: str = "seeds/promptsteal.json"):
+    def __init__(self, seed_file: str = "seeds/malterminal.json"):
         with open(seed_file) as f:
             self.data = json.load(f)
         self._validate_seed_tactics(self.data)
 
     def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         """
-        Generate one deterministic variation of the full PROMPTSTEAL kill chain.
+        Generate one deterministic variation of the full MalTerminal kill chain.
 
         Args:
             seed: Integer seed for deterministic randomness.
@@ -87,11 +87,12 @@ class PromptStealVariation(BaseVariation):
                 "mitre_technique": stage["mitre_technique"],
                 "mitre_technique_name": stage["mitre_technique_name"],
                 "description": stage["description"],
-                "resolved_variables": dict(stage_vars),
-                "dimension_choices": dict(dimension_choices),
+                "resolved_variables": stage_vars,
+                "dimension_choices": dimension_choices,
             })
 
         return result
+
 
 
 # ---------------------------------------------------------------------------
@@ -103,11 +104,11 @@ if __name__ == "__main__":
     import sys
 
     parser = argparse.ArgumentParser(
-        description="Generate PROMPTSTEAL campaign variations"
+        description="Generate MalTerminal campaign variations"
     )
     parser.add_argument(
         "--seed-file",
-        default="seeds/promptsteal.json",
+        default="seeds/malterminal.json",
         help="Path to seed JSON file",
     )
     parser.add_argument(
@@ -136,7 +137,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        gen = PromptStealVariation(args.seed_file)
+        gen = MalTerminalVariation(args.seed_file)
     except FileNotFoundError:
         print(f"Error: seed file not found: {args.seed_file}", file=sys.stderr)
         sys.exit(1)
@@ -146,7 +147,7 @@ if __name__ == "__main__":
 
     for s in seeds:
         print(f"\n{'='*70}")
-        print(f"  PROMPTSTEAL Variation — seed={s}")
+        print(f"  MALTERMINAL Variation — seed={s}")
         print(f"{'='*70}")
 
         if args.detailed:
@@ -168,7 +169,7 @@ if __name__ == "__main__":
 
     if args.output:
         output_data = {
-            "campaign_id": "PROMPTSTEAL",
+            "campaign_id": "MALTERMINAL",
             "metadata": gen.data["metadata"],
             "variations": all_variations,
         }
