@@ -16,16 +16,16 @@ class AttackProfileBuilder:
 
     def from_seed_payload(self, payload: Dict[str, Any]) -> AttackProfile:
         metadata = payload.get("metadata", {})
-        fragments = payload.get("fragments", [])
+        stages = payload.get("stages", [])
         tactics = {
-            fragment.get("mitre_tactic", "")
-            for fragment in fragments
-            if isinstance(fragment, dict) and fragment.get("mitre_tactic")
+            stage.get("mitre_tactic", "")
+            for stage in stages
+            if isinstance(stage, dict) and stage.get("mitre_tactic")
         }
         techniques = {
-            fragment.get("mitre_technique", "")
-            for fragment in fragments
-            if isinstance(fragment, dict) and fragment.get("mitre_technique")
+            stage.get("mitre_technique", "")
+            for stage in stages
+            if isinstance(stage, dict) and stage.get("mitre_technique")
         }
         technique = metadata.get("technique")
         if isinstance(technique, str) and technique.strip():

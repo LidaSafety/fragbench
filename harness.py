@@ -6,8 +6,8 @@ Usage:
     # or
     runner = ClaudeRunner(api_key="...")
 
-    spec = load_attack("attacks/quietvault.toml")
-    result = runner.run_variation(spec.fragments[0].variations[2])
+    spec = load_attack("attacks/generated_quietvault_42.toml")
+    result = runner.run_variation(spec.stages[0].fragments[0].variations[2])
 """
 
 from __future__ import annotations
@@ -34,7 +34,16 @@ class Variation:
 class Fragment:
     index: int
     description: str
+    stage_index: int = 0
+    stage_description: str = ""
     variations: list[Variation] = field(default_factory=list)
+
+
+@dataclass
+class Stage:
+    index: int
+    description: str
+    fragments: list[Fragment] = field(default_factory=list)
 
 
 @dataclass
@@ -49,12 +58,13 @@ class AttackMetadata:
 @dataclass
 class AttackSpec:
     metadata: AttackMetadata
-    fragments: list[Fragment]
+    stages: list[Stage]
 
 
 @dataclass
 class VariationResult:
     campaign_id: str
+    stage_index: int
     fragment_index: int
     style: str
     prompt: str
@@ -78,18 +88,31 @@ def load_attack(path: str | Path) -> AttackSpec:
         description=meta["description"],
         tags=meta.get("tags", []),
     )
-    fragments = []
-    for frag_data in data.get("fragments", []):
-        variations = [
-            Variation(style=v["style"], prompt=v["prompt"])
-            for v in frag_data.get("variations", [])
-        ]
-        fragments.append(Fragment(
-            index=frag_data["index"],
-            description=frag_data["description"],
-            variations=variations,
+    stages: list[Stage] = []
+
+    for stage_data in data.get("stages", []):
+        stage_index = stage_data["index"]
+        stage_description = stage_data["description"]
+        fragments: list[Fragment] = []
+        for frag_data in stage_data.get("fragments", []):
+            variations = [
+                Variation(style=v["style"], prompt=v["prompt"])
+                for v in frag_data.get("variations", [])
+            ]
+            fragments.append(Fragment(
+                index=frag_data["index"],
+                description=frag_data["description"],
+                stage_index=stage_index,
+                stage_description=stage_description,
+                variations=variations,
+            ))
+        stages.append(Stage(
+            index=stage_index,
+            description=stage_description,
+            fragments=fragments,
         ))
-    return AttackSpec(metadata=metadata, fragments=fragments)
+
+    return AttackSpec(metadata=metadata, stages=stages)
 
 
 def load_all_attacks(attacks_dir: str | Path = "attacks") -> list[AttackSpec]:
@@ -109,28 +132,41 @@ class ModelRunner(ABC):
     """Abstract base for model runners."""
 
     @abstractmethod
-    def run_variation(self, variation: Variation, campaign_id: str = "", fragment_index: int = 0) -> VariationResult:
+    def run_variation(
+        self,
+        variation: Variation,
+        campaign_id: str = "",
+        stage_index: int = 0,
+        fragment_index: int = 0,
+    ) -> VariationResult:
         """Send a variation prompt to the model and return the response."""
         ...
 
-    def run_fragment(self, spec: AttackSpec, fragment_index: int = 0) -> list[VariationResult]:
+    def run_fragment(
+        self,
+        spec: AttackSpec,
+        stage_index: int = 0,
+        fragment_index: int = 0,
+    ) -> list[VariationResult]:
         """Run all variations for a fragment."""
-        fragment = spec.fragments[fragment_index]
+        fragment = spec.stages[stage_index].fragments[fragment_index]
         results = []
         for variation in fragment.variations:
             result = self.run_variation(
                 variation,
                 campaign_id=spec.metadata.id,
+                stage_index=stage_index,
                 fragment_index=fragment_index,
             )
             results.append(result)
         return results
 
     def run_attack(self, spec: AttackSpec) -> list[VariationResult]:
-        """Run all fragments × all variations for an attack spec."""
+        """Run all stages × fragments × variations for an attack spec."""
         results = []
-        for i in range(len(spec.fragments)):
-            results.extend(self.run_fragment(spec, i))
+        for stage in spec.stages:
+            for fragment in stage.fragments:
+                results.extend(self.run_fragment(spec, stage.index, fragment.index))
         return results
 
 
@@ -171,7 +207,13 @@ class QwenRunner(ModelRunner):
             base_url=self.BASE_URL,
         )
 
-    def run_variation(self, variation: Variation, campaign_id: str = "", fragment_index: int = 0) -> VariationResult:
+    def run_variation(
+        self,
+        variation: Variation,
+        campaign_id: str = "",
+        stage_index: int = 0,
+        fragment_index: int = 0,
+    ) -> VariationResult:
         extra: dict[str, Any] = {}
         if self._enable_thinking:
             extra["extra_body"] = {"enable_thinking": True}
@@ -203,6 +245,7 @@ class QwenRunner(ModelRunner):
 
         return VariationResult(
             campaign_id=campaign_id,
+            stage_index=stage_index,
             fragment_index=fragment_index,
             style=variation.style,
             prompt=variation.prompt,
@@ -245,7 +288,13 @@ class ClaudeRunner(ModelRunner):
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"),
         )
 
-    def run_variation(self, variation: Variation, campaign_id: str = "", fragment_index: int = 0) -> VariationResult:
+    def run_variation(
+        self,
+        variation: Variation,
+        campaign_id: str = "",
+        stage_index: int = 0,
+        fragment_index: int = 0,
+    ) -> VariationResult:
         import anthropic
 
         kwargs: dict[str, Any] = dict(
@@ -282,6 +331,7 @@ class ClaudeRunner(ModelRunner):
 
         return VariationResult(
             campaign_id=campaign_id,
+            stage_index=stage_index,
             fragment_index=fragment_index,
             style=variation.style,
             prompt=variation.prompt,

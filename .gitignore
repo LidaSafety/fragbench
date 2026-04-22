@@ -6,7 +6,8 @@ __pycache__/
 dist/
 build/
 results/
-attacks/generated_*.toml
+attacks/*.toml
+!attacks/.gitkeep
 .claude/
 .DS_Store
 .mcp-run/*

@@ -46,13 +46,14 @@ Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) to avoid re-entering t
 This runs without any API calls:
 
 ```bash
-python run.py --dry-run
+python run.py --generate --seed-file seeds/hello_world.json --dry-run
 ```
 
-You should see campaign names and prompts printed to the terminal. If that works, you're ready to run a real evaluation:
+You should see staged prompts printed to the terminal. If that works, generate a TOML artifact and run evaluation on that artifact:
 
 ```bash
-python run.py --model claude --campaign AD_DISCOVERY --judge
+python run.py --generate --seed-file seeds/hello_world.json --num-variations 1 --seed 42
+python run.py --model claude --attacks-dir attacks --judge
 ```
 
 ---
@@ -105,21 +106,30 @@ docker compose ps
 
 You should see ~25 containers in **Running** state.
 
-#### 4. Run a single stage (quick smoke test)
+#### 4. Generate one attack TOML (quick smoke test)
+
+```bash
+python run.py --generate --seed-file seeds/hello_world.json --num-variations 1 --seed 42
+```
+
+This writes `attacks/generated_hello_world_42.toml`.
+
+#### 5. Run a single fragment variation through MCP
 
 ```bash
 make docker-attack-run \
-  ATTACK_TOML=attacks/hello_world.toml \
+  ATTACK_TOML=attacks/generated_hello_world_42.toml \
   ATTACK_STAGE=0 \
+  ATTACK_FRAGMENT=0 \
   ATTACK_VARIATION_INDEX=0
 ```
 
-This sends fragment 0, variation 0 through the MCP agent loop against the Ollama model. You'll see the prompt printed, the model's response, and any MCP tool calls it makes.
+This sends stage 0, fragment 0, variation 0 through the MCP agent loop against the Ollama model. You'll see the prompt printed, the model's response, and any MCP tool calls it makes.
 
-#### 5. Run the full kill chain
+#### 6. Run the full kill chain
 
 ```bash
-make docker-chain-run ATTACK_TOML=attacks/hello_world.toml
+make docker-chain-run ATTACK_TOML=attacks/generated_hello_world_42.toml
 ```
 
 This runs every stage and every variation in the TOML sequentially, with a shared run ID. Each variation gets a randomized source IP and session ID for realistic logging.
@@ -129,21 +139,21 @@ This runs every stage and every variation in the TOML sequentially, with a share
 Add `JUDGE=1` to any `docker-chain-run` or `docker-attack-run` command to classify each variation's response after it completes. The judge runs in a background thread so it never blocks the attack chain.
 
 ```bash
-make docker-chain-run ATTACK_TOML=attacks/hello_world.toml JUDGE=1
+make docker-chain-run ATTACK_TOML=attacks/generated_hello_world_42.toml JUDGE=1
 ```
 
 The judge uses OpenRouter by default — set `OPENROUTER_API_KEY` in your environment (or a `.env` file in the project root) before running:
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
-make docker-chain-run ATTACK_TOML=attacks/hello_world.toml JUDGE=1
+make docker-chain-run ATTACK_TOML=attacks/generated_hello_world_42.toml JUDGE=1
 ```
 
 You can override the model or backend:
 
 ```bash
 make docker-chain-run \
-  ATTACK_TOML=attacks/hello_world.toml \
+  ATTACK_TOML=attacks/generated_hello_world_42.toml \
   JUDGE=1 \
   JUDGE_MODEL=anthropic/claude-haiku-4.5 \
   JUDGE_BACKEND=openrouter
@@ -172,15 +182,16 @@ Stop Ollama by pressing Ctrl-C in its terminal (or `killall ollama`).
 **Interactive CLI** — drop into a chat session with MCP tools available:
 
 ```bash
-make docker-cli ATTACK_TOML=attacks/hello_world.toml
+make docker-cli ATTACK_TOML=attacks/generated_hello_world_42.toml
 ```
 
 **Run a specific stage and variation:**
 
 ```bash
 make docker-attack-run \
-  ATTACK_TOML=attacks/hello_world.toml \
+  ATTACK_TOML=attacks/generated_hello_world_42.toml \
   ATTACK_STAGE=1 \
+  ATTACK_FRAGMENT=0 \
   ATTACK_VARIATION_INDEX=0
 ```
 
@@ -189,7 +200,7 @@ make docker-attack-run \
 ```bash
 # OpenRouter (requires OPENROUTER_API_KEY in env)
 make docker-chain-run \
-  ATTACK_TOML=attacks/hello_world.toml \
+  ATTACK_TOML=attacks/generated_hello_world_42.toml \
   MODEL_BACKEND=openrouter \
   MODEL=anthropic/claude-haiku-4.5
 ```
@@ -197,13 +208,13 @@ make docker-chain-run \
 **Run with Ollama (default):**
 ```bash
 make docker-chain-run \
-  ATTACK_TOML=attacks/hello_world.toml
+  ATTACK_TOML=attacks/generated_hello_world_42.toml
 ```
 
-**List all available attack TOMLs:**
+**List generated attack TOMLs:**
 
 ```bash
-ls attacks/*.toml
+ls attacks/generated_*.toml
 ```
 
 **Check container status:**
@@ -293,7 +304,7 @@ python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 
 python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
 ```
 
-Each run writes one TOML file per variation to `attacks/generated_<campaign>_<seed>.toml`, ready to evaluate with `--campaign`.
+Each run writes one TOML file per variation to `attacks/generated_<campaign>_<seed>.toml`. These TOMLs are generated runtime/eval artifacts, not source files tracked in git.
 
 ### Adding a new generatable campaign
 
@@ -308,35 +319,20 @@ Each run writes one TOML file per variation to `attacks/generated_<campaign>_<se
 
 ## Adding campaigns
 
-Create a new TOML file in `attacks/`:
+Add campaigns at the authoring layer:
 
-```toml
-[metadata]
-id = "MY_CAMPAIGN"
-technique = "T1234.001"
-technique_name = "MITRE technique name"
-description = "What this campaign does."
-tags = ["tag1", "tag2"]
+1. `docs/sources/<name>.md`
+2. `seeds/<name>.json`
+3. `variations/<name>.py`
+4. register the variation in `generator.py`
 
-[[fragments]]
-index = 0
-description = "What this step achieves"
-
-[[fragments.variations]]
-style = "direct"
-prompt = "Your prompt here."
-
-[[fragments.variations]]
-style = "educational"
-prompt = "Educational framing of the same prompt."
-# ... add more styles
-```
-
-Run it:
+Then generate TOML artifacts from the seed + variation pipeline:
 
 ```bash
-python run.py --campaign MY_CAMPAIGN --model claude --judge
+python run.py --generate --seed-file seeds/<name>.json --num-variations 1 --seed 42
 ```
+
+The generated `attacks/generated_<name>_42.toml` is what eval and MCP consume.
 
 ## Output
 

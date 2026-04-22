@@ -47,6 +47,7 @@ class ConversationLogger:
         source_ip: Optional[str] = None,
         session_id: Optional[str] = None,
         stage_index: Optional[int] = None,
+        fragment_index: Optional[int] = None,
         variation_index: Optional[int] = None,
         judge: bool = False,
         judge_model: str = "anthropic/claude-haiku-4.5",
@@ -88,6 +89,7 @@ class ConversationLogger:
             "source_ip": self.source_ip,
             "session_id": self.external_session_id,
             "stage_index": stage_index,
+            "fragment_index": fragment_index,
             "variation_index": variation_index,
         })
 
@@ -516,7 +518,8 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     p.add_argument("--source-ip", default=None, help="Synthetic source IP for this session.")
     p.add_argument("--session-id", default=None, help="External session id for this run.")
-    p.add_argument("--stage-index", type=int, default=None, help="TOML fragment/stage index for this run.")
+    p.add_argument("--stage-index", type=int, default=None, help="TOML stage index for this run.")
+    p.add_argument("--fragment-index", type=int, default=None, help="TOML fragment index within the stage.")
     p.add_argument("--variation-index", type=int, default=None, help="Variation index within the stage.")
     p.add_argument("--judge", action="store_true", help="Run LLM-as-judge after each variation (background thread).")
     p.add_argument("--judge-model", default="anthropic/claude-haiku-4.5", help="Model id for LLM judge (OpenRouter format by default).")
@@ -564,6 +567,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
             model=args.model,
             server=args.server_name,
             stage_index=args.stage_index,
+            fragment_index=args.fragment_index,
             variation_index=args.variation_index,
             run_id=args.run_id,
             campaign=args.campaign,

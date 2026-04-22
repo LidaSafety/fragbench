@@ -151,7 +151,7 @@ make maple-ready MODEL_BACKEND=openrouter
 Run interactive CLI with attack-aware toolkit routing:
 
 ```bash
-make cli ATTACK_TOML=attacks/hello_world.toml MODEL_BACKEND=openrouter
+make cli ATTACK_TOML=attacks/generated_hello_world_42.toml MODEL_BACKEND=openrouter
 ```
 
 When using Ollama backend, set an Ollama model name (not OpenRouter model ids):
@@ -163,19 +163,19 @@ make cli MODEL_BACKEND=ollama MODEL=huihui_ai/qwen3.5-abliterated:35b
 Run one-shot hello-world variation:
 
 ```bash
-make hello-run ATTACK_TOML=attacks/hello_world.toml MODEL_BACKEND=openrouter
+make hello-run ATTACK_TOML=attacks/generated_hello_world_42.toml MODEL_BACKEND=openrouter
 ```
 
 Run one-shot attack stage/variation from TOML:
 
 ```bash
-make attack-run ATTACK_TOML=attacks/hello_world.toml ATTACK_STAGE=1 ATTACK_VARIATION_INDEX=0 MODEL_BACKEND=openrouter
+make attack-run ATTACK_TOML=attacks/generated_hello_world_42.toml ATTACK_STAGE=1 ATTACK_FRAGMENT=0 ATTACK_VARIATION_INDEX=0 MODEL_BACKEND=openrouter
 ```
 
 Run a full TOML chain with isolated per-variation sessions (each gets a synthetic source IP):
 
 ```bash
-make docker-chain-run ATTACK_TOML=attacks/hello_world.toml MODEL_BACKEND=openrouter
+make docker-chain-run ATTACK_TOML=attacks/generated_hello_world_42.toml MODEL_BACKEND=openrouter
 ```
 
 Stop everything:
@@ -213,7 +213,7 @@ Use `mcp/registry/toolkits.toml` to define toolkits and connect the selected set
 uv run mcp/mcp_cli.py \
   --auto-toolkits \
   --registry-path mcp/registry/toolkits.toml \
-  --attack-toml attacks/promptsteal.toml \
+  --attack-toml attacks/generated_promptsteal_42.toml \
   --execution-mode simulated
 ```
 

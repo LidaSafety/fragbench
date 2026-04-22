@@ -105,7 +105,8 @@ def load_attack_toml(attack_paths: Iterable[Path] | None = None) -> list[dict[st
 def parse_attack_toml_minimal(text: str) -> dict[str, Any]:
     """Parse minimal attack TOML shape for Python environments without tomllib."""
     metadata: dict[str, Any] = {}
-    fragments: list[dict[str, Any]] = []
+    stages: list[dict[str, Any]] = []
+    current_stage: dict[str, Any] | None = None
     current_fragment: dict[str, Any] | None = None
     current_variation: dict[str, Any] | None = None
 
@@ -113,19 +114,32 @@ def parse_attack_toml_minimal(text: str) -> dict[str, Any]:
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        if line == "[[fragments]]":
-            current_fragment = {"variations": []}
-            fragments.append(current_fragment)
+        if line == "[[stages]]":
+            current_stage = {"fragments": []}
+            stages.append(current_stage)
+            current_fragment = None
             current_variation = None
             continue
-        if line == "[[fragments.variations]]":
+        if line == "[[stages.fragments]]":
+            if current_stage is None:
+                current_stage = {"fragments": []}
+                stages.append(current_stage)
+            current_fragment = {"variations": []}
+            current_stage["fragments"].append(current_fragment)
+            current_variation = None
+            continue
+        if line == "[[stages.fragments.variations]]":
+            if current_stage is None:
+                current_stage = {"fragments": []}
+                stages.append(current_stage)
             if current_fragment is None:
                 current_fragment = {"variations": []}
-                fragments.append(current_fragment)
+                current_stage["fragments"].append(current_fragment)
             current_variation = {}
             current_fragment["variations"].append(current_variation)
             continue
         if line == "[metadata]":
+            current_stage = None
             current_fragment = None
             current_variation = None
             continue
@@ -133,7 +147,7 @@ def parse_attack_toml_minimal(text: str) -> dict[str, Any]:
             continue
         key, value = [x.strip() for x in line.split("=", 1)]
         value = value.strip().strip('"').strip("'")
-        if key in {"id", "technique", "technique_name", "description"} and current_fragment is None and current_variation is None:
+        if key in {"id", "technique", "technique_name", "description"} and current_stage is None and current_fragment is None and current_variation is None:
             metadata[key] = value
         elif current_variation is not None and key in {"style", "prompt"}:
             current_variation[key] = value
@@ -145,8 +159,16 @@ def parse_attack_toml_minimal(text: str) -> dict[str, Any]:
                     current_fragment[key] = 0
             else:
                 current_fragment[key] = value
+        elif current_stage is not None and key in {"index", "description"}:
+            if key == "index":
+                try:
+                    current_stage[key] = int(value)
+                except ValueError:
+                    current_stage[key] = 0
+            else:
+                current_stage[key] = value
 
-    return {"metadata": metadata, "fragments": fragments}
+    return {"metadata": metadata, "stages": stages}
 
 
 def list_session_files() -> list[Path]:
@@ -353,6 +375,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "session_id": event.get("session_id"),
                 "source_ip": event.get("source_ip"),
                 "stage_index": event.get("stage_index"),
+                "fragment_index": event.get("fragment_index"),
                 "variation_index": event.get("variation_index"),
             }
             continue
@@ -490,6 +513,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         merged["session_id"] = q.get("session_id")
         merged["source_ip"] = q.get("source_ip")
         merged["stage_index"] = q.get("stage_index")
+        merged["fragment_index"] = q.get("fragment_index")
         merged["variation_index"] = q.get("variation_index")
         merged["verdict"] = q.get("verdict")
         merged["verdict_justification"] = q.get("verdict_justification", "")
@@ -630,39 +654,64 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
 
     seed_metadata = (seed or {}).get("metadata", {})
     stages = (seed or {}).get("attack_stages", [])
-    fragments = (attack or {}).get("fragments", [])
+    attack_stages = (attack or {}).get("stages", [])
     campaign_name = seed_metadata.get("id") or attack_id or "UNKNOWN"
 
     fragment_rows: list[dict[str, Any]] = []
-    attack_fragment_map = {int(f.get("index", i)): f for i, f in enumerate(fragments) if isinstance(f, dict)}
-    for stage in stages:
-        index = int(stage.get("index", len(fragment_rows)))
-        mapped = attack_fragment_map.get(index, {})
-        vars_list = mapped.get("variations", [])
-        if not isinstance(vars_list, list):
-            vars_list = []
-        fragment_rows.append(
-            {
-                "index": index,
-                "description": stage.get("description", ""),
-                "mitre_tactic": stage.get("mitre_tactic", ""),
-                "mitre_technique": stage.get("mitre_technique", ""),
-                "mitre_technique_name": stage.get("mitre_technique_name", ""),
-                "baseline_prompt": stage.get("baseline_prompt", ""),
-                "variations": [
-                    {"style": v.get("style", "unknown"), "prompt": v.get("prompt", "")}
-                    for v in vars_list
-                    if isinstance(v, dict)
-                ],
-            }
-        )
+    if attack_stages:
+        for stage in attack_stages:
+            stage_index = int(stage.get("index", len(fragment_rows)))
+            stage_description = str(stage.get("description", ""))
+            for fragment in stage.get("fragments", []) or []:
+                vars_list = fragment.get("variations", [])
+                if not isinstance(vars_list, list):
+                    vars_list = []
+                fragment_rows.append(
+                    {
+                        "stage_index": stage_index,
+                        "index": int(fragment.get("index", 0)),
+                        "stage_description": stage_description,
+                        "description": fragment.get("description", ""),
+                        "mitre_tactic": stage.get("mitre_tactic", ""),
+                        "mitre_technique": stage.get("mitre_technique", ""),
+                        "mitre_technique_name": stage.get("mitre_technique_name", ""),
+                        "baseline_prompt": stage.get("baseline_prompt", ""),
+                        "variations": [
+                            {"style": v.get("style", "unknown"), "prompt": v.get("prompt", "")}
+                            for v in vars_list
+                            if isinstance(v, dict)
+                        ],
+                    }
+                )
+    else:
+        for stage in stages:
+            index = int(stage.get("index", len(fragment_rows)))
+            fragment_rows.append(
+                {
+                    "stage_index": index,
+                    "index": 0,
+                    "stage_description": stage.get("description", ""),
+                    "description": stage.get("description", ""),
+                    "mitre_tactic": stage.get("mitre_tactic", ""),
+                    "mitre_technique": stage.get("mitre_technique", ""),
+                    "mitre_technique_name": stage.get("mitre_technique_name", ""),
+                    "baseline_prompt": stage.get("baseline_prompt", ""),
+                    "variations": [],
+                }
+            )
 
     grouped_queries = _group_queries(events)
     traces: list[dict[str, Any]] = []
     tactics_seen: list[str] = []
 
-    ordered_fragment_rows = sorted(fragment_rows, key=lambda row: int(row.get("index", 0)))
-    fragment_by_index = {int(r.get("index", i)): r for i, r in enumerate(ordered_fragment_rows)}
+    ordered_fragment_rows = sorted(
+        fragment_rows,
+        key=lambda row: (int(row.get("stage_index", 0)), int(row.get("index", 0))),
+    )
+    fragment_by_key = {
+        (int(r.get("stage_index", 0)), int(r.get("index", 0))): r
+        for r in ordered_fragment_rows
+    }
 
     for idx, query in enumerate(grouped_queries, start=1):
         prompt = str(query.get("prompt") or "")
@@ -674,8 +723,11 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
             x for x in query.get("tool_results_structured", []) if isinstance(x, dict)
         ]
         query_stage_idx = query.get("stage_index")
-        if query_stage_idx is not None:
-            stage_meta = fragment_by_index.get(int(query_stage_idx), {})
+        query_fragment_idx = query.get("fragment_index")
+        if query_stage_idx is not None and query_fragment_idx is not None:
+            stage_meta = fragment_by_key.get((int(query_stage_idx), int(query_fragment_idx)), {})
+        elif query_stage_idx is not None:
+            stage_meta = fragment_by_key.get((int(query_stage_idx), 0), {})
         else:
             stage_meta = ordered_fragment_rows[idx - 1] if idx - 1 < len(ordered_fragment_rows) else {}
         tactic = str(stage_meta.get("mitre_tactic") or detect_tactic(prompt))
@@ -687,7 +739,11 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
             x for x in query.get("iterations_detail", []) if isinstance(x, dict)
         ]
         step_duration_ms = _ms_between(query.get("ts_start"), query.get("ts_end"))
-        effective_fragment_index = query_stage_idx if query_stage_idx is not None else stage_meta.get("index")
+        effective_fragment_index = (
+            query_fragment_idx
+            if query_fragment_idx is not None
+            else stage_meta.get("index")
+        )
 
         traces.append(
             {
@@ -711,7 +767,9 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
                 "toolkit_set": extract_tool_names(tool_call_details or tool_calls),
                 "alert": kcc > 0.7 or risk > 0.85,
                 "fragment_index": effective_fragment_index,
+                "stage_index": query_stage_idx if query_stage_idx is not None else stage_meta.get("stage_index"),
                 "fragment_description": str(stage_meta.get("description") or ""),
+                "stage_description": str(stage_meta.get("stage_description") or ""),
                 "mitre_technique": str(stage_meta.get("mitre_technique") or ""),
                 "mitre_technique_name": str(stage_meta.get("mitre_technique_name") or ""),
                 "baseline_prompt": str(stage_meta.get("baseline_prompt") or ""),

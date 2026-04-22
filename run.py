@@ -166,6 +166,28 @@ def parse_args() -> argparse.Namespace:
         help="Comma-separated list of styles to generate (default: all 10). "
              "E.g. --styles direct,sysadmin,ctf",
     )
+    p.add_argument(
+        "--gen-backend",
+        choices=["anthropic", "openrouter"],
+        default=os.environ.get("FRAGBENCH_GEN_BACKEND", "openrouter"),
+        help="LLM backend for generation-side rewriting (default: openrouter)",
+    )
+    p.add_argument(
+        "--gen-model",
+        default=None,
+        help="Model id for generation-side rewriting. Defaults to claude-haiku-4-5-20251001 "
+             "for anthropic or google/gemini-2.5-flash for openrouter.",
+    )
+    p.add_argument(
+        "--gen-base-url",
+        default=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        help="Base URL for OpenAI-compatible generation backends (default: OpenRouter API)",
+    )
+    p.add_argument(
+        "--openrouter-key",
+        default=os.environ.get("OPENROUTER_API_KEY"),
+        help="OpenRouter API key for generation-side rewriting",
+    )
 
     return p.parse_args()
 
@@ -201,7 +223,7 @@ def print_result_row(style: str, verdict: str, justification: str = "") -> None:
     print(f"  {color}{verdict:8s}{reset}  {style}{just}")
 
 
-def _shape_generated_fragments(
+def _shape_generated_stages(
     var: list[tuple[str, str]],
     stage_descriptions: list[str],
     *,
@@ -210,40 +232,60 @@ def _shape_generated_fragments(
     api_key: str | None,
     make_fragment_groups_fn,
     legitimize_fragment_fn,
+    llm_backend: str,
+    llm_model: str | None,
+    llm_base_url: str,
 ) -> list:
     """
-    Convert one generated variation into TOML-ready fragment blocks while
-    preserving the original stage boundary, stage-aligned fragment indices,
-    and human-meaningful descriptions.
+    Convert one generated variation into TOML-ready stage blocks while
+    preserving the original stage boundary and fragment grouping.
     """
-    from generator import GeneratedFragment
+    from generator import GeneratedFragment, GeneratedStage, StyledVariation
 
     if len(stage_descriptions) != len(var):
         raise ValueError("stage_descriptions must have the same length as var")
 
     if fragment:
-        fragment_groups = make_fragment_groups_fn(var, api_key=api_key)
+        fragment_groups = make_fragment_groups_fn(
+            var,
+            api_key=api_key,
+            backend=llm_backend,
+            model=llm_model,
+            base_url=llm_base_url,
+        )
     else:
         fragment_groups = [[step] for step, _ in var]
 
     if len(fragment_groups) != len(var):
         raise ValueError("fragment_groups must preserve one outer group per input stage")
 
-    shaped: list[GeneratedFragment] = []
+    shaped: list[GeneratedStage] = []
     for idx, (group, description) in enumerate(zip(fragment_groups, stage_descriptions)):
         if not group:
             group = [var[idx][0]]
 
-        variations = []
+        fragments = []
         for frag_text in group:
+            variation_prompt = frag_text
             if legitimize:
-                frag_text = legitimize_fragment_fn(frag_text, api_key=api_key)
-            variations.append(frag_text)
+                variation_prompt = legitimize_fragment_fn(
+                    frag_text,
+                    api_key=api_key,
+                    backend=llm_backend,
+                    model=llm_model,
+                    base_url=llm_base_url,
+                )
+            fragments.append(
+                GeneratedFragment(
+                    description=frag_text,
+                    variations=[StyledVariation(style="generated", prompt=variation_prompt)],
+                )
+            )
 
         shaped.append(
-            GeneratedFragment(
+            GeneratedStage(
                 description=description or f"Stage {idx}",
-                variations=variations,
+                fragments=fragments,
             )
         )
 
@@ -259,52 +301,68 @@ def run_campaign(spec, runner, args) -> dict:
     print(f"{'='*60}")
 
     results_by_fragment: list[list] = []
+    fragment_refs: list[tuple[int, int, str, str]] = []
+    style_filter = set(s.strip() for s in args.style.split(",")) if args.style else None
 
-    for fragment in spec.fragments:
-        print(f"\nFragment {fragment.index}: {fragment.description}")
-        frag_results = []
+    for stage in spec.stages:
+        print(f"\nStage {stage.index}: {stage.description}")
+        for fragment in stage.fragments:
+            print(f"  Fragment {fragment.index}: {fragment.description}")
+            frag_results = []
 
-        style_filter = set(s.strip() for s in args.style.split(",")) if args.style else None
-        variations = fragment.variations
-        if style_filter:
-            variations = [v for v in variations if v.style in style_filter]
+            variations = fragment.variations
+            if style_filter:
+                variations = [v for v in variations if v.style in style_filter]
 
-        for variation in variations:
-            if args.dry_run:
-                print(f"  [DRY RUN] {variation.style}: {variation.prompt[:80]}...")
-                continue
+            for variation in variations:
+                if args.dry_run:
+                    print(f"    [DRY RUN] {variation.style}: {variation.prompt[:80]}...")
+                    continue
 
-            print(f"  Probing [{variation.style}]...", end=" ", flush=True)
-            result = runner.run_variation(variation, spec.metadata.id, fragment.index)
-
-            if result.error:
-                print(f"ERROR: {result.error}")
-                frag_results.append(result)
-                continue
-
-            # Classify
-            if args.judge:
-                judge: JudgeResult = llm_judge(
-                    result.prompt,
-                    result.response,
-                    api_key=args.claude_key,
-                    model=args.judge_model,
+                print(f"    Probing [{variation.style}]...", end=" ", flush=True)
+                result = runner.run_variation(
+                    variation,
+                    spec.metadata.id,
+                    stage.index,
+                    fragment.index,
                 )
-                verdict = judge.verdict
-                justification = judge.justification
-            else:
-                verdict = keyword_classify(result.response)
-                justification = ""
 
-            # Attach verdict to result for serialization
-            result.__dict__["verdict"] = verdict
-            result.__dict__["justification"] = justification
+                if result.error:
+                    print(f"ERROR: {result.error}")
+                    frag_results.append(result)
+                    continue
 
-            print_result_row(variation.style, verdict, justification)
-            frag_results.append(result)
+                # Classify
+                if args.judge:
+                    judge: JudgeResult = llm_judge(
+                        result.prompt,
+                        result.response,
+                        api_key=args.claude_key,
+                        model=args.judge_model,
+                    )
+                    verdict = judge.verdict
+                    justification = judge.justification
+                else:
+                    verdict = keyword_classify(result.response)
+                    justification = ""
 
-        if not args.dry_run:
-            results_by_fragment.append(frag_results)
+                # Attach verdict to result for serialization
+                result.__dict__["verdict"] = verdict
+                result.__dict__["justification"] = justification
+
+                print_result_row(variation.style, verdict, justification)
+                frag_results.append(result)
+
+            if not args.dry_run:
+                results_by_fragment.append(frag_results)
+                fragment_refs.append(
+                    (
+                        stage.index,
+                        fragment.index,
+                        stage.description,
+                        fragment.description,
+                    )
+                )
 
     if args.dry_run:
         return {}
@@ -320,9 +378,12 @@ def run_campaign(spec, runner, args) -> dict:
         fragment_compliant = len(frag_complied) > 0
         if fragment_compliant:
             compliant_fragment_count += 1
+        stage_index, fragment_index, stage_description, fragment_description = fragment_refs[frag_idx]
         fragment_summaries.append({
-            "fragment_index": frag_idx,
-            "description": spec.fragments[frag_idx].description,
+            "stage_index": stage_index,
+            "fragment_index": fragment_index,
+            "stage_description": stage_description,
+            "description": fragment_description,
             "compliant": fragment_compliant,
             "styles_complied": frag_complied,
             "styles_refused": frag_refused,
@@ -357,6 +418,7 @@ def run_campaign(spec, runner, args) -> dict:
         "killchain": kc.__dict__,
         "variations": [
             {
+                "stage_index": r.stage_index,
                 "fragment_index": r.fragment_index,
                 "style": r.style,
                 "prompt": r.prompt,
@@ -378,6 +440,8 @@ def run_generate(args) -> None:
     import random as _random
 
     from generator import (
+        DEFAULT_ANTHROPIC_GENERATOR_MODEL,
+        DEFAULT_OPENROUTER_GENERATOR_MODEL,
         FragmentGroup,
         STYLES,
         VARIATION_REGISTRY,
@@ -405,7 +469,19 @@ def run_generate(args) -> None:
         sys.exit(1)
 
     gen = VARIATION_REGISTRY[campaign_id](args.seed_file)
-    api_key = args.claude_key if not args.dry_run else None
+    if args.gen_model is None:
+        if args.gen_backend == "anthropic":
+            args.gen_model = DEFAULT_ANTHROPIC_GENERATOR_MODEL
+        else:
+            args.gen_model = DEFAULT_OPENROUTER_GENERATOR_MODEL
+
+    if args.dry_run:
+        api_key = None
+    elif args.gen_backend == "anthropic":
+        api_key = args.claude_key
+    else:
+        api_key = args.openrouter_key
+
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
 
     styles = None
@@ -429,7 +505,7 @@ def run_generate(args) -> None:
         for idx, stage in enumerate(seed_data.get("attack_stages", []))
     ]
 
-    final_frag_list: list[list] = []
+    final_stage_list: list[list] = []
     for i in range(args.num_variations):
         seed = base_seed + i
         var = gen.make_variation(seed)  # list[tuple[str, str]]
@@ -442,11 +518,17 @@ def run_generate(args) -> None:
 
         if args.stylize:
             if args.fragment:
-                raw_groups = make_fragment_groups(var, api_key=api_key)
+                raw_groups = make_fragment_groups(
+                    var,
+                    api_key=api_key,
+                    backend=args.gen_backend,
+                    model=args.gen_model,
+                    base_url=args.gen_base_url,
+                )
             else:
                 raw_groups = [[step] for step, _ in var]
 
-            styled_fragments = []
+            styled_stages = []
             for idx, group in enumerate(raw_groups):
                 if not group:
                     group = [var[idx][0]]
@@ -456,26 +538,38 @@ def run_generate(args) -> None:
                     parent_tactic=var[idx][1],
                     sub_fragments=group,
                 )
-                styled_fragments.extend(
-                    stylize_fragment_group(
-                        fragment_group,
-                        styles=styles,
-                        api_key=api_key,
+                fragments = stylize_fragment_group(
+                    fragment_group,
+                    styles=styles,
+                    api_key=api_key,
+                    model=args.gen_model,
+                    backend=args.gen_backend,
+                    base_url=args.gen_base_url,
+                )
+                if args.legitimize:
+                    for generated_fragment in fragments:
+                        for variation in generated_fragment.variations:
+                            variation.prompt = legitimize_fragment(
+                                variation.prompt,
+                                api_key=api_key,
+                                model=args.gen_model,
+                                backend=args.gen_backend,
+                                base_url=args.gen_base_url,
+                            )
+
+                from generator import GeneratedStage
+
+                styled_stages.append(
+                    GeneratedStage(
+                        description=stage_descriptions[idx] or f"Stage {idx}",
+                        fragments=fragments,
                     )
                 )
 
-            if args.legitimize:
-                for styled_group in styled_fragments:
-                    for variation in styled_group.variations:
-                        variation.prompt = legitimize_fragment(
-                            variation.prompt,
-                            api_key=api_key,
-                        )
-
-            final_frag_list.append(styled_fragments)
+            final_stage_list.append(styled_stages)
         else:
-            final_frag_list.append(
-                _shape_generated_fragments(
+            final_stage_list.append(
+                _shape_generated_stages(
                     var,
                     stage_descriptions,
                     fragment=args.fragment,
@@ -483,6 +577,9 @@ def run_generate(args) -> None:
                     api_key=api_key,
                     make_fragment_groups_fn=make_fragment_groups,
                     legitimize_fragment_fn=legitimize_fragment,
+                    llm_backend=args.gen_backend,
+                    llm_model=args.gen_model,
+                    llm_base_url=args.gen_base_url,
                 )
             )
 
@@ -493,9 +590,9 @@ def run_generate(args) -> None:
     attacks_dir.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
-    for i, frags in enumerate(final_frag_list):
+    for i, stages in enumerate(final_stage_list):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], frags, seed)
+        toml_text = generate_toml(seed_data["metadata"], stages, seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)

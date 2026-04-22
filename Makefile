@@ -9,9 +9,10 @@ OLLAMA_BASE_URL ?= http://host.docker.internal:11434
 VLLM_BASE_URL ?= http://127.0.0.1:8000/v1
 VLLM_API_KEY ?= EMPTY
 ATTACK_SEED ?= seeds/hello_world.json
-ATTACK_TOML ?= attacks/hello_world.toml
+ATTACK_TOML ?=
 ATTACK_VARIATION_SEED ?= 42
 ATTACK_STAGE ?= 0
+ATTACK_FRAGMENT ?= 0
 ATTACK_VARIATION_INDEX ?= 0
 REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.toml
 EXEC_MODE ?= simulated
@@ -54,8 +55,8 @@ help:
 	@echo "  make maple-ready    - Start stack then run maple-check"
 	@echo "  make cli            - Run interactive MCP CLI (auto toolkits)"
 	@echo "  make hello-run      - Generate hello prompt and run one-shot CLI"
-	@echo "  make attack-run     - Run one TOML stage/variation from ATTACK_TOML"
-	@echo "  make chain-run      - Run ALL TOML stages/variations with shared run-id"
+	@echo "  make attack-run     - Run one TOML stage/fragment/variation from ATTACK_TOML"
+	@echo "  make chain-run      - Run ALL TOML stages/fragments/variations with shared run-id"
 	@echo "  make clean-runtime  - Remove pid/log runtime artifacts"
 	@echo ""
 	@echo "Targets (Docker-isolated):"
@@ -67,13 +68,13 @@ help:
 	@echo "  make docker-chain-run  - Full TOML kill-chain in container (all stages/variations)"
 	@echo ""
 	@echo "Targets (Docker dataset pipeline - TOML generation + eval):"
-	@echo "  make docker-dataset-up                  - Reminder: host Ollama at host.docker.internal:11434"
+	@echo "  make docker-dataset-up                  - Show dataset generator backend requirements"
 	@echo "  make docker-dataset-down                - Stop dataset profile containers"
 	@echo "  make docker-dataset-validate-seed       - Validate ATTACK_SEED + VARIATION_REGISTRY wiring"
 	@echo "  make docker-dataset-generate            - Generate TOMLs (no rewriting)"
-	@echo "  make docker-dataset-generate-fragment   - Generate TOMLs with --fragment (via Ollama)"
-	@echo "  make docker-dataset-generate-legitimize - Generate TOMLs with --legitimize (via Ollama)"
-	@echo "  make docker-dataset-generate-frag-legit - Generate TOMLs with --fragment --legitimize (via Ollama)"
+	@echo "  make docker-dataset-generate-fragment   - Generate TOMLs with --fragment"
+	@echo "  make docker-dataset-generate-legitimize - Generate TOMLs with --legitimize"
+	@echo "  make docker-dataset-generate-frag-legit - Generate TOMLs with --fragment --legitimize"
 	@echo "  make docker-attacks-list                - List generated TOMLs"
 	@echo "  make docker-attacks-show                - Print one TOML (ATTACK_TOML=...)"
 	@echo "  make docker-dataset-eval-qwen           - Evaluate attacks/*.toml using Qwen"
@@ -83,7 +84,7 @@ help:
 	@echo "Config overrides (both bare-metal and Docker):"
 	@echo "  MODEL_BACKEND=$(MODEL_BACKEND) MODEL=$(MODEL) EXEC_MODE=$(EXEC_MODE)"
 	@echo "  OLLAMA_BASE_URL=$(OLLAMA_BASE_URL) VLLM_BASE_URL=$(VLLM_BASE_URL)"
-	@echo "  ATTACK_TOML=$(ATTACK_TOML) ATTACK_STAGE=$(ATTACK_STAGE) ATTACK_VARIATION_INDEX=$(ATTACK_VARIATION_INDEX)"
+	@echo "  ATTACK_TOML=$(ATTACK_TOML) ATTACK_STAGE=$(ATTACK_STAGE) ATTACK_FRAGMENT=$(ATTACK_FRAGMENT) ATTACK_VARIATION_INDEX=$(ATTACK_VARIATION_INDEX)"
 	@echo "  ATTACK_SEED=$(ATTACK_SEED) ATTACK_VARIATION_SEED=$(ATTACK_VARIATION_SEED)   # legacy dataset flow"
 	@echo "  REGISTRY_PATH=$(REGISTRY_PATH)"
 	@echo ""
@@ -241,10 +242,11 @@ RUN_ID ?=
 ATTACK_ID_OVERRIDE ?=
 
 attack-run: stack-ready
-	@PROMPT="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); v_idx=int(sys.argv[3]); data=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(data.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; assert vals, f"No prompt variations found for stage index {stage} in {p}"; \
-v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATTACK_STAGE)" "$(ATTACK_VARIATION_INDEX)" )"; \
+	@if [ -z "$(ATTACK_TOML)" ]; then echo "ERROR: set ATTACK_TOML=attacks/generated_<campaign>_<seed>.toml"; exit 1; fi
+	@[ -f "$(ATTACK_TOML)" ] || (echo "ERROR: file not found: $(ATTACK_TOML)"; exit 1)
+	@PROMPT="$$( $(UV) $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); stage_idx=int(sys.argv[2]); fragment_idx=int(sys.argv[3]); v_idx=int(sys.argv[4]); stage=next((s for s in spec.stages if s.index == stage_idx), None); assert stage is not None, f\"No stage index {stage_idx} in {sys.argv[1]}\"; fragment=next((f for f in stage.fragments if f.index == fragment_idx), None); assert fragment is not None, f\"No fragment index {fragment_idx} in stage {stage_idx} of {sys.argv[1]}\"; vals=[str(v.prompt) for v in fragment.variations if str(v.prompt).strip()]; assert vals, f\"No prompt variations found for stage={stage_idx} fragment={fragment_idx} in {sys.argv[1]}\"; v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATTACK_STAGE)" "$(ATTACK_FRAGMENT)" "$(ATTACK_VARIATION_INDEX)" )"; \
 	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )}"; \
-	echo "TOML: $(ATTACK_TOML) | stage: $(ATTACK_STAGE) | variation: $(ATTACK_VARIATION_INDEX)"; \
+	echo "TOML: $(ATTACK_TOML) | stage: $(ATTACK_STAGE) | fragment: $(ATTACK_FRAGMENT) | variation: $(ATTACK_VARIATION_INDEX)"; \
 	echo "Session: $${SESSION_ID:-auto} | source_ip: $${SOURCE_IP:-auto}"; \
 	echo "Prompt: $$PROMPT"; \
 	$(UV) $(PY) fragbench_mcp/mcp_cli.py \
@@ -264,14 +266,17 @@ v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATT
 		$${SOURCE_IP:+--source-ip "$$SOURCE_IP"} \
 		$${SESSION_ID:+--session-id "$$SESSION_ID"} \
 		--stage-index "$(ATTACK_STAGE)" \
+		--fragment-index "$(ATTACK_FRAGMENT)" \
 		--variation-index "$(ATTACK_VARIATION_INDEX)" \
 		--prompt "$$PROMPT"
 
 chain-run: stack-ready
+	@if [ -z "$(ATTACK_TOML)" ]; then echo "ERROR: set ATTACK_TOML=attacks/generated_<campaign>_<seed>.toml"; exit 1; fi
+	@[ -f "$(ATTACK_TOML)" ] || (echo "ERROR: file not found: $(ATTACK_TOML)"; exit 1)
 	@RUN_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
 	ATTACK_ID="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )"; \
-	STAGE_LIST="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs=sorted({int(f.get("index",i)) for i,f in enumerate(frags)}); print(" ".join(str(i) for i in idxs))' "$(ATTACK_TOML)" )"; \
-	NUM_STAGES="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs={int(f.get("index",i)) for i,f in enumerate(frags)}; print(len(idxs))' "$(ATTACK_TOML)" )"; \
+	STAGE_LIST="$$( $(UV) $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); print(" ".join(str(stage.index) for stage in spec.stages))' "$(ATTACK_TOML)" )"; \
+	NUM_STAGES="$$( $(UV) $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); print(len(spec.stages))' "$(ATTACK_TOML)" )"; \
 	echo ""; \
 	echo "╔══════════════════════════════════════════════════════════════╗"; \
 	echo "║  CHAIN RUN: $$ATTACK_ID"; \
@@ -279,24 +284,29 @@ chain-run: stack-ready
 	echo "╚══════════════════════════════════════════════════════════════╝"; \
 	echo ""; \
 	for STAGE in $$STAGE_LIST; do \
-		VAR_COUNT="$$( $(UV) $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); d=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(d.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; print(len(vals))' "$(ATTACK_TOML)" "$$STAGE" )"; \
+		FRAGMENT_LIST="$$( $(UV) $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); stage_idx=int(sys.argv[2]); stage=next((s for s in spec.stages if s.index == stage_idx), None); assert stage is not None, f\"No stage index {stage_idx}\"; print(" ".join(str(fragment.index) for fragment in stage.fragments))' "$(ATTACK_TOML)" "$$STAGE" )"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		echo "  Stage $$STAGE | Variations: $$VAR_COUNT"; \
+		echo "  Stage $$STAGE"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
-			SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
-			SESSION_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
-			$(MAKE) --no-print-directory attack-run \
-				ATTACK_TOML="$(ATTACK_TOML)" \
-				ATTACK_STAGE="$$STAGE" \
-				ATTACK_VARIATION_INDEX="$$VAR_IDX" \
-				MODEL_BACKEND="$(MODEL_BACKEND)" \
-				MODEL="$(MODEL)" \
-				RUN_ID="$$RUN_ID" \
-				ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
-				SOURCE_IP="$$SOURCE_IP" \
-				SESSION_ID="$$SESSION_ID" \
-				LOG_DIR="$(LOG_DIR)"; \
+		for FRAGMENT in $$FRAGMENT_LIST; do \
+			VAR_COUNT="$$( $(UV) $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); stage_idx=int(sys.argv[2]); fragment_idx=int(sys.argv[3]); stage=next((s for s in spec.stages if s.index == stage_idx), None); assert stage is not None; fragment=next((f for f in stage.fragments if f.index == fragment_idx), None); assert fragment is not None; print(len([v for v in fragment.variations if str(v.prompt).strip()]))' "$(ATTACK_TOML)" "$$STAGE" "$$FRAGMENT" )"; \
+			echo "    Fragment $$FRAGMENT | Variations: $$VAR_COUNT"; \
+			for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
+				SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
+				SESSION_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
+				$(MAKE) --no-print-directory attack-run \
+					ATTACK_TOML="$(ATTACK_TOML)" \
+					ATTACK_STAGE="$$STAGE" \
+					ATTACK_FRAGMENT="$$FRAGMENT" \
+					ATTACK_VARIATION_INDEX="$$VAR_IDX" \
+					MODEL_BACKEND="$(MODEL_BACKEND)" \
+					MODEL="$(MODEL)" \
+					RUN_ID="$$RUN_ID" \
+					ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
+					SOURCE_IP="$$SOURCE_IP" \
+					SESSION_ID="$$SESSION_ID" \
+					LOG_DIR="$(LOG_DIR)"; \
+			done; \
 		done; \
 		echo ""; \
 	done; \
@@ -317,7 +327,7 @@ clean-runtime:
 # Prerequisite: docker compose up -d  (starts MCP servers + viewer)
 #
 # Config overrides work the same way:
-#   make docker-chain-run ATTACK_TOML=attacks/promptsteal.toml MODEL_BACKEND=ollama
+#   make docker-chain-run ATTACK_TOML=attacks/generated_promptsteal_42.toml MODEL_BACKEND=ollama
 # =========================================================================
 
 DOCKER_COMPOSE ?= docker compose
@@ -378,14 +388,15 @@ docker-cli: docker-up
 	$(DOCKER_CLIENT_CMD)
 
 docker-attack-run: $(if $(filter 1,$(SKIP_UP)),,docker-up)
-	@PROMPT="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); v_idx=int(sys.argv[3]); data=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(data.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; assert vals, f"No prompt variations found for stage index {stage} in {p}"; \
-v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATTACK_STAGE)" "$(ATTACK_VARIATION_INDEX)" )"; \
+	@if [ -z "$(ATTACK_TOML)" ]; then echo "ERROR: set ATTACK_TOML=attacks/generated_<campaign>_<seed>.toml"; exit 1; fi
+	@[ -f "$(ATTACK_TOML)" ] || (echo "ERROR: file not found: $(ATTACK_TOML)"; exit 1)
+	@PROMPT="$$( $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); stage_idx=int(sys.argv[2]); fragment_idx=int(sys.argv[3]); v_idx=int(sys.argv[4]); stage=next((s for s in spec.stages if s.index == stage_idx), None); assert stage is not None, f\"No stage index {stage_idx}\"; fragment=next((f for f in stage.fragments if f.index == fragment_idx), None); assert fragment is not None, f\"No fragment index {fragment_idx}\"; vals=[str(v.prompt) for v in fragment.variations if str(v.prompt).strip()]; assert vals, f\"No prompt variations found for stage={stage_idx} fragment={fragment_idx} in {sys.argv[1]}\"; v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATTACK_STAGE)" "$(ATTACK_FRAGMENT)" "$(ATTACK_VARIATION_INDEX)" )"; \
 	ATTACK_ID="$${ATTACK_ID_OVERRIDE:-$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )}"; \
 	EFFECTIVE_MODEL="$(MODEL)"; \
 	if [ "$(MODEL_BACKEND)" = "ollama" ]; then \
 	  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
 	fi; \
-	echo "TOML: $(ATTACK_TOML) | stage: $(ATTACK_STAGE) | variation: $(ATTACK_VARIATION_INDEX)"; \
+	echo "TOML: $(ATTACK_TOML) | stage: $(ATTACK_STAGE) | fragment: $(ATTACK_FRAGMENT) | variation: $(ATTACK_VARIATION_INDEX)"; \
 	echo "Session: $${SESSION_ID:-auto} | source_ip: $${SOURCE_IP:-auto}"; \
 	echo "Prompt: $$PROMPT"; \
 	$(DOCKER_COMPOSE) run --rm --build \
@@ -409,15 +420,18 @@ v_idx=max(0,min(v_idx,len(vals)-1)); print(vals[v_idx])' "$(ATTACK_TOML)" "$(ATT
 			$${SOURCE_IP:+--source-ip "$$SOURCE_IP"} \
 			$${SESSION_ID:+--session-id "$$SESSION_ID"} \
 			--stage-index "$(ATTACK_STAGE)" \
+			--fragment-index "$(ATTACK_FRAGMENT)" \
 			--variation-index "$(ATTACK_VARIATION_INDEX)" \
 			--prompt "$$PROMPT" \
 			$(if $(filter 1,$(JUDGE)),--judge --judge-model "$(JUDGE_MODEL)" --judge-backend "$(JUDGE_BACKEND)")
 
 docker-chain-run: docker-ensure-up
+	@if [ -z "$(ATTACK_TOML)" ]; then echo "ERROR: set ATTACK_TOML=attacks/generated_<campaign>_<seed>.toml"; exit 1; fi
+	@[ -f "$(ATTACK_TOML)" ] || (echo "ERROR: file not found: $(ATTACK_TOML)"; exit 1)
 	@RUN_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
 	ATTACK_ID="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$(ATTACK_TOML)" )"; \
-	STAGE_LIST="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs=sorted({int(f.get("index",i)) for i,f in enumerate(frags)}); print(" ".join(str(i) for i in idxs))' "$(ATTACK_TOML)" )"; \
-	NUM_STAGES="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); frags=d.get("fragments") or []; idxs={int(f.get("index",i)) for i,f in enumerate(frags)}; print(len(idxs))' "$(ATTACK_TOML)" )"; \
+	STAGE_LIST="$$( $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); print(" ".join(str(stage.index) for stage in spec.stages))' "$(ATTACK_TOML)" )"; \
+	NUM_STAGES="$$( $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); print(len(spec.stages))' "$(ATTACK_TOML)" )"; \
 	echo ""; \
 	echo "╔══════════════════════════════════════════════════════════════╗"; \
 	echo "║  DOCKER CHAIN RUN: $$ATTACK_ID"; \
@@ -425,28 +439,33 @@ docker-chain-run: docker-ensure-up
 	echo "╚══════════════════════════════════════════════════════════════╝"; \
 	echo ""; \
 	for STAGE in $$STAGE_LIST; do \
-		VAR_COUNT="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; p=Path(sys.argv[1]); stage=int(sys.argv[2]); d=tomllib.loads(p.read_text()); vals=[str(v.get("prompt","")) for i,f in enumerate(d.get("fragments") or []) if f.get("index", i)==stage for v in (f.get("variations") or []) if str(v.get("prompt","")).strip()]; print(len(vals))' "$(ATTACK_TOML)" "$$STAGE" )"; \
+		FRAGMENT_LIST="$$( $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); stage_idx=int(sys.argv[2]); stage=next((s for s in spec.stages if s.index == stage_idx), None); assert stage is not None; print(" ".join(str(fragment.index) for fragment in stage.fragments))' "$(ATTACK_TOML)" "$$STAGE" )"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		echo "  Stage $$STAGE | Variations: $$VAR_COUNT"; \
+		echo "  Stage $$STAGE"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-		for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
-			SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
-			SESSION_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
-			$(MAKE) --no-print-directory docker-attack-run \
-				SKIP_UP=1 \
-				ATTACK_TOML="$(ATTACK_TOML)" \
-				ATTACK_STAGE="$$STAGE" \
-				ATTACK_VARIATION_INDEX="$$VAR_IDX" \
-				MODEL_BACKEND="$(MODEL_BACKEND)" \
-				MODEL="$(MODEL)" \
-				RUN_ID="$$RUN_ID" \
-				ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
-				SOURCE_IP="$$SOURCE_IP" \
-				SESSION_ID="$$SESSION_ID" \
-				LOG_DIR="$(LOG_DIR)" \
-				JUDGE="$(JUDGE)" \
-				JUDGE_MODEL="$(JUDGE_MODEL)" \
-				JUDGE_BACKEND="$(JUDGE_BACKEND)"; \
+		for FRAGMENT in $$FRAGMENT_LIST; do \
+			VAR_COUNT="$$( $(PY) -c 'import sys; from harness import load_attack; spec=load_attack(sys.argv[1]); stage_idx=int(sys.argv[2]); fragment_idx=int(sys.argv[3]); stage=next((s for s in spec.stages if s.index == stage_idx), None); assert stage is not None; fragment=next((f for f in stage.fragments if f.index == fragment_idx), None); assert fragment is not None; print(len([v for v in fragment.variations if str(v.prompt).strip()]))' "$(ATTACK_TOML)" "$$STAGE" "$$FRAGMENT" )"; \
+			echo "    Fragment $$FRAGMENT | Variations: $$VAR_COUNT"; \
+			for VAR_IDX in $$(seq 0 $$((VAR_COUNT - 1))); do \
+				SOURCE_IP="$$( $(PY) -c 'import random; print(f"{random.randint(11,223)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}")' )"; \
+				SESSION_ID="$$( $(PY) -c 'import uuid; print(uuid.uuid4())' )"; \
+				$(MAKE) --no-print-directory docker-attack-run \
+					SKIP_UP=1 \
+					ATTACK_TOML="$(ATTACK_TOML)" \
+					ATTACK_STAGE="$$STAGE" \
+					ATTACK_FRAGMENT="$$FRAGMENT" \
+					ATTACK_VARIATION_INDEX="$$VAR_IDX" \
+					MODEL_BACKEND="$(MODEL_BACKEND)" \
+					MODEL="$(MODEL)" \
+					RUN_ID="$$RUN_ID" \
+					ATTACK_ID_OVERRIDE="$$ATTACK_ID" \
+					SOURCE_IP="$$SOURCE_IP" \
+					SESSION_ID="$$SESSION_ID" \
+					LOG_DIR="$(LOG_DIR)" \
+					JUDGE="$(JUDGE)" \
+					JUDGE_MODEL="$(JUDGE_MODEL)" \
+					JUDGE_BACKEND="$(JUDGE_BACKEND)"; \
+			done; \
 		done; \
 		echo ""; \
 	done; \
@@ -466,7 +485,7 @@ docker-chain-run: docker-ensure-up
 #
 # Required:
 #   - MCP servers up (`make docker-up`)
-#   - TOMLs present under ATTACKS_DIR (default attacks/)
+#   - Generated TOMLs present under ATTACKS_DIR (default attacks/)
 #
 
 TOML_GLOB ?= $(ATTACKS_DIR)/generated_*.toml
@@ -495,10 +514,8 @@ docker-toml-mcp-chain-run: docker-up
 		echo "  TOML: $$TOML"; \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 		ATTACK_ID="$$( $(PY) -c 'import sys,tomllib; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); print((d.get("metadata") or {}).get("id","UNKNOWN"))' "$$TOML" )"; \
-		$(PY) -c 'import sys,tomllib,base64; from pathlib import Path; d=tomllib.loads(Path(sys.argv[1]).read_text()); \
-frags=d.get("fragments") or []; \
-	vals=[str(v.get("prompt","")) for f in frags for v in (f.get("variations") or [])]; \
-	vals=[p for p in vals if p and p.strip()]; \
+		$(PY) -c 'import sys,base64; from harness import load_attack; spec=load_attack(sys.argv[1]); \
+	vals=[str(v.prompt) for stage in spec.stages for fragment in stage.fragments for v in fragment.variations if str(v.prompt).strip()]; \
 	print("\\n".join(base64.b64encode(p.encode("utf-8")).decode("ascii") for p in vals))' "$$TOML" | while read -r B64; do \
 			[ -n "$$B64" ] || continue; \
 			PROMPT="$$( printf "%s" "$$B64" | (base64 --decode 2>/dev/null || base64 -D) )"; \
@@ -541,20 +558,15 @@ DATASET_BASE_SEED ?= 1000
 ATTACKS_DIR ?= attacks
 
 # Generator LLM settings (used by run.py --generate when --fragment/--legitimize)
-GEN_BACKEND ?= ollama
-GEN_BASE_URL ?= http://host.docker.internal:11434
+GEN_BACKEND ?= openrouter
+GEN_BASE_URL ?= https://openrouter.ai/api/v1
 
 # Default GEN_MODEL depends on GEN_BACKEND (not MODEL_BACKEND)
-ifeq ($(GEN_BACKEND),ollama)
-GEN_MODEL ?= huihui_ai/qwen3.5-abliterated:35b
-else ifeq ($(GEN_BACKEND),anthropic)
+ifeq ($(GEN_BACKEND),anthropic)
 GEN_MODEL ?= claude-haiku-4.5
 else
-# Treat as OpenAI-compatible / OpenRouter-style model id
-GEN_MODEL ?= huihui-ai/Huihui-Qwen3.5-35B-A3B-abliterated
+GEN_MODEL ?= google/gemini-2.5-flash
 endif
-
-ATTACK_TOML ?=
 
 .PHONY: docker-dataset-up docker-dataset-down docker-dataset-validate-seed \
         docker-dataset-generate docker-dataset-generate-fragment docker-dataset-generate-legitimize docker-dataset-generate-frag-legit \
@@ -562,11 +574,11 @@ ATTACK_TOML ?=
         docker-dataset-eval-qwen docker-dataset-eval-claude docker-dataset-eval-judge
 
 docker-dataset-up:
-	@echo "Dataset generation uses Ollama on the host (Docker → $(GEN_BASE_URL))."
-	@echo "Start Ollama on the host (e.g. ollama serve) on port 11434 if not already running."
+	@echo "Dataset generation uses $(GEN_BACKEND) (base URL: $(GEN_BASE_URL))."
+	@echo "Set OPENROUTER_API_KEY for OpenRouter or ANTHROPIC_API_KEY for Anthropic before running."
 
 docker-dataset-down:
-	@echo "Nothing to stop (Ollama runs on the host; no ollama container)."
+	@echo "Nothing to stop (generator uses external LLM APIs)."
 
 docker-dataset-validate-seed:
 	@[ -f "$(ATTACK_SEED)" ] || (echo "ERROR: ATTACK_SEED file not found: $(ATTACK_SEED)"; exit 1)
@@ -578,7 +590,7 @@ define DATASET_RUN
 $(DOCKER_COMPOSE) run --rm \
 	-e DASHSCOPE_API_KEY \
 	-e ANTHROPIC_API_KEY \
-	-e OLLAMA_BASE_URL="$(GEN_BASE_URL)" \
+	-e OPENROUTER_API_KEY \
 	dataset-runner
 endef
 
