@@ -35,11 +35,6 @@ class CoinbaitVariation(BaseVariation):
             self.data = json.load(f)
         self._validate_seed_tactics(self.data)
 
-    def _select_dimensions(self, rng: random.Random) -> Dict[str, str]:
-        """Select one value per variation dimension using the seeded RNG."""
-        dimensions = self.data.get("variation_dimensions", {})
-        return {name: rng.choice(dim["values"]) for name, dim in dimensions.items()}
-
     def make_variation(self, seed: int) -> List[Tuple[str, MitreType]]:
         """
         Generate one deterministic variation of the full COINBAIT kill chain.
