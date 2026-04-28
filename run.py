@@ -1,5 +1,5 @@
 """
-CLI entry point for fragbench.
+CLI entry point for fragguard-chain.
 
 Examples:
     # Run all campaigns against Qwen (keyword classifier)
@@ -165,6 +165,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Comma-separated list of styles to generate (default: all 10). "
              "E.g. --styles direct,sysadmin,ctf",
+    )
+    p.add_argument(
+        "--output-json",
+        default=None,
+        help="Write generated fragments to a JSON file (with full traceability). "
+             "E.g. --output-json results/promptsteal_fragments.json",
     )
 
     return p.parse_args()
@@ -408,6 +414,7 @@ def run_generate(args) -> None:
     api_key = args.claude_key if not args.dry_run else None
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
 
+    # Parse style filter
     styles = None
     if args.styles:
         styles = [s.strip() for s in args.styles.split(",") if s.strip()]
@@ -439,6 +446,10 @@ def run_generate(args) -> None:
             for step, tactic in var:
                 print(f"    ({tactic})  {step}")
             continue
+
+        # Step 1: Build fragment groups — authored fragments take precedence;
+        # stages without them fall back to LLM/regex split via make_fragments.
+        groups = build_fragment_groups(detailed, api_key=api_key)
 
         if args.stylize:
             if args.fragment:
@@ -493,16 +504,30 @@ def run_generate(args) -> None:
     attacks_dir.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
+    json_docs: list[dict] = []
     for i, frags in enumerate(final_frag_list):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], frags, seed)
+        toml_text = generate_toml(seed_data["metadata"], [frags], seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)
+        json_docs.append(generate_json(seed_data["metadata"], frags, seed))
 
     print(f"\nWrote {len(written)} TOML file(s) to {attacks_dir}/")
     for p in written:
         print(f"  {p.name}")
+
+    if args.output_json:
+        json_out = Path(args.output_json)
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        output = {
+            "campaign": campaign_id,
+            "base_seed": base_seed,
+            "num_variations": len(json_docs),
+            "variations": json_docs,
+        }
+        json_out.write_text(_json.dumps(output, indent=2, ensure_ascii=False))
+        print(f"\nWrote JSON output to {json_out}")
 
 
 def main() -> None:

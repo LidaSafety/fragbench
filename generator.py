@@ -48,6 +48,10 @@ from variations.wormgpt_kawaiigpt import WormGptKawaiiGptVariation
 log = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Data structures
+# ---------------------------------------------------------------------------
+
 @dataclass
 class GeneratedFragment:
     """Structured generated fragment for TOML serialization."""
@@ -74,15 +78,22 @@ STYLES: list[str] = [
 class FragmentGroup:
     """Links sub-fragments back to their parent step."""
 
+    When fragments are authored in the seed (not regex-split post-hoc),
+    ``roles``, ``produces``, and ``consumes`` carry the create/edit/dispatch
+    role and the shared-artifact wiring. They are parallel lists indexed the
+    same as ``sub_fragments``. For regex-split fragments these lists are empty.
+    """
     parent_step: str
     parent_tactic: str
     sub_fragments: list[str] = field(default_factory=list)
+    roles: list[str] = field(default_factory=list)
+    produces: list[list[str]] = field(default_factory=list)
+    consumes: list[list[str]] = field(default_factory=list)
 
 
 @dataclass
 class StyledVariation:
     """A single prompt rephrased in a specific style."""
-
     style: str
     prompt: str
 
@@ -91,9 +102,15 @@ class StyledVariation:
 class StyledFragmentGroup:
     """A fragment with all style variations, traceable to its parent."""
 
+    ``role`` / ``produces`` / ``consumes`` carry the artifact-chain wiring
+    from the seed when available (empty for legacy regex-split fragments).
+    """
     parent_step: str
     parent_tactic: str
     variations: list[StyledVariation] = field(default_factory=list)
+    role: str = ""
+    produces: list[str] = field(default_factory=list)
+    consumes: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +179,6 @@ def _fix_json_escapes(text: str) -> str:
     all backslash sequences to single backslashes, then re-escaping them.
     This only operates inside JSON string values (between quotes).
     """
-
     def _fix_string(m: re.Match) -> str:
         s = m.group(0)
         # Collapse any run of backslashes to the chars they represent,
@@ -200,7 +216,6 @@ def make_fragment_groups(
 
     try:
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning steps unchanged")
@@ -401,14 +416,21 @@ def stylize_fragment_group(
     """
     Apply style variations to each sub-fragment in a FragmentGroup.
     Returns one StyledFragmentGroup per sub-fragment.
+
+    When ``group`` carries authored-fragment metadata (roles/produces/consumes),
+    it is forwarded onto the corresponding StyledFragmentGroup so the JSON
+    output preserves the artifact-chain wiring.
     """
     styled_groups: list[StyledFragmentGroup] = []
-    for sub_frag in group.sub_fragments:
+    for i, sub_frag in enumerate(group.sub_fragments):
         variations = stylize_fragment(sub_frag, styles=styles, api_key=api_key, model=model)
         styled_groups.append(StyledFragmentGroup(
             parent_step=group.parent_step,
             parent_tactic=group.parent_tactic,
             variations=variations,
+            role=group.roles[i] if i < len(group.roles) else "",
+            produces=group.produces[i] if i < len(group.produces) else [],
+            consumes=group.consumes[i] if i < len(group.consumes) else [],
         ))
     return styled_groups
 
@@ -438,7 +460,6 @@ def legitimize_fragment(
 
     try:
         import anthropic
-
         client = anthropic.Anthropic(api_key=api_key)
     except ImportError:
         log.error("anthropic package not installed — returning fragment unchanged")
@@ -473,7 +494,6 @@ def legitimize_fragment(
 # TOML serialization
 # ---------------------------------------------------------------------------
 
-
 def _toml_str(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
@@ -496,10 +516,10 @@ def generate_toml(
     inside that fragment becomes one [[fragments.variations]] entry.
     """
     campaign_id = f"{metadata['id']}_{seed}"
-    technique = metadata.get("technique", "T0000")
-    tech_name = metadata.get("technique_name", "Generated")
+    technique   = metadata.get("technique", "T0000")
+    tech_name   = metadata.get("technique_name", "Generated")
     description = metadata.get("description", "Auto-generated attack scenario.")
-    tags = metadata.get("tags", ["generated"])
+    tags        = metadata.get("tags", ["generated"])
 
     lines: list[str] = [
         "[metadata]",
@@ -548,5 +568,107 @@ def generate_toml(
                 f"prompt = {_toml_str(frag_text)}",
                 "",
             ]
+            for sv in frag.variations:
+                lines += [
+                    "[[fragments.variations]]",
+                    f'style = "{sv.style}"',
+                    f"prompt = {_toml_str(sv.prompt)}",
+                    "",
+                ]
+        else:
+            # Legacy: list[str]
+            lines += [
+                "[[fragments]]",
+                f"index = {frag_idx}",
+                f'description = "Generated fragment {frag_idx} (seed={seed})"',
+                "",
+            ]
+            for frag_text in frag:
+                lines += [
+                    "[[fragments.variations]]",
+                    'style = "generated"',
+                    f"prompt = {_toml_str(frag_text)}",
+                    "",
+                ]
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# JSON serialization
+# ---------------------------------------------------------------------------
+
+def generate_json(
+    metadata: dict,
+    fragments: list[StyledFragmentGroup] | list[FragmentGroup],
+    seed: int,
+) -> dict:
+    """
+    Build a JSON-serializable dict with full fragment traceability.
+
+    Includes: metadata, seed, and per-fragment parent→sub-fragment→style mapping.
+    Suitable for network simulation and attack detection research.
+    """
+    campaign_id = f"{metadata['id']}_{seed}"
+
+    frag_list = []
+    for frag_idx, frag in enumerate(fragments):
+        if isinstance(frag, StyledFragmentGroup):
+            entry = {
+                "fragment_index": frag_idx,
+                "parent_prompt": frag.parent_step,
+                "parent_tactic": getattr(frag.parent_tactic, "value", str(frag.parent_tactic)),
+                "variations": [
+                    {"style": sv.style, "prompt": sv.prompt}
+                    for sv in frag.variations
+                ],
+            }
+            if frag.role:
+                entry["role"] = frag.role
+            if frag.produces:
+                entry["produces"] = list(frag.produces)
+            if frag.consumes:
+                entry["consumes"] = list(frag.consumes)
+            frag_list.append(entry)
+        elif isinstance(frag, FragmentGroup):
+            frag_list.append({
+                "fragment_index": frag_idx,
+                "parent_prompt": frag.parent_step,
+                "parent_tactic": getattr(frag.parent_tactic, "value", str(frag.parent_tactic)),
+                "sub_fragments": frag.sub_fragments,
+            })
+        else:
+            # Legacy: list[str]
+            frag_list.append({
+                "fragment_index": frag_idx,
+                "sub_fragments": frag,
+            })
+
+    # Artifact-chain summary: who produces each artifact, who consumes it.
+    artifact_chain: dict[str, dict] = {}
+    for entry in frag_list:
+        idx = entry["fragment_index"]
+        for a in entry.get("produces", []):
+            artifact_chain.setdefault(a, {"produced_by": None, "consumed_by": []})
+            if artifact_chain[a]["produced_by"] is None:
+                artifact_chain[a]["produced_by"] = idx
+        for a in entry.get("consumes", []):
+            artifact_chain.setdefault(a, {"produced_by": None, "consumed_by": []})
+            artifact_chain[a]["consumed_by"].append(idx)
+
+    result = {
+        "campaign_id": campaign_id,
+        "seed": seed,
+        "metadata": {
+            "id": metadata.get("id"),
+            "technique": metadata.get("technique"),
+            "technique_name": metadata.get("technique_name"),
+            "description": metadata.get("description"),
+            "tags": metadata.get("tags", []),
+        },
+        "total_fragments": len(frag_list),
+        "fragments": frag_list,
+    }
+    if artifact_chain:
+        result["artifact_chain"] = artifact_chain
+    return result
