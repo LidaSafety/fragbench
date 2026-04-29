@@ -9,7 +9,7 @@ Usage:
     from variations.malterminal import MalTerminalVariation
 
     gen = MalTerminalVariation("seeds/malterminal.json")
-    variation = gen.make_variation(seed=42)
+    variation = gen.make_variation(seed=13)
     for prompt, tactic in variation:
         print(f"[{tactic}] {prompt}")
 """
@@ -80,7 +80,7 @@ class MalTerminalVariation(BaseVariation):
             )
             prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
-            result.append({
+            stage_dict: Dict[str, Any] = {
                 "index": stage["index"],
                 "prompt": prompt,
                 "mitre_tactic": stage["mitre_tactic"],
@@ -89,10 +89,22 @@ class MalTerminalVariation(BaseVariation):
                 "description": stage["description"],
                 "resolved_variables": stage_vars,
                 "dimension_choices": dimension_choices,
-            })
+            }
+
+            if "fragments" in stage:
+                stage_dict["fragments"] = [
+                    {
+                        "role": frag["role"],
+                        "prompt": frag["prompt"].format(**stage_vars),
+                        "produces": list(frag.get("produces", [])),
+                        "consumes": list(frag.get("consumes", [])),
+                    }
+                    for frag in stage["fragments"]
+                ]
+
+            result.append(stage_dict)
 
         return result
-
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--seed",
         type=int,
-        default=42,
+        default=13,
         help="Random seed for variation generation",
     )
     parser.add_argument(
