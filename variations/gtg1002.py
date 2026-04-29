@@ -15,6 +15,7 @@ Usage:
 """
 
 import json
+import random
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -44,7 +45,6 @@ class GTG1002Variation(BaseVariation):
         Returns:
             List of (prompt_text, MitreType) tuples — one per attack stage.
         """
-        import random
         rng = random.Random(seed)
         dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
@@ -68,7 +68,6 @@ class GTG1002Variation(BaseVariation):
         Returns list of dicts with: prompt, tactic, technique, description,
         resolved_variables, dimension_choices — useful for debugging and JSON export.
         """
-        import random
         rng = random.Random(seed)
         dimension_choices = self._select_dimensions(rng)
         stages = self.data["attack_stages"]
@@ -81,16 +80,30 @@ class GTG1002Variation(BaseVariation):
             )
             prompt = stage["baseline_prompt"].format(**stage_vars)
             resolved_vars[stage["index"]] = stage_vars
-            result.append({
+
+            stage_dict: Dict[str, Any] = {
                 "index": stage["index"],
                 "prompt": prompt,
                 "mitre_tactic": stage["mitre_tactic"],
                 "mitre_technique": stage["mitre_technique"],
                 "mitre_technique_name": stage["mitre_technique_name"],
                 "description": stage["description"],
-                "resolved_variables": dict(stage_vars),
-                "dimension_choices": dict(dimension_choices),
-            })
+                "resolved_variables": stage_vars,
+                "dimension_choices": dimension_choices,
+            }
+
+            if "fragments" in stage:
+                stage_dict["fragments"] = [
+                    {
+                        "role": frag["role"],
+                        "prompt": frag["prompt"].format(**stage_vars),
+                        "produces": list(frag.get("produces", [])),
+                        "consumes": list(frag.get("consumes", [])),
+                    }
+                    for frag in stage["fragments"]
+                ]
+
+            result.append(stage_dict)
 
         return result
 
