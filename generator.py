@@ -76,7 +76,8 @@ STYLES: list[str] = [
 
 @dataclass
 class FragmentGroup:
-    """Links sub-fragments back to their parent step."""
+    """
+    Links sub-fragments back to their parent step.
 
     When fragments are authored in the seed (not regex-split post-hoc),
     ``roles``, ``produces``, and ``consumes`` carry the create/edit/dispatch
@@ -100,7 +101,8 @@ class StyledVariation:
 
 @dataclass
 class StyledFragmentGroup:
-    """A fragment with all style variations, traceable to its parent."""
+    """
+    A fragment with all style variations, traceable to its parent.
 
     ``role`` / ``produces`` / ``consumes`` carry the artifact-chain wiring
     from the seed when available (empty for legacy regex-split fragments).
@@ -568,28 +570,6 @@ def generate_toml(
                 f"prompt = {_toml_str(frag_text)}",
                 "",
             ]
-            for sv in frag.variations:
-                lines += [
-                    "[[fragments.variations]]",
-                    f'style = "{sv.style}"',
-                    f"prompt = {_toml_str(sv.prompt)}",
-                    "",
-                ]
-        else:
-            # Legacy: list[str]
-            lines += [
-                "[[fragments]]",
-                f"index = {frag_idx}",
-                f'description = "Generated fragment {frag_idx} (seed={seed})"',
-                "",
-            ]
-            for frag_text in frag:
-                lines += [
-                    "[[fragments.variations]]",
-                    'style = "generated"',
-                    f"prompt = {_toml_str(frag_text)}",
-                    "",
-                ]
 
     return "\n".join(lines)
 
@@ -630,6 +610,12 @@ def generate_json(
             if frag.consumes:
                 entry["consumes"] = list(frag.consumes)
             frag_list.append(entry)
+        elif isinstance(frag, GeneratedFragment):
+            frag_list.append({
+                "fragment_index": frag_idx,
+                "parent_prompt": frag.description,
+                "variations": [{"style": "direct", "prompt": v} for v in frag.variations],
+            })
         elif isinstance(frag, FragmentGroup):
             frag_list.append({
                 "fragment_index": frag_idx,

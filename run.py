@@ -387,6 +387,7 @@ def run_generate(args) -> None:
         FragmentGroup,
         STYLES,
         VARIATION_REGISTRY,
+        generate_json,
         generate_toml,
         legitimize_fragment,
         make_fragment_groups,
@@ -447,10 +448,6 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        # Step 1: Build fragment groups — authored fragments take precedence;
-        # stages without them fall back to LLM/regex split via make_fragments.
-        groups = build_fragment_groups(detailed, api_key=api_key)
-
         if args.stylize:
             if args.fragment:
                 raw_groups = make_fragment_groups(var, api_key=api_key)
@@ -507,7 +504,7 @@ def run_generate(args) -> None:
     json_docs: list[dict] = []
     for i, frags in enumerate(final_frag_list):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], [frags], seed)
+        toml_text = generate_toml(seed_data["metadata"], frags, seed)
         out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
         out_path.write_text(toml_text)
         written.append(out_path)
