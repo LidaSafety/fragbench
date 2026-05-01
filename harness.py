@@ -104,6 +104,60 @@ def load_all_attacks(attacks_dir: str | Path = "attacks") -> list[AttackSpec]:
 
 
 # ---------------------------------------------------------------------------
+# JSON loader (consume generator output from `--generate --output-json ...`)
+# ---------------------------------------------------------------------------
+
+def load_attack_from_json_doc(doc: dict) -> AttackSpec:
+    """Adapt one element of envelope['variations'] into an AttackSpec.
+
+    The seeded `campaign_id` (e.g. QUIETVAULT_42) is used as the AttackSpec id
+    so each generated variation is a distinct row in the eval summary.
+    """
+    meta = doc["metadata"]
+    metadata = AttackMetadata(
+        id=doc.get("campaign_id", meta["id"]),
+        technique=meta["technique"],
+        technique_name=meta["technique_name"],
+        description=meta.get("description", ""),
+        tags=meta.get("tags", []),
+    )
+    fragments = []
+    for frag in doc.get("fragments", []):
+        idx = frag["fragment_index"]
+        variations = [
+            Variation(style=v["style"], prompt=v["prompt"])
+            for v in frag.get("variations", [])
+        ]
+        fragments.append(Fragment(
+            index=idx,
+            description=frag.get("parent_prompt") or f"Stage {idx}",
+            variations=variations,
+        ))
+    return AttackSpec(metadata=metadata, fragments=fragments)
+
+
+def load_attacks_from_json(paths: Iterable[str | Path]) -> list[AttackSpec]:
+    """Load every variation from every envelope JSON in `paths` as an AttackSpec.
+
+    Skips JSON files whose top-level dict lacks a 'variations' key (so unrelated
+    JSON files in results/ don't crash eval); a warning is printed for each skip.
+    """
+    specs: list[AttackSpec] = []
+    for path in paths:
+        path = Path(path)
+        envelope = json.loads(path.read_text())
+        if not isinstance(envelope, dict) or "variations" not in envelope:
+            print(
+                f"WARNING: {path} is not a generator envelope (no 'variations' key); skipping",
+                file=sys.stderr,
+            )
+            continue
+        for doc in envelope["variations"]:
+            specs.append(load_attack_from_json_doc(doc))
+    return specs
+
+
+# ---------------------------------------------------------------------------
 # Base runner
 # ---------------------------------------------------------------------------
 
