@@ -35,6 +35,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
 import os
@@ -172,6 +173,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Use template-based stylization (default — no Haiku calls). "
              "Pass --no-style-templates to use Haiku for LLM rephrasing instead.",
+    )
+    p.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=8,
+        help="Max parallel LLM calls during --generate (default: 8). "
+             "Lower this if hitting Anthropic rate limits.",
     )
     p.add_argument(
         "--output-json",
@@ -421,7 +429,7 @@ def run_campaign(spec, runner, args) -> dict:
     }
 
 
-def run_generate(args) -> None:
+async def run_generate(args) -> None:
     """Dataset generation pipeline: seed file → vary → [fragment] → stylize → [legitimize] → JSON."""
     import json as _json
     import random as _random
@@ -437,6 +445,8 @@ def run_generate(args) -> None:
         make_fragment_groups,
         stylize_fragment_group,
     )
+
+    sem = asyncio.Semaphore(args.max_concurrency)
 
     if not args.seed_file:
         print("ERROR: --seed-file <path> is required with --generate", file=sys.stderr)
@@ -509,7 +519,9 @@ def run_generate(args) -> None:
             )
         else:
             if args.fragment:
-                raw_groups = make_fragment_groups(var, api_key=api_key)
+                raw_groups = await make_fragment_groups(
+                    var, api_key=api_key, semaphore=sem
+                )
             else:
                 raw_groups = [[step] for step, _ in var]
 
@@ -523,23 +535,33 @@ def run_generate(args) -> None:
                     sub_fragments=group,
                 ))
 
-        styled_fragments = []
-        for fragment_group in groups_to_stylize:
-            styled_fragments.extend(
-                stylize_fragment_group(
-                    fragment_group,
-                    styles=styles,
-                    api_key=None if use_templates else api_key,
-                )
+        # Stylize all fragment groups concurrently — per-style and per-sub-fragment
+        # fan-out happens inside stylize_fragment_group via asyncio.gather.
+        stylize_api_key = None if use_templates else api_key
+        styled_lists = await asyncio.gather(*[
+            stylize_fragment_group(
+                fragment_group,
+                styles=styles,
+                api_key=stylize_api_key,
+                semaphore=sem,
             )
+            for fragment_group in groups_to_stylize
+        ])
+        styled_fragments = [sg for sublist in styled_lists for sg in sublist]
 
         if args.legitimize:
-            for styled_group in styled_fragments:
-                for variation in styled_group.variations:
-                    variation.prompt = legitimize_fragment(
-                        variation.prompt,
-                        api_key=api_key,
-                    )
+            # Fan out all per-variation legitimize calls at once.
+            targets = [
+                v
+                for styled_group in styled_fragments
+                for v in styled_group.variations
+            ]
+            new_prompts = await asyncio.gather(*[
+                legitimize_fragment(v.prompt, api_key=api_key, semaphore=sem)
+                for v in targets
+            ])
+            for v, new_prompt in zip(targets, new_prompts):
+                v.prompt = new_prompt
 
         final_frag_list.append(styled_fragments)
         n_frags = len(styled_fragments)
@@ -599,7 +621,7 @@ def main() -> None:
         print(f"LLM call log: {log_path}")
 
     if args.generate:
-        run_generate(args)
+        asyncio.run(run_generate(args))
         return
 
     from harness import load_all_attacks
