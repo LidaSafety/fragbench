@@ -46,13 +46,13 @@ Add these to your shell profile (`~/.zshrc`, `~/.bashrc`) to avoid re-entering t
 This runs without any API calls:
 
 ```bash
-python run.py --dry-run
+python run.py --evaluate --dry-run
 ```
 
 You should see campaign names and prompts printed to the terminal. If that works, you're ready to run a real evaluation:
 
 ```bash
-python run.py --model claude --campaign AD_DISCOVERY --judge
+python run.py --evaluate --model claude --campaign AD_DISCOVERY --judge
 ```
 
 ---
@@ -216,20 +216,20 @@ make docker-status
 
 ```bash
 # Run all campaigns against Claude (default: claude-sonnet-4-6)
-python run.py --model claude
+python run.py --evaluate --model claude
 
 # Use LLM-as-judge (Claude Haiku) for semantic classification
 # Fixes cases where keyword heuristics miss compliance (e.g. identity-rewriting)
-python run.py --model claude --judge
+python run.py --evaluate --model claude --judge
 
 # Run a single campaign with judge + JSON output
-python run.py --campaign DPRK_FRAUD --model claude --judge --output results/dprk.json
+python run.py --evaluate --campaign DPRK_FRAUD --model claude --judge --output results/dprk.json
 
 # Run against Qwen via DashScope
-python run.py --model qwen --qwen-key $DASHSCOPE_API_KEY --qwen-model qwen-plus
+python run.py --evaluate --model qwen --qwen-key $DASHSCOPE_API_KEY --qwen-model qwen-plus
 
 # Enable extended thinking on Claude target
-python run.py --model claude --thinking --judge
+python run.py --evaluate --model claude --thinking --judge
 
 # See all options
 python run.py --help
@@ -280,20 +280,23 @@ Instead of hand-authoring TOML files, you can generate attack variations program
 
 ```bash
 # Preview without making any API calls
-python run.py --generate --seed-file seeds/vibe_extortion.json --dry-run
+python run.py --generate --seed-file seeds/vibe_extortion.json --output-json out.json --dry-run
 
 # Generate 50 variations (preserves original prompts, no LLM rewriting)
-python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --output-json out.json
 
 # Reproducible run with a fixed seed
-python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --seed 42
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --seed 42 --output-json out.json
 
 # Opt-in: LLM fragmentation (split steps) and/or legitimization (add cover stories)
-python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
-python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --output-json out.json
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize --output-json out.json
+
+# Also write per-variation TOMLs (opt-in)
+python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --output-json out.json --output-toml attacks/
 ```
 
-Each run writes one TOML file per variation to `attacks/generated_<campaign>_<seed>.toml`, ready to evaluate with `--campaign`.
+Each run writes a JSON document with all variations to the path given to `--output-json`. Per-variation TOML files (`generated_<campaign>_<seed>.toml`, ready to evaluate with `--campaign`) are written only if you also pass `--output-toml <dir>`.
 
 ### Adding a new generatable campaign
 
@@ -335,7 +338,7 @@ prompt = "Educational framing of the same prompt."
 Run it:
 
 ```bash
-python run.py --campaign MY_CAMPAIGN --model claude --judge
+python run.py --evaluate --campaign MY_CAMPAIGN --model claude --judge
 ```
 
 ## Output

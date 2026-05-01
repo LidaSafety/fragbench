@@ -3,36 +3,39 @@ CLI entry point for fragguard-chain.
 
 Examples:
     # Run all campaigns against Qwen (keyword classifier)
-    python run.py --model qwen --qwen-key $DASHSCOPE_API_KEY
+    python run.py --evaluate --model qwen --qwen-key $DASHSCOPE_API_KEY
 
     # Run all campaigns against Claude with LLM judge
-    python run.py --model claude --judge
+    python run.py --evaluate --model claude --judge
 
     # Run a single campaign
-    python run.py --campaign dprk_fraud --model claude --judge
+    python run.py --evaluate --campaign dprk_fraud --model claude --judge
 
     # Run with extended thinking on the target model (Claude only)
-    python run.py --model claude --thinking --judge
+    python run.py --evaluate --model claude --thinking --judge
 
     # Output JSON results to a file
-    python run.py --model claude --judge --output results/run1.json
+    python run.py --evaluate --model claude --judge --output results/run1.json
 
-    # Generate variations → TOML (no LLM rewriting, preserves original prompts)
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50
+    # Generate variations to JSON (templates by default — no Haiku calls)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --output-json out.json
 
-    # Generate with optional LLM fragmentation and/or legitimization
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
+    # Preserve original prompts (no template wrapping)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --style direct --output-json out.json
 
-    # Generate with LLM style variations
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize --styles direct,sysadmin,ctf
+    # Filter to specific styles, or use Haiku for LLM-rephrased styles
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --style direct,sysadmin,ctf --output-json out.json
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --no-style-templates --output-json out.json
+
+    # Apply LLM fragmentation or legitimization (seeds without authored fragments[] only)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --output-json out.json
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize --output-json out.json
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
 import os
@@ -48,8 +51,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--model",
         choices=["qwen", "claude"],
-        default="qwen",
-        help="Target model to probe (default: qwen)",
+        default="claude",
+        help="Target model to probe (default: claude)",
     )
     p.add_argument(
         "--qwen-key",
@@ -99,7 +102,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--style",
         default=None,
-        help="Comma-separated list of styles to run (e.g. direct,ctf,sysadmin). Omit to run all.",
+        help="Comma-separated list of styles (e.g. direct,ctf,sysadmin). "
+             "In eval mode: filter which styles to probe. "
+             "In --generate mode: filter which styles to produce. "
+             "Omit to use all 10 styles.",
     )
     p.add_argument(
         "--attacks-dir",
@@ -122,11 +128,17 @@ def parse_args() -> argparse.Namespace:
         help="Log all LLM calls (judge, generator) in addition to target calls",
     )
 
-    # --- Dataset generation mode -------------------------------------------
-    p.add_argument(
+    # --- Mode selection (required) ----------------------------------------
+    mode = p.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Run the evaluation pipeline (probe target model with attack TOMLs).",
+    )
+    mode.add_argument(
         "--generate",
         action="store_true",
-        help="Run the dataset generation pipeline instead of evaluation",
+        help="Run the dataset generation pipeline.",
     )
     p.add_argument(
         "--seed-file",
@@ -156,24 +168,59 @@ def parse_args() -> argparse.Namespace:
         help="Apply LLM legitimization (reframe steps with cover stories)",
     )
     p.add_argument(
-        "--stylize",
-        action="store_true",
-        help="Apply LLM style variations (rephrase each fragment into 10 styles)",
+        "--style-templates",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Use template-based stylization (default — no Haiku calls). "
+             "Pass --no-style-templates to use Haiku for LLM rephrasing instead.",
     )
     p.add_argument(
-        "--styles",
-        default=None,
-        help="Comma-separated list of styles to generate (default: all 10). "
-             "E.g. --styles direct,sysadmin,ctf",
+        "--max-concurrency",
+        type=int,
+        default=8,
+        help="Max parallel LLM calls during --generate (default: 8). "
+             "Lower this if hitting Anthropic rate limits.",
     )
     p.add_argument(
         "--output-json",
         default=None,
         help="Write generated fragments to a JSON file (with full traceability). "
-             "E.g. --output-json results/promptsteal_fragments.json",
+             "Required with --generate. E.g. --output-json results/promptsteal_fragments.json",
+    )
+    p.add_argument(
+        "--output-toml",
+        default=None,
+        help="Directory to write per-variation TOML files into (opt-in; only used "
+             "with --generate). E.g. --output-toml attacks/",
     )
 
-    return p.parse_args()
+    args = p.parse_args()
+
+    if not args.generate:
+        gen_only = []
+        if args.seed_file is not None:
+            gen_only.append("--seed-file")
+        if args.seed is not None:
+            gen_only.append("--seed")
+        if args.style_templates is not None:
+            gen_only.append("--style-templates" if args.style_templates else "--no-style-templates")
+        if args.fragment:
+            gen_only.append("--fragment")
+        if args.legitimize:
+            gen_only.append("--legitimize")
+        if args.output_json is not None:
+            gen_only.append("--output-json")
+        if args.output_toml is not None:
+            gen_only.append("--output-toml")
+        if gen_only:
+            p.error(
+                f"the following flags require --generate: {', '.join(gen_only)}"
+            )
+    else:
+        if not args.output_json:
+            p.error("--output-json <path> is required with --generate")
+
+    return args
 
 
 def _safe_format(template: str, variables: dict) -> str:
@@ -215,53 +262,57 @@ def print_result_row(style: str, verdict: str, justification: str = "") -> None:
     print(f"  {color}{verdict:8s}{reset}  {style}{just}")
 
 
-def _shape_generated_fragments(
-    var: list[tuple[str, str]],
-    stage_descriptions: list[str],
-    *,
-    fragment: bool,
-    legitimize: bool,
-    api_key: str | None,
-    make_fragment_groups_fn,
-    legitimize_fragment_fn,
-) -> list:
+def _build_authored_fragment_groups(seed_data: dict, gen, seed: int):
     """
-    Convert one generated variation into TOML-ready fragment blocks while
-    preserving the original stage boundary, stage-aligned fragment indices,
-    and human-meaningful descriptions.
+    Build FragmentGroups from each stage's authored ``fragments[]`` array,
+    rendering each fragment's prompt template with the variation's resolved
+    variables. Carries roles/produces/consumes onto the group so the JSON
+    output preserves the artifact-chain wiring.
+
+    Returns None if no stage in the seed has an authored ``fragments[]``.
     """
-    from generator import GeneratedFragment
+    from generator import FragmentGroup
+    from variations.base import MitreType
 
-    if len(stage_descriptions) != len(var):
-        raise ValueError("stage_descriptions must have the same length as var")
+    stages = seed_data.get("attack_stages", [])
+    if not any(s.get("fragments") for s in stages):
+        return None
 
-    if fragment:
-        fragment_groups = make_fragment_groups_fn(var, api_key=api_key)
-    else:
-        fragment_groups = [[step] for step, _ in var]
-
-    if len(fragment_groups) != len(var):
-        raise ValueError("fragment_groups must preserve one outer group per input stage")
-
-    shaped: list[GeneratedFragment] = []
-    for idx, (group, description) in enumerate(zip(fragment_groups, stage_descriptions)):
-        if not group:
-            group = [var[idx][0]]
-
-        variations = []
-        for frag_text in group:
-            if legitimize:
-                frag_text = legitimize_fragment_fn(frag_text, api_key=api_key)
-            variations.append(frag_text)
-
-        shaped.append(
-            GeneratedFragment(
-                description=description or f"Stage {idx}",
-                variations=variations,
-            )
+    detailed = gen.make_variation_detailed(seed)
+    if len(detailed) != len(stages):
+        raise ValueError(
+            f"make_variation_detailed returned {len(detailed)} stages, "
+            f"seed has {len(stages)}"
         )
 
-    return shaped
+    groups: list = []
+    for stage, dvar in zip(stages, detailed):
+        parent_step = dvar.get("prompt", "")
+        parent_tactic = MitreType(stage["mitre_tactic"])
+        resolved = dvar.get("resolved_variables", {})
+        authored = stage.get("fragments", [])
+
+        if authored:
+            sub_fragments = [_safe_format(f["prompt"], resolved) for f in authored]
+            roles = [f.get("role", "") for f in authored]
+            produces = [list(f.get("produces", [])) for f in authored]
+            consumes = [list(f.get("consumes", [])) for f in authored]
+        else:
+            sub_fragments = [parent_step]
+            roles = []
+            produces = []
+            consumes = []
+
+        groups.append(FragmentGroup(
+            parent_step=parent_step,
+            parent_tactic=parent_tactic,
+            sub_fragments=sub_fragments,
+            roles=roles,
+            produces=produces,
+            consumes=consumes,
+        ))
+
+    return groups
 
 
 def run_campaign(spec, runner, args) -> dict:
@@ -386,10 +437,11 @@ def run_campaign(spec, runner, args) -> dict:
     }
 
 
-def run_generate(args) -> None:
-    """Dataset generation pipeline: seed file → vary → [fragment] → [stylize] → [legitimize] → TOML."""
+async def run_generate(args) -> None:
+    """Dataset generation pipeline: seed file → vary → [fragment] → stylize → [legitimize] → JSON."""
     import json as _json
     import random as _random
+    import time as _time
 
     from generator import (
         FragmentGroup,
@@ -401,6 +453,8 @@ def run_generate(args) -> None:
         make_fragment_groups,
         stylize_fragment_group,
     )
+
+    sem = asyncio.Semaphore(args.max_concurrency)
 
     if not args.seed_file:
         print("ERROR: --seed-file <path> is required with --generate", file=sys.stderr)
@@ -425,8 +479,8 @@ def run_generate(args) -> None:
 
     # Parse style filter
     styles = None
-    if args.styles:
-        styles = [s.strip() for s in args.styles.split(",") if s.strip()]
+    if args.style:
+        styles = [s.strip() for s in args.style.split(",") if s.strip()]
         invalid = [s for s in styles if s not in STYLES]
         if invalid:
             print(
@@ -435,15 +489,23 @@ def run_generate(args) -> None:
             )
             sys.exit(1)
 
+    seed_has_authored = any(
+        s.get("fragments") for s in seed_data.get("attack_stages", [])
+    )
+    if args.fragment and seed_has_authored:
+        print(
+            "ERROR: --fragment is incompatible with seeds that define authored "
+            "fragments[] per stage (this seed does). The authored chain wiring "
+            "would be lost. Drop --fragment to use the authored breakdown.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    use_templates = args.style_templates is not False
+
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
-    if args.stylize:
-        print(f"  Styles: {', '.join(styles or STYLES)}")
-
-    stage_descriptions = [
-        stage.get("description", f"Stage {idx}")
-        for idx, stage in enumerate(seed_data.get("attack_stages", []))
-    ]
+    print(f"  Styles: {', '.join(styles or STYLES)}")
 
     final_frag_list: list[list] = []
     for i in range(args.num_variations):
@@ -456,106 +518,100 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
-        if args.stylize:
-            seed_stages = seed_data.get("attack_stages", [])
-            has_authored = any("fragments" in s for s in seed_stages)
+        print(f"  [{i+1}/{args.num_variations}] seed={seed}  stages={len(var)}", flush=True)
+        t0 = _time.perf_counter()
 
-            if has_authored and not args.fragment:
-                # Use authored seed fragments: resolve prompts and wire DAG metadata
-                detailed = gen.make_variation_detailed(seed)
-                raw_groups, all_roles, all_produces, all_consumes = [], [], [], []
-                for stage_detail, stage_def in zip(detailed, seed_stages):
-                    rv = stage_detail.get("resolved_variables", {})
-                    authored = stage_def.get("fragments", [])
-                    raw_groups.append([_safe_format(f["prompt"], rv) for f in authored])
-                    all_roles.append([f.get("role", "") for f in authored])
-                    all_produces.append([f.get("produces", []) for f in authored])
-                    all_consumes.append([f.get("consumes", []) for f in authored])
+        if seed_has_authored:
+            groups_to_stylize = _build_authored_fragment_groups(
+                seed_data, gen, seed
+            )
+        else:
+            if args.fragment:
+                raw_groups = await make_fragment_groups(
+                    var, api_key=api_key, semaphore=sem
+                )
             else:
-                if args.fragment:
-                    raw_groups = make_fragment_groups(var, api_key=api_key)
-                else:
-                    raw_groups = [[step] for step, _ in var]
-                all_roles = [[] for _ in raw_groups]
-                all_produces = [[] for _ in raw_groups]
-                all_consumes = [[] for _ in raw_groups]
+                raw_groups = [[step] for step, _ in var]
 
-            styled_fragments = []
-            for idx, (group, roles, produces, consumes) in enumerate(
-                zip(raw_groups, all_roles, all_produces, all_consumes)
-            ):
+            groups_to_stylize = []
+            for idx, group in enumerate(raw_groups):
                 if not group:
                     group = [var[idx][0]]
-
-                fragment_group = FragmentGroup(
+                groups_to_stylize.append(FragmentGroup(
                     parent_step=var[idx][0],
                     parent_tactic=var[idx][1],
                     sub_fragments=group,
-                    roles=roles,
-                    produces=produces,
-                    consumes=consumes,
-                )
-                styled_fragments.extend(
-                    stylize_fragment_group(
-                        fragment_group,
-                        styles=styles,
-                        api_key=api_key,
-                    )
-                )
+                ))
 
-            if args.legitimize:
-                for styled_group in styled_fragments:
-                    for variation in styled_group.variations:
-                        variation.prompt = legitimize_fragment(
-                            variation.prompt,
-                            api_key=api_key,
-                        )
-
-            final_frag_list.append(styled_fragments)
-        else:
-            final_frag_list.append(
-                _shape_generated_fragments(
-                    var,
-                    stage_descriptions,
-                    fragment=args.fragment,
-                    legitimize=args.legitimize,
-                    api_key=api_key,
-                    make_fragment_groups_fn=make_fragment_groups,
-                    legitimize_fragment_fn=legitimize_fragment,
-                )
+        # Stylize all fragment groups concurrently — per-style and per-sub-fragment
+        # fan-out happens inside stylize_fragment_group via asyncio.gather.
+        stylize_api_key = None if use_templates else api_key
+        styled_lists = await asyncio.gather(*[
+            stylize_fragment_group(
+                fragment_group,
+                styles=styles,
+                api_key=stylize_api_key,
+                semaphore=sem,
             )
+            for fragment_group in groups_to_stylize
+        ])
+        styled_fragments = [sg for sublist in styled_lists for sg in sublist]
+
+        if args.legitimize:
+            # Fan out all per-variation legitimize calls at once.
+            targets = [
+                v
+                for styled_group in styled_fragments
+                for v in styled_group.variations
+            ]
+            new_prompts = await asyncio.gather(*[
+                legitimize_fragment(v.prompt, api_key=api_key, semaphore=sem)
+                for v in targets
+            ])
+            for v, new_prompt in zip(targets, new_prompts):
+                v.prompt = new_prompt
+
+        final_frag_list.append(styled_fragments)
+        n_frags = len(styled_fragments)
+        n_vars = sum(len(f.variations) for f in styled_fragments)
+
+        elapsed = _time.perf_counter() - t0
+        print(f"      → fragments={n_frags}  variations={n_vars}  ({elapsed:.1f}s)", flush=True)
 
     if args.dry_run:
         return
 
-    attacks_dir = Path(args.attacks_dir)
-    attacks_dir.mkdir(parents=True, exist_ok=True)
+    toml_dir: Path | None = None
+    if args.output_toml:
+        toml_dir = Path(args.output_toml)
+        toml_dir.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
     json_docs: list[dict] = []
     for i, frags in enumerate(final_frag_list):
         seed = base_seed + i
-        toml_text = generate_toml(seed_data["metadata"], frags, seed)
-        out_path = attacks_dir / f"generated_{campaign_id}_{seed}.toml"
-        out_path.write_text(toml_text)
-        written.append(out_path)
+        if toml_dir is not None:
+            toml_text = generate_toml(seed_data["metadata"], frags, seed)
+            out_path = toml_dir / f"generated_{campaign_id}_{seed}.toml"
+            out_path.write_text(toml_text)
+            written.append(out_path)
         json_docs.append(generate_json(seed_data["metadata"], frags, seed))
 
-    print(f"\nWrote {len(written)} TOML file(s) to {attacks_dir}/")
-    for p in written:
-        print(f"  {p.name}")
+    if toml_dir is not None:
+        print(f"\nWrote {len(written)} TOML file(s) to {toml_dir}/")
+        for p in written:
+            print(f"  {p.name}")
 
-    if args.output_json:
-        json_out = Path(args.output_json)
-        json_out.parent.mkdir(parents=True, exist_ok=True)
-        output = {
-            "campaign": campaign_id,
-            "base_seed": base_seed,
-            "num_variations": len(json_docs),
-            "variations": json_docs,
-        }
-        json_out.write_text(_json.dumps(output, indent=2, ensure_ascii=False))
-        print(f"\nWrote JSON output to {json_out}")
+    json_out = Path(args.output_json)
+    json_out.parent.mkdir(parents=True, exist_ok=True)
+    output = {
+        "campaign": campaign_id,
+        "base_seed": base_seed,
+        "num_variations": len(json_docs),
+        "variations": json_docs,
+    }
+    json_out.write_text(_json.dumps(output, indent=2, ensure_ascii=False))
+    print(f"\nWrote JSON output to {json_out}")
 
 
 def main() -> None:
@@ -573,7 +629,7 @@ def main() -> None:
         print(f"LLM call log: {log_path}")
 
     if args.generate:
-        run_generate(args)
+        asyncio.run(run_generate(args))
         return
 
     from harness import load_all_attacks

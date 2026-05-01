@@ -199,32 +199,35 @@ Two modes:
 
 ### Generate mode (create attack specs):
 ```bash
-# Basic generation
-python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10
-
-# With style variations (all 10 styles)
-python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --stylize
+# Basic generation (templates by default — no Haiku calls)
+python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --output-json out.json
 
 # With specific styles only
-python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --stylize --styles direct,sysadmin,ctf
+python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --style direct,sysadmin,ctf --output-json out.json
 
-# With LLM fragmentation + stylization + legitimization
-python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --fragment --stylize --legitimize
+# With Haiku LLM rephrasing instead of templates
+python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --no-style-templates --output-json out.json
+
+# With LLM fragmentation + legitimization
+python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --fragment --legitimize --output-json out.json
+
+# Also emit per-variation TOMLs (opt-in)
+python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --output-json out.json --output-toml attacks/
 
 # Dry run (print prompts, no API calls, no files written)
-python run.py --generate --seed-file seeds/promptsteal.json --num-variations 1 --stylize --dry-run
+python run.py --generate --seed-file seeds/promptsteal.json --num-variations 1 --output-json out.json --dry-run
 ```
 
 ### Evaluate mode (test models):
 ```bash
 # Evaluate against Claude
-python run.py --model claude --campaign PROMPTSTEAL --judge --output results.json
+python run.py --evaluate --model claude --campaign PROMPTSTEAL --judge --output results.json
 
 # Evaluate against Qwen
-python run.py --model qwen --campaign PROMPTSTEAL --judge --output results.json
+python run.py --evaluate --model qwen --campaign PROMPTSTEAL --judge --output results.json
 
 # Dry run (print prompts without calling model)
-python run.py --model claude --campaign PROMPTSTEAL --dry-run
+python run.py --evaluate --model claude --campaign PROMPTSTEAL --dry-run
 ```
 
 ### All CLI flags:
@@ -243,7 +246,7 @@ python run.py --model claude --campaign PROMPTSTEAL --dry-run
 | `--seed <n>` | gen | Base seed for reproducibility |
 | `--fragment` | gen | LLM split into sub-steps |
 | `--stylize` | gen | Rephrase into 10 styles |
-| `--styles <list>` | gen | Filter styles (e.g. `direct,sysadmin,ctf`) |
+| `--style <list>` | both | Filter styles (e.g. `direct,sysadmin,ctf`) |
 | `--legitimize` | gen | LLM add cover stories |
 
 ---
