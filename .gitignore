@@ -9,6 +9,6 @@ build/
 .DS_Store
 .mcp-run/*
 *.log
-logs
+logs/*.jsonl
 *.lock
 /key.txt

@@ -11,7 +11,7 @@ function renderFragmentRows(fragments) {
           return `
           <div class="panel" style="margin-bottom:0.5rem">
             <div class="panel-header">
-              <span>Stage ${f.index}</span>
+              <span>Fragment ${f.index}</span>
               <span>
                 <span class="badge badge-tactic">${escapeHtml(f.mitre_tactic || "")}</span>
                 ${escapeHtml(f.mitre_technique || "")}

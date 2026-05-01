@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FragBench Graph Viewer</title>
+  <link rel="stylesheet" href="./assets/css/base.css">
+  <link rel="stylesheet" href="./assets/css/components.css">
+</head>
+<body>
+  <nav class="topbar">
+    <div class="topbar-left">
+      <div class="logo">FRAGBENCH</div>
+      <div class="view-tabs" role="tablist" aria-label="Viewer tabs">
+        <a class="view-tab" href="./index.html" data-view-tab="live">Live</a>
+        <a class="view-tab active" href="./graph.html" data-view-tab="graph" aria-current="page">Graph</a>
+      </div>
+    </div>
+    <div class="controls">
+      <label class="ctrl-label" for="graph-fragments-selector">Fragments</label>
+      <select id="graph-fragments-selector" title="Filter runs by fragments JSON file"></select>
+      <select id="graph-run-selector"></select>
+      <button id="graph-refresh-btn">Refresh</button>
+    </div>
+  </nav>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-group open">
+        <div class="sidebar-header"><span class="chevron">▾</span> RUN SUMMARY</div>
+        <div class="sidebar-body" id="graph-run-summary"></div>
+      </div>
+      <div class="sidebar-group open">
+        <div class="sidebar-header"><span class="chevron">▾</span> VARIATIONS</div>
+        <div class="sidebar-body" id="graph-sidebar-list"></div>
+      </div>
+    </aside>
+    <main class="content">
+      <section id="graph-dag-canonical" class="dag-canonical-section"></section>
+      <section id="graph-view"></section>
+    </main>
+  </div>
+
+  <script type="module" src="./assets/js/graph.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "run_id": "attack_20260501_183957_ec619c",
+  "campaign": "promptsteal",
+  "style": "direct",
+  "fragments_path": "/app/results/promptsteal_fragments.json",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "started_at": "2026-05-01T18:39:57.861492+00:00",
+  "target_model": "anthropic/claude-sonnet-4-6",
+  "target_backend": "openrouter",
+  "llm_product": "openrouter:anthropic/claude-sonnet-4-6",
+  "judge_model": "anthropic/claude-haiku-4.5",
+  "status": "running"
+}

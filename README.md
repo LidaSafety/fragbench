@@ -212,6 +212,159 @@ ls attacks/*.toml
 make docker-status
 ```
 
+---
+
+### Option C — Graph attack runner (Docker-only)
+
+Higher-throughput flow for evaluating many seeds from a precomputed fragments JSON file (e.g. `results/promptsteal_fragments.json`). Picks one variation per `(seed, style)` deterministically, schedules each variation through the MCP following its `produces`/`consumes` DAG, evaluates each fragment with the same LLM-as-judge framework as Option B, and writes a graph_format-shaped report plus a `[true, false, true, ...]` pass vector.
+
+This flow runs entirely inside the existing Docker stack — there is no bare-metal alternative.
+
+#### Prerequisites
+
+Same as **Option B**:
+
+- Docker Desktop installed and running.
+- Ollama running on the host (for the default `MODEL_BACKEND=ollama`), or `OPENROUTER_API_KEY` exported (for `MODEL_BACKEND=openrouter`).
+- A fragments JSON file with the artifact-linked schema (an example is shipped at `results/promptsteal_fragments.json`).
+
+#### 1. Start the stack
+
+```bash
+docker compose up -d
+```
+
+This is the same stack `make docker-up` brings up for Option B. The new piece is that `mcp-client` now mounts `./results` read-write so the runner can persist outputs there, and the `viewer` mounts it read-only so the new graph page can read them.
+
+#### 2. Run a graph attack
+
+```bash
+make docker-attack-graph-run \
+  FRAGMENTS=results/promptsteal_fragments.json \
+  STYLE=direct \
+  SEEDS=0-9 \
+  MAX_PARALLEL_VARIATIONS=4 \
+  MAX_PARALLEL_FRAGMENTS=2
+```
+
+This launches one ephemeral `mcp-client` container, which then spawns one `mcp_cli.py` subprocess per fragment inside that same container while honouring produces/consumes ordering and the parallelism caps. The default `MCP_MODEL_BACKEND=ollama` requires a host Ollama daemon (see Option B); to skip Ollama entirely, use OpenRouter as the target backend (next).
+
+> **Two LLMs, two distinct knobs.** Don't confuse the model under test with the evaluator:
+>
+> | Knob | Role | Default |
+> |---|---|---|
+> | `MCP_MODEL_BACKEND` / `MCP_MODEL` | **Target** LLM driving the MCP agent (the model under test) | `ollama` / `huihui_ai/qwen3.5-abliterated:35b` |
+> | `JUDGE_BACKEND` / `JUDGE_MODEL` | **Evaluator** LLM that classifies the target's output (only used when `JUDGE=1`) | `openrouter` / `anthropic/claude-haiku-4.5` |
+>
+> Legacy aliases `MODEL_BACKEND` / `MODEL` still work but are ambiguous — prefer the `MCP_*` spelling.
+
+#### 2b. Run without Ollama (OpenRouter target)
+
+The runner forwards `MCP_MODEL_BACKEND` and `MCP_MODEL` straight through to `mcp_cli.py`, so you can drive the attack against any OpenRouter-hosted target model without touching Ollama. `OPENROUTER_API_KEY` is the only secret required, no host-side daemons are needed:
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+make docker-attack-graph-run \
+  FRAGMENTS=results/promptsteal_fragments.json \
+  STYLE=direct \
+  SEEDS=0-2 \
+  MCP_MODEL_BACKEND=openrouter \
+  MCP_MODEL=anthropic/claude-sonnet-4-6 \
+  JUDGE=1 \
+  JUDGE_MODEL=anthropic/claude-haiku-4.5
+```
+
+In this example the **target** LLM (the one being evaluated) is `claude-sonnet-4-6`, and the **judge** is the cheaper `claude-haiku-4.5`. Ollama is not contacted. Both models are recorded in the output files (`target_model`, `target_backend`, `judge_model`) and shown in the graph viewer as the **Target LLM** and **Judge LLM** chips.
+
+| Make variable | Meaning | Default |
+|---------------|---------|---------|
+| `FRAGMENTS` | Path to the fragments JSON | `results/promptsteal_fragments.json` |
+| `STYLE` | One style: `direct`, `command_form`, `sysadmin`, `developer`, `educational`, `ctf`, `compliance_audit`, `oblique_technical`, `hidden_intent`, `helpdesk` | `direct` |
+| `SEEDS` | Seed spec: `0`, `0,2,4`, `0-9`, or `0-3,7,12-14`. Empty = all seeds in the file | (all) |
+| `MAX_PARALLEL_VARIATIONS` | Concurrent variations | `2` |
+| `MAX_PARALLEL_FRAGMENTS` | Concurrent fragments per variation (DAG-aware) | `2` |
+| `MCP_MODEL_BACKEND` | Target backend: `ollama`, `openrouter`, or `vllm` | `ollama` |
+| `MCP_MODEL` | Target model id (the model under test) | `huihui_ai/qwen3.5-abliterated:35b` |
+| `JUDGE` | `1` enables the LLM-as-judge for both per-response and per-fragment classification | `0` |
+| `JUDGE_BACKEND` | Evaluator backend: `openrouter` or `anthropic` | `openrouter` |
+| `JUDGE_MODEL` | Evaluator model id | `anthropic/claude-haiku-4.5` |
+| `ATTACK_RUN_ID` | Override the generated run id | (auto) |
+| (legacy) `MODEL_BACKEND`, `MODEL` | Aliases for `MCP_MODEL_BACKEND`, `MCP_MODEL` | — |
+
+#### 2a. Enable LLM-as-judge
+
+The judge configuration is identical to **Option B**'s `JUDGE=1` flow — same backend, same model, same env vars (`OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`). When `JUDGE=1` is set:
+
+1. Each per-fragment session is judged for compliance (mcp_cli.py `--judge`, written into the session JSONL as a `verdict` event), and
+2. Each fragment is **also** judged for *tool-sequence realisation* using `attack_success.llm_judge_fragment` — the judge reads the actual tool calls the agent issued and decides whether they perform the requested action.
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+make docker-attack-graph-run \
+  FRAGMENTS=results/promptsteal_fragments.json \
+  STYLE=direct \
+  SEEDS=0 \
+  JUDGE=1 \
+  JUDGE_MODEL=anthropic/claude-haiku-4.5 \
+  JUDGE_BACKEND=openrouter
+```
+
+If `JUDGE=1` but no API key is reachable, the runner automatically falls back to a deterministic keyword-based check. Without `JUDGE=1` the keyword classifier is the default.
+
+#### 3. View the results
+
+Open **http://localhost:8787** in your browser. Two pages are now linked from the topbar:
+
+- `index.html` — existing live trace viewer; each trace is annotated with its `seed`, `style`, and a green/red pass dot once the run finishes.
+- `graph.html` — new graph-format browser that lists each variation's pass/fail vector, phase ordering, fragment-by-fragment `tools_executed`, and the judge's justification.
+
+```bash
+# Deep-link to a specific run id:
+open "http://localhost:8787/graph.html?run=<run_id>"
+```
+
+#### 4. Output files (under `./results/runs/`)
+
+Each run writes **two files per seed** (mounted to the host so they survive `docker compose down`). Filenames carry the run datetime, run id, seed, and campaign so individual variations are easy to grep, diff, or move around:
+
+| File | Contents |
+|------|----------|
+| `attack_<DATETIME>_<RUNID>_seed_<SEED>_<CAMPAIGN>.json` | **Chain** summary for one seed: ordered fragment list with prompts, `produces` / `consumes`, and per-fragment `passed` / `verdict` / `justification`. Small and JSON-greppable; no tool executions or response previews. |
+| `attack_graph_<DATETIME>_<RUNID>_seed_<SEED>_<CAMPAIGN>.json` | **Graph** detail for one seed: graph_format-shaped variation entry with `phases_in_order`, `tools_executed: [["write_file", "invite.txt"], ...]`, the judge `verdict` + `justification`, and `passed: true/false` per fragment. |
+
+For example, a 3-seed run produces six files like:
+
+```
+attack_20260501_191500_6ad579_seed_0_PROMPTSTEAL_0.json
+attack_20260501_191500_6ad579_seed_1_PROMPTSTEAL_1.json
+attack_20260501_191500_6ad579_seed_2_PROMPTSTEAL_2.json
+attack_graph_20260501_191500_6ad579_seed_0_PROMPTSTEAL_0.json
+attack_graph_20260501_191500_6ad579_seed_1_PROMPTSTEAL_1.json
+attack_graph_20260501_191500_6ad579_seed_2_PROMPTSTEAL_2.json
+```
+
+A variation is `passed=true` only when **every** fragment passes. The viewer groups all per-seed files for a run under a single row in `graph.html` and reassembles the legacy `{variations: [...]}` shape internally; older `<run_id>_graph.json` / `<run_id>_passes.json` runs continue to load unchanged.
+
+#### 5. Tear down
+
+```bash
+docker compose down
+```
+
+#### Programmatic picker
+
+The deterministic picker is importable inside the container (or on the host with the project on `PYTHONPATH`):
+
+```python
+from attack_picker import pick_attack
+
+attack = pick_attack("results/promptsteal_fragments.json", seed=42, style="sysadmin")
+for f in attack.fragments:
+    print(f.index, f.role, f.produces, f.consumes, f.prompt[:80])
+```
+
+Same `(file, seed, style)` triple always returns the same `PickedAttack` — no randomness, no state, nothing to persist.
+
 ## Usage
 
 By default, `--evaluate` loads every generator-produced JSON file in `results/`. To eval specific files only, pass `--input-json` (repeatable). To fall back to TOML campaigns, pass `--attacks-dir <dir>`.

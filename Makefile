@@ -3,8 +3,38 @@ SHELL := /bin/bash
 UV ?= uv run
 PY ?= python3
 
-MODEL_BACKEND ?= ollama
-# Host Ollama (reachable from Docker via host.docker.internal on Mac/Windows Desktop)
+# ----------------------------------------------------------------------------
+# Model configuration — TWO independent LLMs are involved:
+#
+#   * MCP_MODEL_BACKEND / MCP_MODEL — the **target** LLM that drives the MCP
+#     agent loop (the model under test). This is what processes the attack
+#     prompt and decides which MCP tools to call.
+#
+#   * JUDGE_BACKEND / JUDGE_MODEL — the **evaluator** LLM that classifies the
+#     target's response (per-fragment success and per-response compliance).
+#     Defined further down with the JUDGE config block.
+#
+# Legacy aliases MODEL_BACKEND / MODEL are still accepted for back-compat
+# with existing targets and shell scripts.
+# ----------------------------------------------------------------------------
+
+MCP_MODEL_BACKEND ?= $(or $(MODEL_BACKEND),ollama)
+
+ifeq ($(MCP_MODEL_BACKEND),ollama)
+_DEFAULT_MCP_MODEL := huihui_ai/qwen3.5-abliterated:35b
+else ifeq ($(MCP_MODEL_BACKEND),vllm)
+_DEFAULT_MCP_MODEL := huihui-ai/Huihui-Qwen3.5-35B-A3B-abliterated
+else
+_DEFAULT_MCP_MODEL := anthropic/claude-haiku-4.5
+endif
+
+MCP_MODEL ?= $(or $(MODEL),$(_DEFAULT_MCP_MODEL))
+
+# Legacy aliases (set unconditionally so recipes that still reference $(MODEL)
+# / $(MODEL_BACKEND) keep working; users may pass either spelling on the CLI).
+MODEL_BACKEND := $(MCP_MODEL_BACKEND)
+MODEL := $(MCP_MODEL)
+
 OLLAMA_BASE_URL ?= http://host.docker.internal:11434
 VLLM_BASE_URL ?= http://127.0.0.1:8000/v1
 VLLM_API_KEY ?= EMPTY
@@ -21,14 +51,6 @@ PID_DIR := .mcp-run
 SERVER_LOG_DIR := $(PID_DIR)/logs
 TOOLKIT_ENDPOINTS := http://127.0.0.1:8001/mcp http://127.0.0.1:8011/mcp http://127.0.0.1:8012/mcp http://127.0.0.1:8013/mcp http://127.0.0.1:8014/mcp
 
-ifeq ($(MODEL_BACKEND),ollama)
-MODEL ?= huihui_ai/qwen3.5-abliterated:35b
-else ifeq ($(MODEL_BACKEND),vllm)
-MODEL ?= huihui-ai/Huihui-Qwen3.5-35B-A3B-abliterated
-else
-MODEL ?= anthropic/claude-haiku-4.5
-endif
-
 FS_PID := $(PID_DIR)/filesystem.pid
 SHELL_PID := $(PID_DIR)/shell.pid
 ARCHIVE_PID := $(PID_DIR)/archive.pid
@@ -41,12 +63,12 @@ ARCHIVE_URL := http://127.0.0.1:8012/mcp
 EXFIL_URL := http://127.0.0.1:8013/mcp
 NETWORK_URL := http://127.0.0.1:8014/mcp
 
-.PHONY: help stack-up stack-up-all stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run chain-run clean-runtime
+.PHONY: help stack-up stack-up-all stack-down stack-status stack-ready maple-check maple-ready cli hello-run attack-run chain-run clean-runtime docker-attack-graph-run
 
 help:
 	@echo "Targets (bare-metal):"
 	@echo "  make stack-up       - Start 5 core MCP toolkit servers"
-	@echo "  make stack-up-all   - Start ALL 23 MCP toolkit servers"
+	@echo "  make stack-up-all   - Start ALL 24 MCP toolkit servers (incl. email)"
 	@echo "  make stack-down     - Stop all MCP toolkit servers"
 	@echo "  make stack-status   - Show server process status"
 	@echo "  make stack-ready    - Start stack and verify status"
@@ -65,6 +87,7 @@ help:
 	@echo "  make docker-cli        - Interactive MCP CLI inside container"
 	@echo "  make docker-attack-run - Single TOML stage/variation in container"
 	@echo "  make docker-chain-run  - Full TOML kill-chain in container (all stages/variations)"
+	@echo "  make docker-attack-graph-run - Run picked attacks from FRAGMENTS with parallel scheduler"
 	@echo ""
 	@echo "Targets (Docker dataset pipeline - TOML generation + eval):"
 	@echo "  make docker-dataset-up                  - Reminder: host Ollama at host.docker.internal:11434"
@@ -80,8 +103,15 @@ help:
 	@echo "  make docker-dataset-eval-claude         - Evaluate attacks/*.toml using Claude"
 	@echo "  make docker-dataset-eval-judge          - Evaluate using Qwen/Claude + LLM judge"
 	@echo ""
-	@echo "Config overrides (both bare-metal and Docker):"
-	@echo "  MODEL_BACKEND=$(MODEL_BACKEND) MODEL=$(MODEL) EXEC_MODE=$(EXEC_MODE)"
+	@echo "Model config — TWO independent LLMs:"
+	@echo "  MCP_MODEL_BACKEND=$(MCP_MODEL_BACKEND) MCP_MODEL=$(MCP_MODEL)"
+	@echo "      ^- the target LLM driving the MCP agent (the model under test)"
+	@echo "  JUDGE_BACKEND=$(JUDGE_BACKEND) JUDGE_MODEL=$(JUDGE_MODEL)"
+	@echo "      ^- the evaluator LLM (only used when JUDGE=1)"
+	@echo "  Legacy aliases: MODEL_BACKEND, MODEL still accepted."
+	@echo ""
+	@echo "Other config overrides:"
+	@echo "  EXEC_MODE=$(EXEC_MODE)"
 	@echo "  OLLAMA_BASE_URL=$(OLLAMA_BASE_URL) VLLM_BASE_URL=$(VLLM_BASE_URL)"
 	@echo "  ATTACK_TOML=$(ATTACK_TOML) ATTACK_STAGE=$(ATTACK_STAGE) ATTACK_VARIATION_INDEX=$(ATTACK_VARIATION_INDEX)"
 	@echo "  ATTACK_SEED=$(ATTACK_SEED) ATTACK_VARIATION_SEED=$(ATTACK_VARIATION_SEED)   # legacy dataset flow"
@@ -185,6 +215,7 @@ VULN_PID := $(PID_DIR)/vuln_scanner.pid
 AGENT_PID := $(PID_DIR)/agent_control.pid
 C2_PID := $(PID_DIR)/c2_callback.pid
 PROJECT_PID := $(PID_DIR)/project.pid
+EMAIL_PID := $(PID_DIR)/email.pid
 
 stack-up-all: stack-up $(PID_DIR)
 	$(call START_IF_NEEDED,http://127.0.0.1:8020/mcp,recon-osint,fragbench_mcp/servers/recon_osint/server.py --transport sse --port 8020,$(SERVER_LOG_DIR)/recon_osint.log,$(RECON_OSINT_PID))
@@ -205,8 +236,9 @@ stack-up-all: stack-up $(PID_DIR)
 	$(call START_IF_NEEDED,http://127.0.0.1:8035/mcp,agent-control,fragbench_mcp/servers/agent_control/server.py --transport sse --port 8035,$(SERVER_LOG_DIR)/agent_control.log,$(AGENT_PID))
 	$(call START_IF_NEEDED,http://127.0.0.1:8036/mcp,c2-callback,fragbench_mcp/servers/c2_callback/server.py --transport sse --port 8036,$(SERVER_LOG_DIR)/c2_callback.log,$(C2_PID))
 	$(call START_IF_NEEDED,http://127.0.0.1:8037/mcp,project,fragbench_mcp/servers/project/server.py --transport sse --port 8037,$(SERVER_LOG_DIR)/project.log,$(PROJECT_PID))
+	$(call START_IF_NEEDED,http://127.0.0.1:8038/mcp,email,fragbench_mcp/servers/email/server.py --transport sse --port 8038,$(SERVER_LOG_DIR)/email.log,$(EMAIL_PID))
 	@sleep 2
-	@echo "All 23 servers started."
+	@echo "All 24 servers started."
 
 cli:
 	@$(UV) $(PY) fragbench_mcp/mcp_cli.py \
@@ -308,6 +340,43 @@ chain-run: stack-ready
 
 clean-runtime:
 	@rm -rf "$(PID_DIR)"
+
+# =========================================================================
+# Graph attack runner (Docker-only)
+# =========================================================================
+# Picks attacks deterministically from a fragments JSON (e.g. results/promptsteal_fragments.json)
+# in a single style, runs each fragment via mcp_cli.py with hybrid topological parallelism,
+# evaluates produces/consumes via the LLM judge (when JUDGE=1) or a deterministic
+# keyword fallback, and writes both outputs to results/runs/:
+#   - <run_id>_seed_<seed>_<CAMPAIGN>.json
+#       per-seed chain summary (ordered fragments + verdicts, no tools)
+#   - attack_graph_<run_id_suffix>_seed_<seed>_<CAMPAIGN>.json
+#       per-seed graph_format-shaped detail with tools_executed
+#
+# Mirrors the Option B (docker-attack-run / docker-chain-run) flow: requires
+# `make docker-up` first. Forward JUDGE=1 to enable the LLM-as-judge for both
+# the per-response classifier (mcp_cli.py --judge) and the per-fragment success
+# check (attack_success.llm_judge_fragment).
+#
+# Config (mirrors docker-attack-run where applicable):
+#   FRAGMENTS=<path>             default: results/promptsteal_fragments.json
+#   STYLE=<style>                default: direct
+#   SEEDS=<spec>                 default: all (e.g. 0-9 or 0,1,5)
+#   MAX_PARALLEL_VARIATIONS=<n>  default: 2
+#   MAX_PARALLEL_FRAGMENTS=<n>   default: 2
+#   JUDGE=0|1                    default: 0 (uses keyword fallback)
+#   JUDGE_MODEL=<id>             default: anthropic/claude-haiku-4.5
+#   JUDGE_BACKEND=openrouter|anthropic   default: openrouter
+#   MODEL_BACKEND=ollama|openrouter|vllm default: ollama
+#   MODEL=<id>                   default: huihui_ai/qwen3.5-abliterated:35b
+#   ATTACK_RUN_ID=<id>           override generated run id
+
+FRAGMENTS ?= results/promptsteal_fragments.json
+STYLE ?= direct
+SEEDS ?=
+MAX_PARALLEL_VARIATIONS ?= 2
+MAX_PARALLEL_FRAGMENTS ?= 2
+ATTACK_RUN_ID ?=
 
 # =========================================================================
 # Docker-isolated equivalents
@@ -455,6 +524,48 @@ docker-chain-run: docker-ensure-up
 	echo "║  Run ID: $$RUN_ID"; \
 	echo "║  View: http://127.0.0.1:8787 → Load Latest or select run"; \
 	echo "╚══════════════════════════════════════════════════════════════╝"
+
+# -------------------------------------------------------------------------
+# Docker: Graph attack runner (Option C)
+# -------------------------------------------------------------------------
+# Two distinct LLMs are configurable here:
+#   * MCP_MODEL_BACKEND / MCP_MODEL   - target LLM driving the MCP agent
+#   * JUDGE_BACKEND     / JUDGE_MODEL - evaluator LLM (only used when JUDGE=1)
+# Legacy aliases MODEL_BACKEND / MODEL are still accepted (set near top of
+# Makefile so $(MODEL) and $(MCP_MODEL) always resolve to the same value).
+# Other knobs: FRAGMENTS, STYLE, SEEDS, MAX_PARALLEL_*, ATTACK_RUN_ID.
+docker-attack-graph-run: docker-ensure-up
+	@EFFECTIVE_MODEL="$(MCP_MODEL)"; \
+	if [ "$(MCP_MODEL_BACKEND)" = "ollama" ]; then \
+	  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
+	fi; \
+	echo "MCP target:  $(MCP_MODEL_BACKEND):$$EFFECTIVE_MODEL"; \
+	if [ "$(JUDGE)" = "1" ]; then echo "JUDGE LLM:   $(JUDGE_BACKEND):$(JUDGE_MODEL)"; \
+	else echo "JUDGE LLM:   (disabled — pass JUDGE=1 to enable)"; fi; \
+	echo "Run config:  FRAGMENTS=$(FRAGMENTS) STYLE=$(STYLE) SEEDS=$(SEEDS)"; \
+	$(DOCKER_COMPOSE) run --rm --build \
+		-e OPENROUTER_API_KEY \
+		-e OPENAI_API_KEY \
+		-e ANTHROPIC_API_KEY \
+		-e OLLAMA_BASE_URL="$(DOCKER_OLLAMA_URL)" \
+		-e VLLM_BASE_URL="$(DOCKER_VLLM_URL)" \
+		-e MCP_REGISTRY_PATH="$(DOCKER_REGISTRY_PATH)" \
+		-e MCP_SERVER_URL=http://server-filesystem:8001/mcp \
+		-e MCP_MODEL_BACKEND="$(MCP_MODEL_BACKEND)" \
+		-e MCP_MODEL="$$EFFECTIVE_MODEL" \
+		-e PYTHONUNBUFFERED=1 \
+		--entrypoint python \
+		mcp-client -u attack_runner.py \
+			--fragments "$(FRAGMENTS)" \
+			--style "$(STYLE)" \
+			$(if $(SEEDS),--seeds "$(SEEDS)",) \
+			--max-parallel-variations "$(MAX_PARALLEL_VARIATIONS)" \
+			--max-parallel-fragments "$(MAX_PARALLEL_FRAGMENTS)" \
+			--log-dir "$(LOG_DIR)" \
+			--mcp-arg=--model-backend --mcp-arg="$(MCP_MODEL_BACKEND)" \
+			--mcp-arg=--model --mcp-arg="$$EFFECTIVE_MODEL" \
+			$(if $(filter 1,$(JUDGE)),--judge --judge-model "$(JUDGE_MODEL)" --judge-backend "$(JUDGE_BACKEND)") \
+			$(if $(ATTACK_RUN_ID),--run-id "$(ATTACK_RUN_ID)",)
 
 # -------------------------------------------------------------------------
 # Docker: Run TOML prompts as MCP stages (Option B)
