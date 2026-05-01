@@ -25,6 +25,7 @@ import logging
 import sys
 from dataclasses import dataclass, field
 
+from variations.ad_discovery import AdDiscoveryVariation
 from variations.ai_phishing import AIPhishingVariation
 from variations.clickfix import ClickFixVariation
 from variations.coinbait import CoinbaitVariation
@@ -129,6 +130,7 @@ class StyledFragmentGroup:
 # ---------------------------------------------------------------------------
 
 VARIATION_REGISTRY: dict[str, type] = {
+    "ad_discovery":        AdDiscoveryVariation,
     "ai_phishing":         AIPhishingVariation,
     "clickfix_via_ai_chat": ClickFixVariation,
     "coinbait":            CoinbaitVariation,
