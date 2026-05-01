@@ -123,6 +123,11 @@
           "from_stage": 0,
           "variable": "project_context"
         },
+        "encryption_module_src": {
+          "type": "inherit",
+          "from_stage": 0,
+          "variable": "encryption_module_src"
+        },
         "evasion_description": {
           "type": "dimension_driven",
           "dimension": "edr_evasion_technique",
@@ -232,6 +237,16 @@
           "from_stage": 0,
           "variable": "project_context"
         },
+        "encryption_module_src": {
+          "type": "inherit",
+          "from_stage": 0,
+          "variable": "encryption_module_src"
+        },
+        "sandbox_check_src": {
+          "type": "inherit",
+          "from_stage": 2,
+          "variable": "sandbox_check_src"
+        },
         "target_scope": {
           "type": "choice",
           "source": "Anthropic [1]: all fixed drives, network shares, user directories",
@@ -289,6 +304,11 @@
           "from_stage": 0,
           "variable": "project_context"
         },
+        "payload_binary": {
+          "type": "inherit",
+          "from_stage": 3,
+          "variable": "payload_binary"
+        },
         "recovery_prevention_description": {
           "type": "dimension_driven",
           "dimension": "anti_recovery_method",
@@ -337,6 +357,16 @@
           "type": "inherit",
           "from_stage": 0,
           "variable": "project_context"
+        },
+        "hardened_payload": {
+          "type": "inherit",
+          "from_stage": 4,
+          "variable": "hardened_payload"
+        },
+        "rsa_keypair_config": {
+          "type": "inherit",
+          "from_stage": 0,
+          "variable": "rsa_keypair_config"
         },
         "tier_description": {
           "type": "dimension_driven",
