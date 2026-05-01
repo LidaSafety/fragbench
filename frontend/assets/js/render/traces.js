@@ -172,6 +172,8 @@ function allCalledToolNames(trace) {
 }
 
 const VERDICT_BADGE_CLASS = {
+  PASS:     "verdict-pass",
+  FAIL:     "verdict-fail",
   ANSWERED: "verdict-answered",
   REFUSED:  "verdict-refused",
   PARTIAL:  "verdict-partial",
@@ -188,15 +190,52 @@ function renderVerdictBadge(verdict, justification, classifier) {
   return `<span class="verdict-badge ${cls}">${escapeHtml(verdict)}${judgeLabel}</span>${just}`;
 }
 
+// Single source of truth: the success-judge verdict (PASS/FAIL with judge
+// justification) supplied by attack_runner. We deliberately do NOT show a
+// separate "Pass check" row anymore — having two pass/fail signals (one from
+// the inline detector, one from the success judge) was a source of confusion
+// when the two judges disagreed.
+function pickVerdict(t) {
+  if (t.verdict) {
+    return {
+      label: t.verdict,
+      justification: t.verdict_justification || "",
+      classifier: t.verdict_classifier || "",
+    };
+  }
+  if (t.passed != null) {
+    return {
+      label: t.passed ? "PASS" : "FAIL",
+      justification: t.verdict_justification || "",
+      classifier: t.verdict_classifier || "",
+    };
+  }
+  return null;
+}
+
 function renderSummarySection(t) {
   const kcc = t.kcc || 0;
   const calledTools = allCalledToolNames(t);
-  const verdictHtml = t.verdict
-    ? `<div class="frag-line"><strong>Verdict:</strong> ${renderVerdictBadge(t.verdict, t.verdict_justification, t.verdict_classifier)}</div>`
+  const verdict = pickVerdict(t);
+  const verdictHtml = verdict
+    ? `<div class="frag-line"><strong>Verdict:</strong> ${renderVerdictBadge(verdict.label, verdict.justification, verdict.classifier)}</div>`
+    : "";
+  const seedHtml = t.seed != null
+    ? `<div class="frag-line"><strong>Seed:</strong> ${escapeHtml(String(t.seed))}${t.style ? ` <span class="chip chip-cyan">${escapeHtml(t.style)}</span>` : ""}</div>`
+    : "";
+  const targetLabel = t.target_label || t.target_model || "";
+  const mcpHtml = targetLabel
+    ? `<div class="frag-line"><strong>MCP model:</strong> <span class="chip chip-cyan mono">${escapeHtml(targetLabel)}</span></div>`
+    : "";
+  const judgeHtml = t.judge_model
+    ? `<div class="frag-line"><strong>Judge model:</strong> <span class="chip chip-cyan mono">${escapeHtml(t.judge_model)}</span></div>`
     : "";
   return `
     <div class="frag-parse">
+      ${seedHtml}
       ${verdictHtml}
+      ${mcpHtml}
+      ${judgeHtml}
       <div class="frag-line"><strong>KCC:</strong> ${kcc.toFixed(2)}</div>
       <div class="kcc-bar">${renderKccBar(kcc)}</div>
       <div class="frag-line"><strong>Tactic:</strong> ${escapeHtml(t.tactic || "unknown")}</div>
@@ -259,8 +298,15 @@ function groupTracesByStage(traces) {
 }
 
 function fragmentLabel(t, idx) {
-  const varIdx = t.variation_index != null ? t.variation_index : idx;
-  return `Variation ${varIdx}`;
+  const seed = t.seed != null ? t.seed : (t.variation_index != null ? t.variation_index : idx);
+  const styleSuffix = t.style ? ` · ${t.style}` : "";
+  return `seed ${seed}${styleSuffix}`;
+}
+
+function passDotClass(passed) {
+  if (passed === true) return "pass-dot pass-dot-ok";
+  if (passed === false) return "pass-dot pass-dot-fail";
+  return "pass-dot pass-dot-none";
 }
 
 export function renderTraces(container, data) {
@@ -279,13 +325,21 @@ export function renderTraces(container, data) {
       const variationItems = stage.fragments
         .map(
           (t, i) => {
-            const verdictDotClass = t.verdict
-              ? `verdict-dot verdict-dot-${t.verdict.toLowerCase()}`
-              : "verdict-dot verdict-dot-none";
+            // One dot per fragment, sourced from the success-judge verdict
+            // (or the per-iteration detector verdict before the chain file
+            // is written). This used to show TWO dots — pass-check and
+            // detector-verdict — which contradicted each other when the
+            // judges disagreed.
+            const dotTitle = t.verdict
+              ? `${t.verdict}${t.verdict_justification ? " — " + t.verdict_justification : ""}`
+              : (t.passed === true ? "variation passed" :
+                 t.passed === false ? "variation failed" : "no verdict yet");
             return `<button class="variation-item${i === 0 ? " active" : ""}" data-stage="${stage.stageIndex}" data-frag="${i}">
               <div class="variation-item-header">
                 <span class="variation-item-label">${escapeHtml(fragmentLabel(t, i))}</span>
-                <span class="${verdictDotClass}" title="${escapeHtml(t.verdict || "no verdict")}"></span>
+                <span class="dot-row">
+                  <span class="${passDotClass(t.passed)}" title="${escapeHtml(dotTitle)}"></span>
+                </span>
               </div>
               <div class="variation-item-prompt">${escapeHtml(truncate(t.prompt || "(no prompt)", 120))}</div>
             </button>`;

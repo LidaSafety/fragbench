@@ -7,17 +7,28 @@ async function req(path, options = {}) {
   return data;
 }
 
-export async function fetchRuns() {
-  const payload = await req("/api/runs");
+function withFragments(path, fragmentsPath) {
+  if (!fragmentsPath) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}fragments=${encodeURIComponent(fragmentsPath)}`;
+}
+
+export async function fetchRuns({ fragmentsPath } = {}) {
+  const payload = await req(withFragments("/api/runs", fragmentsPath));
   return payload.runs || [];
 }
 
-export async function fetchLatestRun() {
-  return req("/api/run/latest");
+export async function fetchLatestRun({ fragmentsPath } = {}) {
+  return req(withFragments("/api/run/latest", fragmentsPath));
 }
 
-export async function fetchRunById(runId) {
-  return req(`/api/run/${encodeURIComponent(runId)}`);
+export async function fetchRunById(runId, { fragmentsPath } = {}) {
+  return req(withFragments(`/api/run/${encodeURIComponent(runId)}`, fragmentsPath));
+}
+
+export async function fetchFragmentsFiles() {
+  const payload = await req("/api/fragments-files");
+  return payload.files || [];
 }
 
 export async function normalizeUpload(payload) {

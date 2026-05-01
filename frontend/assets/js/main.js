@@ -1,16 +1,60 @@
-import { fetchLatestRun, fetchRunById, fetchRuns } from "./api/client.js";
+import { fetchFragmentsFiles, fetchLatestRun, fetchRunById, fetchRuns } from "./api/client.js";
 import { ensureRuntimeShape } from "./ingest/normalize.js";
 import { normalizeFromUpload } from "./ingest/upload.js";
 import { setActiveView, renderAll } from "./router.js";
 import { store } from "./state/store.js";
 import { byId, escapeHtml, toggleClass } from "./utils/dom.js";
 import { formatDuration } from "./utils/format.js";
+import { renderDag } from "./graph_dag.js";
+
+let _fragmentsPath = "";
+
+function getFragmentsParam() {
+  const params = new URLSearchParams(location.search);
+  return params.get("fragments") || "";
+}
+
+function setFragmentsParam(path) {
+  const params = new URLSearchParams(location.search);
+  if (path) params.set("fragments", path);
+  else params.delete("fragments");
+  const qs = params.toString();
+  const url = `${location.pathname}${qs ? `?${qs}` : ""}${location.hash}`;
+  history.replaceState(null, "", url);
+}
+
+function syncTabsHrefs(path) {
+  document.querySelectorAll(".view-tab").forEach((a) => {
+    const base = a.getAttribute("href").split("?")[0];
+    a.href = path ? `${base}?fragments=${encodeURIComponent(path)}` : base;
+  });
+}
+
+function renderPassStrip(passes) {
+  if (!Array.isArray(passes) || passes.length === 0) return "";
+  const cells = passes
+    .map((p, i) => `<span class="pass-cell pass-cell-${p ? "ok" : "fail"}" title="seed ${i}: ${p ? "PASS" : "FAIL"}"></span>`)
+    .join("");
+  return `<div class="pass-strip" title="${passes.length} variations">${cells}</div>`;
+}
 
 function updateRunSummary(data) {
   const run = data?.run || {};
+  const seedChip = run.style
+    ? `<span class="chip chip-cyan">style=${escapeHtml(run.style)}</span>`
+    : "";
+  const seedsChip = Array.isArray(run.seeds) && run.seeds.length
+    ? `<span class="chip">seeds=${run.seeds.length}</span>`
+    : "";
+  const passChip = Number.isFinite(run.num_passed) && Number.isFinite(run.num_variations) && run.num_variations > 0
+    ? `<span class="chip chip-green">pass ${run.num_passed}/${run.num_variations}</span>`
+    : "";
+
   byId("run-summary").innerHTML = `
     <div><strong>Attack:</strong> ${escapeHtml(run.attack_id || "n/a")}</div>
     <div><strong>Model:</strong> ${escapeHtml(run.model || "n/a")}</div>
+    ${seedChip || seedsChip || passChip ? `<div class="chip-row">${seedChip}${seedsChip}${passChip}</div>` : ""}
+    ${renderPassStrip(run.passes)}
     ${run.session_id ? `<div><strong>Session:</strong> <span class="mono">${escapeHtml(run.session_id)}</span></div>` : ""}
     ${run.source_ip ? `<div><strong>IP:</strong> <span class="mono">${escapeHtml(run.source_ip)}</span></div>` : ""}
     <div><strong>Events:</strong> ${run.events || 0}</div>
@@ -44,7 +88,7 @@ function populateSidebarItems(data) {
       seenStages.add(stageIdx);
       const stageTraces = traces.filter((x) => (x.fragment_index ?? x.step) === stageIdx);
       const totalCalls = stageTraces.reduce((s, x) => s + (x.total_tool_calls || (x.tool_calls || []).length), 0);
-      return `<button class="sidebar-stage" data-view="traces" data-stage="${stageIdx}">Stage ${stageIdx} \u2014 ${escapeHtml(t.tactic)} (${stageTraces.length} frag${stageTraces.length !== 1 ? "s" : ""}/${totalCalls}t)</button>`;
+      return `<button class="sidebar-stage" data-view="traces" data-stage="${stageIdx}">Fragment ${stageIdx} \u2014 ${escapeHtml(t.tactic)} (${stageTraces.length} variation${stageTraces.length !== 1 ? "s" : ""}/${totalCalls}t)</button>`;
     })
     .join("");
 
@@ -74,16 +118,35 @@ function populateSidebarItems(data) {
   });
 }
 
+function renderCanonicalDag(data) {
+  const host = byId("live-dag-canonical");
+  if (!host) return;
+  const fragments = data?.run?.dag_fragments || [];
+  if (!Array.isArray(fragments) || fragments.length === 0) {
+    host.classList.add("hidden");
+    host.innerHTML = "";
+    return;
+  }
+  host.classList.remove("hidden");
+  const campaign = data?.run?.campaign || data?.run?.attack_id || "";
+  const style = data?.run?.style || "";
+  host.innerHTML = renderDag(fragments, {
+    title: `Fragment dependency DAG — ${campaign}${style ? ` / ${style}` : ""} (${fragments.length} fragments)`,
+    showStatus: false,
+  });
+}
+
 function setData(data) {
   const shaped = ensureRuntimeShape(data);
   store.set({ data: shaped });
   renderAll(shaped);
   updateRunSummary(shaped);
   populateSidebarItems(shaped);
+  renderCanonicalDag(shaped);
 }
 
 async function loadRuns() {
-  const runs = await fetchRuns();
+  const runs = await fetchRuns({ fragmentsPath: _fragmentsPath });
   store.set({ runs });
   const selector = byId("run-selector");
   const seen = new Set();
@@ -94,19 +157,67 @@ async function loadRuns() {
     const label = r.run_id ? `[chain] ${r.run_id} (${r.id})` : r.id;
     options.push(`<option value="${r.id}">${label}</option>`);
   }
-  selector.innerHTML = options.join("");
+  selector.innerHTML = options.length
+    ? options.join("")
+    : `<option value="">(no runs for this fragments file)</option>`;
 }
 
 async function loadLatest() {
-  const data = await fetchLatestRun();
-  setData(data);
+  try {
+    const data = await fetchLatestRun({ fragmentsPath: _fragmentsPath });
+    setData(data);
+  } catch (err) {
+    // No sessions yet for the selected fragments file; clear the panel.
+    if (String(err.message).includes("no session logs") || String(err.message).includes("404")) {
+      const host = byId("live-dag-canonical");
+      if (host) { host.classList.add("hidden"); host.innerHTML = ""; }
+      return;
+    }
+    throw err;
+  }
 }
 
 async function loadSelectedRun() {
   const id = byId("run-selector").value;
   if (!id) return;
-  const data = await fetchRunById(id);
+  const data = await fetchRunById(id, { fragmentsPath: _fragmentsPath });
   setData(data);
+}
+
+async function loadFragmentsFiles() {
+  const files = await fetchFragmentsFiles();
+  const selector = byId("fragments-selector");
+  if (!selector) return files;
+  if (files.length === 0) {
+    selector.innerHTML = `<option value="">(all session files)</option>`;
+    return files;
+  }
+  const opts = [
+    `<option value="">(all session files)</option>`,
+    ...files.map(
+      (f) => `<option value="${escapeHtml(f.path)}">${escapeHtml(f.basename)} · ${f.run_count} run${f.run_count === 1 ? "" : "s"}</option>`,
+    ),
+  ];
+  selector.innerHTML = opts.join("");
+  // Pick: existing URL param, else most recent file (newest by run mtime).
+  const wanted = getFragmentsParam();
+  const matched = wanted && files.some((f) => f.path === wanted) ? wanted : files[0].path;
+  selector.value = matched;
+  _fragmentsPath = matched;
+  setFragmentsParam(matched);
+  syncTabsHrefs(matched);
+  return files;
+}
+
+async function onFragmentsChange() {
+  const selector = byId("fragments-selector");
+  if (!selector) return;
+  _fragmentsPath = selector.value || "";
+  setFragmentsParam(_fragmentsPath);
+  syncTabsHrefs(_fragmentsPath);
+  await loadRuns();
+  await loadLatest();
+  _lastRunListSnapshot = (store.state.runs || []).map((r) => r.id).join(",");
 }
 
 function bindSidebarSections() {
@@ -155,7 +266,7 @@ const POLL_SLOW = 60_000;
 
 async function _poll() {
   try {
-    const runs = await fetchRuns();
+    const runs = await fetchRuns({ fragmentsPath: _fragmentsPath });
     const snapshot = runs.map((r) => r.id).join(",");
     const hasNewRuns = snapshot !== _lastRunListSnapshot;
 
@@ -187,7 +298,7 @@ async function _poll() {
       const selector = byId("run-selector");
       const current = selector.value;
       if (current) {
-        const data = await fetchRunById(current);
+        const data = await fetchRunById(current, { fragmentsPath: _fragmentsPath });
         setData(data);
       }
       _pollInterval = runs.length > 0 ? POLL_SLOW : POLL_FAST;
@@ -202,9 +313,14 @@ async function init() {
   bindSidebarSections();
   bindNavigation();
   bindUpload();
-  byId("refresh-runs-btn").addEventListener("click", loadRuns);
+  byId("refresh-runs-btn").addEventListener("click", async () => {
+    await loadFragmentsFiles();
+    await loadRuns();
+  });
   byId("load-latest-btn").addEventListener("click", loadLatest);
   byId("run-selector").addEventListener("change", loadSelectedRun);
+  byId("fragments-selector").addEventListener("change", onFragmentsChange);
+  await loadFragmentsFiles();
   await loadRuns();
   await loadLatest();
   // Seed the snapshot so the first poll doesn't trigger a spurious reload.

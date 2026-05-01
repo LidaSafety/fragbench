@@ -48,13 +48,16 @@ class ConversationLogger:
         session_id: Optional[str] = None,
         stage_index: Optional[int] = None,
         variation_index: Optional[int] = None,
+        style: Optional[str] = None,
         judge: bool = False,
         judge_model: str = "anthropic/claude-haiku-4.5",
         judge_backend: str = "openrouter",
         judge_api_key: Optional[str] = None,
     ):
         log_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Microsecond-precision timestamp avoids filename collisions when
+        # multiple subprocesses (e.g. attack_runner) launch concurrently.
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         self.path = log_dir / f"session_{ts}.jsonl"
         self.model = model
         self.server = server
@@ -89,6 +92,7 @@ class ConversationLogger:
             "session_id": self.external_session_id,
             "stage_index": stage_index,
             "variation_index": variation_index,
+            "style": style,
         })
 
     def _emit(self, event: str, data: Dict[str, Any]) -> None:
@@ -518,6 +522,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--session-id", default=None, help="External session id for this run.")
     p.add_argument("--stage-index", type=int, default=None, help="TOML fragment/stage index for this run.")
     p.add_argument("--variation-index", type=int, default=None, help="Variation index within the stage.")
+    p.add_argument("--style", default=None, help="Style of the picked variation (e.g. direct, sysadmin).")
     p.add_argument("--judge", action="store_true", help="Run LLM-as-judge after each variation (background thread).")
     p.add_argument("--judge-model", default="anthropic/claude-haiku-4.5", help="Model id for LLM judge (OpenRouter format by default).")
     p.add_argument("--judge-backend", choices=["openrouter", "anthropic"], default="openrouter", help="Backend for LLM judge (default: openrouter).")
@@ -565,6 +570,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
             server=args.server_name,
             stage_index=args.stage_index,
             variation_index=args.variation_index,
+            style=args.style,
             run_id=args.run_id,
             campaign=args.campaign,
             attack_id=args.attack_id,

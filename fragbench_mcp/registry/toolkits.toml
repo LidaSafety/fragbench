@@ -227,3 +227,13 @@ tags = ["dev", "project"]
 attack_tags = ["extras"]
 execution_modes = ["simulated", "bounded_real"]
 tool_prefix = "project"
+
+[[toolkit]]
+id = "email_toolkit"
+description = "Email composition and (simulated) delivery; never makes real SMTP calls."
+transport = "sse"
+endpoint = "http://127.0.0.1:8038/mcp"
+tags = ["email", "dispatch", "initial_access"]
+attack_tags = []
+execution_modes = ["simulated"]
+tool_prefix = "email"

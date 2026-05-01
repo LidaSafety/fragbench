@@ -32,6 +32,62 @@ LOGS_DIR = REPO_ROOT / "logs"
 SEEDS_DIR = REPO_ROOT / "seeds"
 ATTACKS_DIR = REPO_ROOT / "attacks"
 MCP_LOGS_DIR = REPO_ROOT / "mcp" / "logs"
+RESULTS_RUNS_DIR = REPO_ROOT / "results" / "runs"
+
+
+# Output file naming (per-seed):
+#   chain : ``<run_id>_seed_<seed>_<CAMPAIGN>.json``                where run_id starts with ``attack_``
+#   graph : ``attack_graph_<run_id_minus_attack_prefix>_seed_<seed>_<CAMPAIGN>.json``
+#
+# Legacy (single file per run) naming we still understand for back-compat:
+#   ``<run_id>_passes.json``
+#   ``<run_id>_graph.json``
+_CHAIN_FILE_RE = re.compile(
+    r"^(?P<run_id>attack_(?!graph_)[A-Za-z0-9._-]+?)_seed_(?P<seed>-?\d+)_(?P<campaign>[A-Za-z0-9._-]+)\.json$"
+)
+_GRAPH_FILE_RE = re.compile(
+    r"^attack_graph_(?P<runid_suffix>[A-Za-z0-9._-]+?)_seed_(?P<seed>-?\d+)_(?P<campaign>[A-Za-z0-9._-]+)\.json$"
+)
+
+
+def _parse_chain_filename(p: Path) -> tuple[str, int, str] | None:
+    m = _CHAIN_FILE_RE.match(p.name)
+    if not m:
+        return None
+    try:
+        return m.group("run_id"), int(m.group("seed")), m.group("campaign")
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_graph_filename(p: Path) -> tuple[str, int, str] | None:
+    m = _GRAPH_FILE_RE.match(p.name)
+    if not m:
+        return None
+    try:
+        return f"attack_{m.group('runid_suffix')}", int(m.group("seed")), m.group("campaign")
+    except (ValueError, TypeError):
+        return None
+
+
+def _list_chain_files() -> list[Path]:
+    if not RESULTS_RUNS_DIR.exists():
+        return []
+    return [p for p in RESULTS_RUNS_DIR.glob("*.json") if _parse_chain_filename(p) is not None]
+
+
+def _list_graph_files() -> list[Path]:
+    if not RESULTS_RUNS_DIR.exists():
+        return []
+    return [p for p in RESULTS_RUNS_DIR.glob("attack_graph_*.json") if _parse_graph_filename(p) is not None]
+
+
+def _chain_files_for_run(run_id: str) -> list[Path]:
+    return [p for p in _list_chain_files() if (parsed := _parse_chain_filename(p)) and parsed[0] == run_id]
+
+
+def _graph_files_for_run(run_id: str) -> list[Path]:
+    return [p for p in _list_graph_files() if (parsed := _parse_graph_filename(p)) and parsed[0] == run_id]
 
 
 @dataclass(frozen=True)
@@ -150,7 +206,157 @@ def parse_attack_toml_minimal(text: str) -> dict[str, Any]:
 
 
 def list_session_files() -> list[Path]:
-    return sorted(LOGS_DIR.glob("session_*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+    """Return every ``session_*.jsonl`` under ``logs/`` and ``logs/<run_id>/``.
+
+    ``attack_runner`` defaults to writing each execution's session files into
+    its own ``logs/<run_id>/`` subdirectory so historical data can never leak
+    between runs. Older one-off runs (``mcp_cli.py`` invoked directly) still
+    drop their files at the top level — we pick up both.
+    """
+    return sorted(
+        list(LOGS_DIR.glob("session_*.jsonl"))
+        + list(LOGS_DIR.glob("*/session_*.jsonl")),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def _graph_run_index() -> dict[str, dict[str, Any]]:
+    """{run_id -> {fragments_path, mtime, ...}} for every known attack run.
+
+    Sources, in *increasing* authority (later sources overwrite earlier):
+
+    1. ``<run_id>_meta.json`` — written by ``attack_runner`` at run **start**,
+       before any per-seed graph file has been flushed. Lets the live viewer
+       associate in-progress runs with their fragments file so the fragments
+       filter does not silently drop them.
+    2. Legacy ``<run_id>_graph.json`` — single-file pre-per-seed runs.
+    3. Per-seed ``attack_graph_<...>_seed_<seed>_<CAMPAIGN>.json`` files.
+    """
+    if not RESULTS_RUNS_DIR.exists():
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+
+    # 1. Meta markers (in-progress runs and finished runs alike).
+    for f in RESULTS_RUNS_DIR.glob("*_meta.json"):
+        run_id = f.name[: -len("_meta.json")]
+        try:
+            payload = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        out[run_id] = {
+            "fragments_path": payload.get("fragments_path"),
+            "campaign": payload.get("campaign"),
+            "style": payload.get("style"),
+            "mtime": f.stat().st_mtime,
+            "status": payload.get("status"),
+        }
+
+    # 2. Per-seed graph files (preferred when both exist).
+    for f in _list_graph_files():
+        parsed = _parse_graph_filename(f)
+        if parsed is None:
+            continue
+        run_id, _seed, _campaign = parsed
+        try:
+            payload = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        bucket = out.setdefault(
+            run_id,
+            {
+                "fragments_path": payload.get("fragments_path"),
+                "campaign": payload.get("campaign"),
+                "style": payload.get("style"),
+                "mtime": 0.0,
+            },
+        )
+        # Prefer the freshest file's metadata; track the newest mtime across seeds.
+        mtime = f.stat().st_mtime
+        if mtime > float(bucket.get("mtime") or 0):
+            bucket["fragments_path"] = payload.get("fragments_path") or bucket.get("fragments_path")
+            bucket["campaign"] = payload.get("campaign") or bucket.get("campaign")
+            bucket["style"] = payload.get("style") or bucket.get("style")
+            bucket["mtime"] = mtime
+
+    # 3. Legacy layout: one monolithic ``<run_id>_graph.json`` for the whole run.
+    for f in RESULTS_RUNS_DIR.glob("*_graph.json"):
+        # Skip new-style files (they also match this glob but parse as graph filenames).
+        if _parse_graph_filename(f) is not None:
+            continue
+        run_id = f.name[: -len("_graph.json")]
+        try:
+            payload = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        bucket = out.setdefault(
+            run_id,
+            {
+                "fragments_path": payload.get("fragments_path"),
+                "campaign": payload.get("campaign"),
+                "style": payload.get("style"),
+                "mtime": 0.0,
+            },
+        )
+        mtime = f.stat().st_mtime
+        if mtime >= float(bucket.get("mtime") or 0):
+            bucket["fragments_path"] = payload.get("fragments_path") or bucket.get("fragments_path")
+            bucket["campaign"] = payload.get("campaign") or bucket.get("campaign")
+            bucket["style"] = payload.get("style") or bucket.get("style")
+            bucket["mtime"] = mtime
+    return out
+
+
+def list_fragments_files() -> list[dict[str, Any]]:
+    """Distinct fragments files seen across graph runs, newest run first.
+
+    Each entry: ``{path, basename, run_count, latest_mtime}``.
+    """
+    idx = _graph_run_index()
+    grouped: dict[str, dict[str, Any]] = {}
+    for run_id, meta in idx.items():
+        path = meta.get("fragments_path") or ""
+        if not path:
+            continue
+        bucket = grouped.setdefault(
+            path,
+            {"path": path, "basename": Path(path).name, "run_count": 0, "latest_mtime": 0.0},
+        )
+        bucket["run_count"] += 1
+        bucket["latest_mtime"] = max(bucket["latest_mtime"], float(meta.get("mtime") or 0))
+    out = list(grouped.values())
+    out.sort(key=lambda x: x.get("latest_mtime") or 0, reverse=True)
+    for item in out:
+        ts = item.pop("latest_mtime", 0.0)
+        item["latest_iso"] = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat() if ts else None
+    return out
+
+
+def _filter_session_files_by_fragments(
+    files: list[Path],
+    fragments_path: str,
+) -> list[Path]:
+    """Drop session files whose run_id does not point at *fragments_path*."""
+    if not fragments_path:
+        return files
+    idx = _graph_run_index()
+    wanted = str(fragments_path)
+    wanted_basename = Path(wanted).name
+    out: list[Path] = []
+    for f in files:
+        rid = _extract_run_id(f)
+        if not rid:
+            # Sessions without run_id predate attack_runner; hide them when a
+            # fragments filter is active so the dropdown only contains runs
+            # tied to the selected file.
+            continue
+        meta = idx.get(rid)
+        if not meta:
+            continue
+        run_path = str(meta.get("fragments_path") or "")
+        if run_path == wanted or Path(run_path).name == wanted_basename:
+            out.append(f)
+    return out
 
 
 def load_mcp_log_summaries() -> list[dict[str, Any]]:
@@ -307,15 +513,17 @@ def _ms_between(start_iso: str | None, end_iso: str | None) -> int | None:
 
 def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
-    Group runtime logs into query-level records.
+    Group runtime logs into query-level records, **per session_id**.
 
-    A single user query can span multiple iterations (tool call round-trips).
-    We merge those iterations into one query flow so the UI can show:
-    user -> intermediary assistant/tooling -> final assistant.
+    A single attack_runner run produces N concurrent ``mcp_cli`` subprocesses
+    (one per (seed, fragment)), each writing its own ``session_*.jsonl``.
+    When the viewer loads a run it merges all those files and sorts events by
+    timestamp. That means events from different sessions interleave — so any
+    state machine that tracks a single ``current_query`` will mis-attribute
+    iteration data the moment two fragments overlap. We instead key all per-run
+    state on the event's ``session_id`` so each fragment's prompt, tool calls,
+    results and verdict stay welded together.
     """
-    queries: list[dict[str, Any]] = []
-    current_query: dict[str, Any] | None = None
-    latest_iter = 0
 
     def _new_iteration(iteration: int, prompt: str) -> dict[str, Any]:
         return {
@@ -343,24 +551,41 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             q["iteration_order"].append(iteration)
         return iters[iteration]
 
-    current_session_meta: dict[str, Any] = {}
+    # Per-session state maps. Keyed by ``session_id`` from each event.
+    session_meta: dict[str, dict[str, Any]] = {}
+    open_query: dict[str, dict[str, Any]] = {}
+    latest_iter_by_session: dict[str, int] = {}
+    queries: list[dict[str, Any]] = []
+
+    # Some legacy events may lack ``session_id`` — funnel those into a single
+    # bucket so they don't pollute every other session.
+    DEFAULT_SID = "__default__"
+
+    def _sid(event: dict[str, Any]) -> str:
+        sid = event.get("session_id")
+        return str(sid) if sid else DEFAULT_SID
 
     for event in events:
         kind = str(event.get("event") or "")
+        sid = _sid(event)
 
         if kind == "session_start":
-            current_session_meta = {
+            session_meta[sid] = {
                 "session_id": event.get("session_id"),
                 "source_ip": event.get("source_ip"),
                 "stage_index": event.get("stage_index"),
                 "variation_index": event.get("variation_index"),
+                "style": event.get("style"),
             }
             continue
 
         if kind == "user_query":
-            if current_query is not None:
-                queries.append(current_query)
-            current_query = {
+            # Close out any in-flight query for the same session before starting
+            # a new one (rare — usually one user_query per session file).
+            if sid in open_query:
+                queries.append(open_query.pop(sid))
+            meta = session_meta.get(sid, {})
+            open_query[sid] = {
                 "prompt": str(event.get("query") or ""),
                 "iterations": {},
                 "iteration_order": [],
@@ -369,11 +594,13 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "verdict": None,
                 "verdict_justification": "",
                 "verdict_classifier": "",
-                **current_session_meta,
+                "style": meta.get("style"),
+                **meta,
             }
-            latest_iter = 0
+            latest_iter_by_session[sid] = 0
             continue
 
+        current_query = open_query.get(sid)
         if current_query is None:
             continue
 
@@ -384,6 +611,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             iteration = None
 
         event_ts = _parse_ts(event.get("ts"))
+        latest_iter = latest_iter_by_session.get(sid, 0)
 
         if kind == "verdict":
             # Prefer llm_judge verdict over keyword when both are present
@@ -398,6 +626,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 latest_iter += 1
                 iteration = latest_iter
             latest_iter = max(latest_iter, iteration)
+            latest_iter_by_session[sid] = latest_iter
             turn = ensure_iteration(current_query, iteration)
             turn["events"].append(event)
             if event_ts and not turn["ts_start"]:
@@ -407,6 +636,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if iteration is None:
             iteration = latest_iter if latest_iter > 0 else 1
         latest_iter = max(latest_iter, iteration)
+        latest_iter_by_session[sid] = latest_iter
         turn = ensure_iteration(current_query, iteration)
         turn["events"].append(event)
         if event_ts:
@@ -471,10 +701,16 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif kind == "query_complete":
             turn["query_complete"] = event
 
-    if current_query is not None:
-        queries.append(current_query)
+    # Drain any sessions that were still mid-flight at end-of-stream.
+    for sid, q in open_query.items():
+        queries.append(q)
+    open_query.clear()
     if not queries:
         return []
+
+    # Sort the finalised queries by their first-seen timestamp so the trace
+    # cards still appear in chronological order across concurrent sessions.
+    queries.sort(key=lambda q: q.get("ts_start") or "")
 
     merged_queries: list[dict[str, Any]] = []
     for q in queries:
@@ -491,6 +727,7 @@ def _group_queries(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         merged["source_ip"] = q.get("source_ip")
         merged["stage_index"] = q.get("stage_index")
         merged["variation_index"] = q.get("variation_index")
+        merged["style"] = q.get("style")
         merged["verdict"] = q.get("verdict")
         merged["verdict_justification"] = q.get("verdict_justification", "")
         merged["verdict_classifier"] = q.get("verdict_classifier", "")
@@ -567,14 +804,261 @@ def _extract_run_id(path: Path) -> str | None:
 
 
 def _find_sibling_sessions(session_path: Path, run_id: str) -> list[Path]:
-    """Find all session files in the same directory with the same run_id."""
+    """Find every other session file that belongs to the same ``run_id``.
+
+    With the per-run directory layout (``logs/<run_id>/session_*.jsonl``)
+    every sibling lives in the same directory; we still scan the top-level
+    ``logs/`` as a backstop so legacy session files (no per-run dir) are
+    matched purely by their embedded ``run_id`` and never misattributed.
+    """
+    candidates = list(session_path.parent.glob("session_*.jsonl"))
+    if session_path.parent != LOGS_DIR:
+        candidates += list(LOGS_DIR.glob("session_*.jsonl"))
     siblings: list[Path] = []
-    for candidate in sorted(session_path.parent.glob("session_*.jsonl")):
+    for candidate in sorted(set(candidates)):
         if candidate == session_path:
             continue
         if _extract_run_id(candidate) == run_id:
             siblings.append(candidate)
     return sorted(siblings, key=lambda p: p.name)
+
+
+def _load_passes_for_run(run_id: str | None) -> dict[str, Any] | None:
+    """Return ``{seeds, passes, ...}`` aggregated from per-seed chain files.
+
+    Falls back to the legacy single-file ``<run_id>_passes.json`` if it exists.
+    """
+    if not run_id:
+        return None
+
+    chain_files = _chain_files_for_run(run_id)
+    if chain_files:
+        rows: list[tuple[int, dict[str, Any]]] = []
+        for f in chain_files:
+            parsed = _parse_chain_filename(f)
+            if parsed is None:
+                continue
+            _rid, seed, _camp = parsed
+            try:
+                payload = json.loads(f.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            rows.append((seed, payload))
+        if rows:
+            rows.sort(key=lambda r: r[0])
+            head = rows[0][1]
+            return {
+                "run_id": run_id,
+                "campaign": head.get("campaign"),
+                "style": head.get("style"),
+                "fragments_path": head.get("fragments_path"),
+                "seeds": [seed for seed, _ in rows],
+                "passes": [bool(payload.get("passed")) for _, payload in rows],
+                "target_model": head.get("target_model"),
+                "target_backend": head.get("target_backend"),
+                "judge_model": head.get("judge_model"),
+                "generated_at": head.get("generated_at"),
+                "chains": [payload for _, payload in rows],
+            }
+
+    legacy = RESULTS_RUNS_DIR / f"{run_id}_passes.json"
+    if legacy.exists():
+        try:
+            return json.loads(legacy.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+    return None
+
+
+def _passes_lookup(passes: dict[str, Any] | None) -> dict[int, bool]:
+    """Build {seed -> bool} from a passes file payload."""
+    if not passes:
+        return {}
+    seeds = passes.get("seeds") or []
+    bools = passes.get("passes") or []
+    out: dict[int, bool] = {}
+    for s, p in zip(seeds, bools):
+        try:
+            out[int(s)] = bool(p)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _fragment_outcomes_lookup(
+    passes: dict[str, Any] | None,
+) -> dict[tuple[int, int], dict[str, Any]]:
+    """``{(seed, fragment_index) -> {passed, verdict, justification, classifier}}``.
+
+    Single source of truth for the trace card's verdict, sourced from the
+    success-judge that ``attack_runner`` ran post-execution. The viewer prefers
+    this over the per-iteration detector verdicts (which classify ANSWERED /
+    REFUSED only and do not reason about whether the *fragment goal* was met).
+    """
+    if not passes:
+        return {}
+    out: dict[tuple[int, int], dict[str, Any]] = {}
+    for chain in passes.get("chains") or []:
+        if not isinstance(chain, dict):
+            continue
+        try:
+            seed = int(chain.get("seed"))
+        except (TypeError, ValueError):
+            continue
+        for frag in chain.get("fragments") or []:
+            if not isinstance(frag, dict):
+                continue
+            fidx_raw = frag.get("fragment_index")
+            try:
+                fidx = int(fidx_raw)
+            except (TypeError, ValueError):
+                continue
+            out[(seed, fidx)] = {
+                "passed": bool(frag.get("passed")),
+                "verdict": frag.get("verdict"),
+                "justification": str(frag.get("justification") or ""),
+                "classifier": str(frag.get("classifier") or ""),
+            }
+    return out
+
+
+def _assemble_graph_payload(run_id: str) -> dict[str, Any] | None:
+    """Build the legacy ``{variations: [...], ...}`` payload from per-seed graph files.
+
+    Returns ``None`` if no per-seed files exist (caller should try the legacy
+    single-file path).
+    """
+    files = _graph_files_for_run(run_id)
+    if not files:
+        return None
+    rows: list[tuple[int, Path, dict[str, Any]]] = []
+    for f in files:
+        parsed = _parse_graph_filename(f)
+        if parsed is None:
+            continue
+        _rid, seed, _camp = parsed
+        try:
+            payload = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        rows.append((seed, f, payload))
+    if not rows:
+        return None
+    rows.sort(key=lambda r: r[0])
+    head = rows[0][2]
+    variations: list[dict[str, Any]] = []
+    for _seed, _path, payload in rows:
+        variation = payload.get("variation")
+        if isinstance(variation, dict):
+            variations.append(variation)
+    return {
+        "run_id": run_id,
+        "campaign": head.get("campaign"),
+        "style": head.get("style"),
+        "fragments_path": head.get("fragments_path"),
+        "started_at": head.get("started_at"),
+        "ended_at": head.get("ended_at"),
+        "target_model": head.get("target_model"),
+        "target_backend": head.get("target_backend"),
+        "llm_product": head.get("llm_product"),
+        "judge_model": head.get("judge_model"),
+        "variations": variations,
+    }
+
+
+def list_graph_runs() -> list[dict[str, Any]]:
+    """Return one row per attack_runner run, aggregated across per-seed files.
+
+    Falls back to legacy ``<run_id>_graph.json`` files when present.
+    """
+    if not RESULTS_RUNS_DIR.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    # Group per-seed graph files by run_id.
+    by_run: dict[str, list[Path]] = {}
+    for f in _list_graph_files():
+        parsed = _parse_graph_filename(f)
+        if parsed is None:
+            continue
+        by_run.setdefault(parsed[0], []).append(f)
+
+    for run_id, files in by_run.items():
+        files.sort(key=lambda p: p.stat().st_mtime)
+        try:
+            head_payload = json.loads(files[-1].read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        passes_payload = _load_passes_for_run(run_id) or {}
+        passes_vec = passes_payload.get("passes") or []
+        latest_mtime = max(p.stat().st_mtime for p in files)
+        total_bytes = sum(p.stat().st_size for p in files)
+        out.append(
+            {
+                "run_id": run_id,
+                "campaign": head_payload.get("campaign"),
+                "style": head_payload.get("style"),
+                "started_at": head_payload.get("started_at"),
+                "ended_at": head_payload.get("ended_at"),
+                "num_variations": len(files),
+                "num_passed": sum(1 for p in passes_vec if p),
+                "fragments_path": head_payload.get("fragments_path"),
+                "mtime": datetime.fromtimestamp(latest_mtime, tz=timezone.utc).isoformat(),
+                "bytes": total_bytes,
+            }
+        )
+        seen.add(run_id)
+
+    # Legacy single-file runs that haven't been reformatted to per-seed yet.
+    for f in RESULTS_RUNS_DIR.glob("*_graph.json"):
+        if _parse_graph_filename(f) is not None:
+            continue
+        run_id = f.name[: -len("_graph.json")]
+        if run_id in seen:
+            continue
+        try:
+            payload = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        passes_payload = _load_passes_for_run(run_id)
+        passes_vec = (passes_payload or {}).get("passes", []) if passes_payload else []
+        out.append(
+            {
+                "run_id": run_id,
+                "campaign": payload.get("campaign"),
+                "style": payload.get("style"),
+                "started_at": payload.get("started_at"),
+                "ended_at": payload.get("ended_at"),
+                "num_variations": len(payload.get("variations", []) or []),
+                "num_passed": sum(1 for p in passes_vec if p),
+                "fragments_path": payload.get("fragments_path"),
+                "mtime": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat(),
+                "bytes": f.stat().st_size,
+            }
+        )
+
+    out.sort(key=lambda x: x.get("mtime") or "", reverse=True)
+    return out
+
+
+def load_graph_run(run_id: str) -> dict[str, Any] | None:
+    """Assemble a single viewer payload for *run_id* from per-seed files."""
+    graph = _assemble_graph_payload(run_id)
+    if graph is None:
+        legacy = RESULTS_RUNS_DIR / f"{run_id}_graph.json"
+        if not legacy.exists():
+            return None
+        try:
+            graph = json.loads(legacy.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+    passes_payload = _load_passes_for_run(run_id) or {}
+    return {
+        "run_id": run_id,
+        "graph": graph,
+        "passes": passes_payload,
+    }
 
 
 def build_artifact_bundle(
@@ -614,10 +1098,201 @@ def build_artifact_bundle(
     )
 
 
-def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
+def _load_graph_for_run(run_id: str | None) -> dict[str, Any] | None:
+    """Return the assembled graph payload for *run_id*, or None.
+
+    Tries per-seed files first, then falls back to legacy ``<run_id>_graph.json``.
+    """
+    if not run_id:
+        return None
+    assembled = _assemble_graph_payload(run_id)
+    if assembled is not None:
+        return assembled
+    legacy = RESULTS_RUNS_DIR / f"{run_id}_graph.json"
+    if not legacy.exists():
+        return None
+    try:
+        return json.loads(legacy.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _canonical_dag_fragments(graph: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Pull a canonical fragment list (produces/consumes/role/passed) from a
+    graph payload so the live viewer can render the same DAG that the graph
+    viewer shows. We use the first variation as the shape (all variations of a
+    deterministic picker share the same fragment skeleton).
+    """
+    if not graph:
+        return []
+    variations = graph.get("variations") or []
+    if not variations:
+        return []
+    sample = variations[0].get("fragments") or []
+    out: list[dict[str, Any]] = []
+    for f in sample:
+        if not isinstance(f, dict):
+            continue
+        out.append({
+            "fragment_index": f.get("fragment_index"),
+            "role": f.get("role"),
+            "phase": f.get("phase"),
+            "produces": list(f.get("produces") or []),
+            "consumes": list(f.get("consumes") or []),
+        })
+    return out
+
+
+def _canonical_dag_from_fragments_file(path: str | Path | None) -> list[dict[str, Any]]:
+    """Derive a canonical fragment skeleton (index/role/produces/consumes) from
+    the source fragments JSON without needing a graph file. Used as a fallback
+    so the live viewer can show the DAG even before ``attack_runner`` has
+    flushed ``<run_id>_graph.json`` (e.g. while the run is still in progress).
+    """
+    if not path:
+        return []
+    p = Path(path)
+    if not p.exists():
+        return []
+    try:
+        doc = json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    variations = doc.get("variations") or []
+    if not isinstance(variations, list) or not variations:
+        return []
+    sample = variations[0]
+    if not isinstance(sample, dict):
+        return []
+    fragments = sample.get("fragments") or []
+    out: list[dict[str, Any]] = []
+    for f in fragments:
+        if not isinstance(f, dict):
+            continue
+        out.append({
+            "fragment_index": f.get("fragment_index"),
+            "role": f.get("role"),
+            "phase": f.get("phase"),
+            "produces": list(f.get("produces") or []),
+            "consumes": list(f.get("consumes") or []),
+        })
+    return out
+
+
+def _resolve_fallback_fragments_path(
+    explicit: str | None,
+    attack_id: str | None,
+) -> str | None:
+    """Best-effort lookup for a fragments file when the live session has no
+    matching ``_graph.json`` yet.
+
+    Order of preference:
+      1. ``?fragments=<path>`` passed by the viewer (frontend selector).
+      2. The most-recent graph run (which exposes ``fragments_path``).
+      3. Any registered fragments file whose basename token matches the
+         session's ``attack_id`` (e.g. ``PROMPTSTEAL`` → ``promptsteal_*.json``).
+      4. Any ``*_fragments.json`` directly under ``results/`` whose basename
+         token matches the attack_id.
+    """
+    if explicit and Path(explicit).exists():
+        return explicit
+    files = list_fragments_files()
+
+    def _existing(path: str) -> str | None:
+        p = Path(path)
+        if p.exists():
+            return str(p)
+        # Container paths (e.g. ``/app/results/foo.json``) won't exist on the
+        # host, but the basename will under ``results/`` — translate.
+        host_alt = REPO_ROOT / "results" / p.name
+        return str(host_alt) if host_alt.exists() else None
+
+    if explicit:
+        wanted_base = Path(explicit).name
+        host_alt = REPO_ROOT / "results" / wanted_base
+        if host_alt.exists():
+            return str(host_alt)
+        for f in files:
+            if Path(f["path"]).name == wanted_base:
+                hit = _existing(f["path"])
+                if hit:
+                    return hit
+
+    token = ""
+    if attack_id:
+        token = re.sub(r"[_-]\d+$", "", str(attack_id)).lower()
+
+    if token:
+        for f in files:
+            if token in f["basename"].lower():
+                hit = _existing(f["path"])
+                if hit:
+                    return hit
+        # Scan the local ``results/`` directory directly — covers the case
+        # where the graph file index is empty (fresh checkout, run still in
+        # progress and not flushed, etc.).
+        results_dir = REPO_ROOT / "results"
+        if results_dir.exists():
+            for cand in sorted(results_dir.glob("*_fragments.json")):
+                if token in cand.name.lower():
+                    return str(cand)
+
+    if files:
+        hit = _existing(files[0]["path"])
+        if hit:
+            return hit
+
+    # Last resort: most-recent ``*_fragments.json`` in ``results/``.
+    results_dir = REPO_ROOT / "results"
+    if results_dir.exists():
+        cands = sorted(
+            results_dir.glob("*_fragments.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if cands:
+            return str(cands[0])
+    return None
+
+
+def normalize_bundle(
+    bundle: ArtifactBundle,
+    *,
+    fragments_filter: str | None = None,
+) -> dict[str, Any]:
     events = bundle.session_events
     session_start = next((e for e in events if e.get("event") == "session_start"), {})
     attack_id = _normalize_attack_id(session_start.get("attack_id"))
+    run_id = session_start.get("run_id")
+    run_style = session_start.get("style")
+    passes_payload = _load_passes_for_run(run_id)
+    passes_by_seed = _passes_lookup(passes_payload)
+    fragment_outcomes = _fragment_outcomes_lookup(passes_payload)
+    # Run-level model labels — surfaced once on the run + on every trace card.
+    chain_head = ((passes_payload or {}).get("chains") or [{}])[0] if passes_payload else {}
+    target_model = (passes_payload or {}).get("target_model") or chain_head.get("target_model")
+    target_backend = (passes_payload or {}).get("target_backend") or chain_head.get("target_backend")
+    judge_model = (passes_payload or {}).get("judge_model") or chain_head.get("judge_model")
+    if target_model and target_backend:
+        target_label = f"{target_backend}:{target_model}"
+    elif target_model:
+        target_label = str(target_model)
+    else:
+        target_label = None
+    graph_payload = _load_graph_for_run(run_id)
+    canonical_fragments = _canonical_dag_fragments(graph_payload)
+    graph_fragments_path = (graph_payload or {}).get("fragments_path") if graph_payload else None
+
+    # Fallback: if no <run_id>_graph.json exists yet (run in progress, or
+    # legacy session), build the canonical DAG straight from the fragments
+    # JSON file. This way the live viewer always shows the dependency picture
+    # alongside the trace, even before attack_runner finalises results.
+    if not canonical_fragments:
+        fb_path = _resolve_fallback_fragments_path(fragments_filter, attack_id)
+        if fb_path:
+            canonical_fragments = _canonical_dag_from_fragments_file(fb_path)
+            if canonical_fragments and not graph_fragments_path:
+                graph_fragments_path = fb_path
     seed_idx = _seed_index(bundle.seeds)
     attack_idx = _attack_index(bundle.attacks)
     seed = _select_by_id(bundle.seeds, seed_idx, attack_id)
@@ -689,6 +1364,42 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
         step_duration_ms = _ms_between(query.get("ts_start"), query.get("ts_end"))
         effective_fragment_index = query_stage_idx if query_stage_idx is not None else stage_meta.get("index")
 
+        # variation_index is the picked-attack seed when attack_runner spawned this trace.
+        seed_value = query.get("variation_index")
+        try:
+            seed_int = int(seed_value) if seed_value is not None else None
+        except (TypeError, ValueError):
+            seed_int = None
+        # Resolve a SINGLE pass/fail verdict per fragment.
+        #
+        # Authority order:
+        #   1. attack_runner success-judge for this exact (seed, fragment) →
+        #      authoritative PASS / FAIL with judge justification.
+        #   2. variation-level passes vector (per-seed) → coarse fallback while
+        #      a chain file hasn't been written yet.
+        #   3. mcp_cli's per-iteration detector verdict (ANSWERED/REFUSED) →
+        #      live-preview only; never overrides the success judge.
+        passed_value: bool | None = None
+        verdict_value = query.get("verdict")
+        verdict_just = query.get("verdict_justification", "")
+        verdict_cls = query.get("verdict_classifier", "")
+
+        outcome_key = (
+            (seed_int, int(effective_fragment_index))
+            if seed_int is not None and effective_fragment_index is not None
+            else None
+        )
+        outcome = fragment_outcomes.get(outcome_key) if outcome_key is not None else None
+        if outcome is not None:
+            passed_value = outcome["passed"]
+            # The success judge is the source of truth — overwrite the inline
+            # detector signal so the card never shows two contradictory verdicts.
+            verdict_value = outcome["verdict"] or ("PASS" if passed_value else "FAIL")
+            verdict_just = outcome["justification"]
+            verdict_cls = outcome["classifier"] or "llm_judge"
+        elif seed_int is not None and seed_int in passes_by_seed:
+            passed_value = passes_by_seed[seed_int]
+
         traces.append(
             {
                 "step": idx,
@@ -727,9 +1438,16 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
                 "source_ip": query.get("source_ip"),
                 "stage_index": query.get("stage_index"),
                 "variation_index": query.get("variation_index"),
-                "verdict": query.get("verdict"),
-                "verdict_justification": query.get("verdict_justification", ""),
-                "verdict_classifier": query.get("verdict_classifier", ""),
+                "seed": seed_int,
+                "style": query.get("style") or run_style,
+                "passed": passed_value,
+                "verdict": verdict_value,
+                "verdict_justification": verdict_just,
+                "verdict_classifier": verdict_cls,
+                "target_model": target_model,
+                "target_backend": target_backend,
+                "target_label": target_label,
+                "judge_model": judge_model,
             }
         )
 
@@ -772,6 +1490,10 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
     run_ended = max(all_ts) if all_ts else None
     total_duration_ms = _ms_between(run_started, run_ended)
 
+    seed_set = sorted({t["seed"] for t in traces if t.get("seed") is not None})
+    pass_vector = [bool(passes_by_seed[s]) for s in seed_set if s in passes_by_seed] if passes_by_seed else []
+    pass_count = sum(1 for v in pass_vector if v)
+
     return {
         "run": {
             "session_file": bundle.source.get("session_file"),
@@ -781,12 +1503,24 @@ def normalize_bundle(bundle: ArtifactBundle) -> dict[str, Any]:
             "campaign": session_start.get("campaign"),
             "session_id": session_start.get("session_id"),
             "source_ip": session_start.get("source_ip"),
+            "run_id": run_id,
+            "style": run_style,
+            "seeds": seed_set,
+            "passes": pass_vector,
+            "num_passed": pass_count,
+            "num_variations": len(seed_set),
             "events": len(events),
             "alerts": latest_alert,
             "kcc": latest_kcc,
             "started_at": run_started,
             "ended_at": run_ended,
             "total_duration_ms": total_duration_ms,
+            "fragments_path": graph_fragments_path,
+            "dag_fragments": canonical_fragments,
+            "target_model": target_model,
+            "target_backend": target_backend,
+            "target_label": target_label,
+            "judge_model": judge_model,
         },
         "campaigns": [campaign],
         "fragments": fragment_rows,
@@ -836,10 +1570,23 @@ class ViewerHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:
         return
 
+    def _query(self) -> dict[str, str]:
+        from urllib.parse import parse_qs, urlsplit
+
+        qs = urlsplit(self.path).query
+        return {k: v[0] for k, v in parse_qs(qs).items() if v}
+
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
+        params = self._query()
+        fragments_filter = params.get("fragments", "").strip()
+        if path == "/api/fragments-files":
+            _json_response(self, {"files": list_fragments_files()})
+            return
         if path == "/api/runs":
             files = list_session_files()
+            if fragments_filter:
+                files = _filter_session_files_by_fragments(files, fragments_filter)
             payload = []
             for f in files[:50]:
                 entry: dict[str, Any] = {
@@ -855,20 +1602,46 @@ class ViewerHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/run/latest":
             files = list_session_files()
+            if fragments_filter:
+                files = _filter_session_files_by_fragments(files, fragments_filter)
             if not files:
                 _json_response(self, {"error": "no session logs found"}, status=404)
                 return
             bundle = build_artifact_bundle(session_path=files[0])
-            _json_response(self, normalize_bundle(bundle))
+            _json_response(self, normalize_bundle(bundle, fragments_filter=fragments_filter))
+            return
+        if path == "/api/graph/runs":
+            runs = list_graph_runs()
+            if fragments_filter:
+                wanted_basename = Path(fragments_filter).name
+                runs = [
+                    r for r in runs
+                    if (r.get("fragments_path") == fragments_filter
+                        or Path(r.get("fragments_path") or "").name == wanted_basename)
+                ]
+            _json_response(self, {"runs": runs})
+            return
+        if path.startswith("/api/graph/"):
+            run_id = path.rsplit("/", 1)[-1]
+            payload = load_graph_run(run_id)
+            if payload is None:
+                _json_response(self, {"error": f"graph run not found: {run_id}"}, status=404)
+                return
+            _json_response(self, payload)
             return
         if path.startswith("/api/run/"):
             run_id = path.rsplit("/", 1)[-1]
             session_path = LOGS_DIR / run_id
+            # Per-run isolation puts files at logs/<attack_run_id>/<file>.jsonl;
+            # fall back to a recursive search so the route still works.
+            if not session_path.exists():
+                matches = list(LOGS_DIR.glob(f"*/{run_id}"))
+                session_path = matches[0] if matches else session_path
             if not session_path.exists():
                 _json_response(self, {"error": f"run not found: {run_id}"}, status=404)
                 return
             bundle = build_artifact_bundle(session_path=session_path)
-            _json_response(self, normalize_bundle(bundle))
+            _json_response(self, normalize_bundle(bundle, fragments_filter=fragments_filter))
             return
         self._serve_static(path)
 
@@ -913,6 +1686,11 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", (ctype or "application/octet-stream") + "; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
+        # Dev tooling — never cache HTML/JS/CSS so iterating on the viewer
+        # actually shows up in the browser without a manual hard reload.
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.end_headers()
         self.wfile.write(raw)
 

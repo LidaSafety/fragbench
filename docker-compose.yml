@@ -16,6 +16,7 @@ services:
     environment:
       - OPENROUTER_API_KEY
       - OPENAI_API_KEY
+      - ANTHROPIC_API_KEY
       # Default to host Ollama from inside the container (override with OLLAMA_BASE_URL)
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - VLLM_BASE_URL
@@ -27,6 +28,11 @@ services:
       - ./logs:/app/logs
       - ./seeds:/app/seeds:ro
       - ./attacks:/app/attacks:ro
+      # results/ is read+write so attack_runner.py can write per-seed
+      # `<run_id>_seed_<seed>_<CAMPAIGN>.json` (chain) and
+      # `attack_graph_<run_id_suffix>_seed_<seed>_<CAMPAIGN>.json` (graph) files
+      # into results/runs/ for the viewer to pick up.
+      - ./results:/app/results
 
   # ── Frontend viewer ──────────────────────────────────────────
   viewer:
@@ -46,6 +52,7 @@ services:
       - ./logs:/app/logs:ro
       - ./seeds:/app/seeds:ro
       - ./attacks:/app/attacks:ro
+      - ./results:/app/results:ro
     networks:
       - viewer-net
     deploy:
@@ -200,6 +207,14 @@ services:
     build:
       context: .
       dockerfile: fragbench_mcp/servers/agent_control/Dockerfile
+
+  # ── Communications (simulated email) ─────────────────────────
+  server-email:
+    <<: *server-base
+    build:
+      context: .
+      dockerfile: fragbench_mcp/servers/email/Dockerfile
+    # No network egress — all email is simulated.
 
 networks:
   internal_mgmt:
