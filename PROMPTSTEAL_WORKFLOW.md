@@ -219,35 +219,48 @@ python run.py --generate --seed-file seeds/promptsteal.json --num-variations 1 -
 ```
 
 ### Evaluate mode (test models):
+
+By default, `--evaluate` loads every generator-produced JSON in `results/`. Pass `--input-json <path>` (repeatable) to evaluate specific files, or `--attacks-dir <dir>` to load TOMLs instead.
+
 ```bash
-# Evaluate against Claude
-python run.py --evaluate --model claude --campaign PROMPTSTEAL --judge --output results.json
+# Evaluate every generator JSON in results/ against Claude
+python run.py --evaluate --model claude --judge --output out.json
+
+# Evaluate one specific generator JSON
+python run.py --evaluate --input-json results/promptsteal_manual.json --model claude --judge
 
 # Evaluate against Qwen
-python run.py --evaluate --model qwen --campaign PROMPTSTEAL --judge --output results.json
+python run.py --evaluate --input-json results/promptsteal_manual.json --model qwen --judge
 
 # Dry run (print prompts without calling model)
-python run.py --evaluate --model claude --campaign PROMPTSTEAL --dry-run
+python run.py --evaluate --input-json results/promptsteal_manual.json --model claude --dry-run
+
+# Fall back to TOML inputs
+python run.py --evaluate --attacks-dir attacks/ --campaign PROMPTSTEAL --judge
 ```
 
 ### All CLI flags:
 
 | Flag | Mode | What it does |
 |---|---|---|
+| `--evaluate` | eval | Enable evaluation mode (required unless `--generate` is set) |
+| `--generate` | gen | Enable generation mode |
 | `--model {qwen\|claude}` | eval | Target model |
 | `--campaign <id>` | eval | Filter to one campaign |
+| `--input-json <path>` | eval | Specific generator JSON to eval (repeatable; default: every `results/*.json`) |
+| `--attacks-dir <dir>` | eval | Use TOML campaigns from this dir instead of JSON |
 | `--judge` | eval | Use LLM judge instead of keyword classifier |
 | `--thinking` | eval | Enable extended thinking on Claude |
 | `--output <path>` | eval | Write JSON results |
 | `--dry-run` | both | Print prompts, no API calls |
-| `--generate` | gen | Enable generation mode |
 | `--seed-file <path>` | gen | Seed JSON input |
 | `--num-variations <n>` | gen | How many variations (default: 100) |
 | `--seed <n>` | gen | Base seed for reproducibility |
 | `--fragment` | gen | LLM split into sub-steps |
-| `--stylize` | gen | Rephrase into 10 styles |
 | `--style <list>` | both | Filter styles (e.g. `direct,sysadmin,ctf`) |
 | `--legitimize` | gen | LLM add cover stories |
+| `--output-json <path>` | gen | Required: where to write the generator JSON |
+| `--output-toml <dir>` | gen | Optional: also emit per-variation TOMLs |
 
 ---
 

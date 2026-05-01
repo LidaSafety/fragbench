@@ -214,16 +214,27 @@ make docker-status
 
 ## Usage
 
+By default, `--evaluate` loads every generator-produced JSON file in `results/`. To eval specific files only, pass `--input-json` (repeatable). To fall back to TOML campaigns, pass `--attacks-dir <dir>`.
+
 ```bash
-# Run all campaigns against Claude (default: claude-sonnet-4-6)
+# Run every generator JSON in results/ against Claude (default: claude-sonnet-4-6)
 python run.py --evaluate --model claude
+
+# Eval one specific generator JSON file
+python run.py --evaluate --input-json results/quietvault_manual.json --model claude --judge
+
+# Eval several generator JSONs at once
+python run.py --evaluate --input-json results/quietvault_manual.json --input-json results/malterminal_manual.json --judge
 
 # Use LLM-as-judge (Claude Haiku) for semantic classification
 # Fixes cases where keyword heuristics miss compliance (e.g. identity-rewriting)
 python run.py --evaluate --model claude --judge
 
-# Run a single campaign with judge + JSON output
-python run.py --evaluate --campaign DPRK_FRAUD --model claude --judge --output results/dprk.json
+# Run a single seeded variation with judge + JSON output
+python run.py --evaluate --campaign QUIETVAULT_42 --model claude --judge --output results/qv42.json
+
+# Fall back to hand-authored TOML campaigns
+python run.py --evaluate --attacks-dir attacks/ --campaign DPRK_FRAUD --model claude --judge
 
 # Run against Qwen via DashScope
 python run.py --evaluate --model qwen --qwen-key $DASHSCOPE_API_KEY --qwen-model qwen-plus

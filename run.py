@@ -109,8 +109,17 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--attacks-dir",
-        default="attacks",
-        help="Directory containing attack TOML files (default: attacks/)",
+        default=None,
+        help="Directory of attack TOML files. When set in --evaluate mode, "
+             "switches eval input from JSON (default: results/*.json) to TOMLs.",
+    )
+    p.add_argument(
+        "--input-json",
+        action="append",
+        default=None,
+        metavar="PATH",
+        help="Path to a JSON file produced by --generate. Repeat the flag for "
+             "multiple files. Eval mode only; default is results/*.json when omitted.",
     )
     p.add_argument(
         "--output",
@@ -216,9 +225,20 @@ def parse_args() -> argparse.Namespace:
             p.error(
                 f"the following flags require --generate: {', '.join(gen_only)}"
             )
+        if args.attacks_dir is not None and args.input_json:
+            p.error("--attacks-dir and --input-json are mutually exclusive")
     else:
         if not args.output_json:
             p.error("--output-json <path> is required with --generate")
+        eval_only = []
+        if args.attacks_dir is not None:
+            eval_only.append("--attacks-dir")
+        if args.input_json:
+            eval_only.append("--input-json")
+        if eval_only:
+            p.error(
+                f"the following flags require --evaluate: {', '.join(eval_only)}"
+            )
 
     return args
 
@@ -632,18 +652,51 @@ def main() -> None:
         asyncio.run(run_generate(args))
         return
 
-    from harness import load_all_attacks
+    from harness import load_all_attacks, load_attacks_from_json
 
-    # Load attack specs
-    attacks_dir = Path(args.attacks_dir)
-    if not attacks_dir.exists():
-        print(f"ERROR: attacks directory not found: {attacks_dir}", file=sys.stderr)
-        sys.exit(1)
-
-    all_specs = load_all_attacks(attacks_dir)
-    if not all_specs:
-        print(f"ERROR: no *.toml files found in {attacks_dir}", file=sys.stderr)
-        sys.exit(1)
+    # Load attack specs: precedence is --input-json > --attacks-dir > results/*.json
+    if args.input_json:
+        json_paths = [Path(p) for p in args.input_json]
+        missing = [str(p) for p in json_paths if not p.is_file()]
+        if missing:
+            print(f"ERROR: --input-json file(s) not found: {', '.join(missing)}", file=sys.stderr)
+            sys.exit(1)
+        all_specs = load_attacks_from_json(json_paths)
+        if not all_specs:
+            print(
+                f"ERROR: no attack variations loaded from {len(json_paths)} JSON file(s); "
+                f"check that they were produced by --generate",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    elif args.attacks_dir is not None:
+        attacks_dir = Path(args.attacks_dir)
+        if not attacks_dir.exists():
+            print(f"ERROR: attacks directory not found: {attacks_dir}", file=sys.stderr)
+            sys.exit(1)
+        all_specs = load_all_attacks(attacks_dir)
+        if not all_specs:
+            print(f"ERROR: no *.toml files found in {attacks_dir}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        results_dir = Path("results")
+        json_paths = sorted(results_dir.glob("*.json")) if results_dir.exists() else []
+        if not json_paths:
+            print(
+                "ERROR: no JSON files found in results/. Run `--generate --output-json <path>` "
+                "first, or pass --input-json <path>, or --attacks-dir <dir> to use TOMLs.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        all_specs = load_attacks_from_json(json_paths)
+        if not all_specs:
+            print(
+                f"ERROR: results/ contains JSON files but none are generator envelopes "
+                f"(no 'variations' key). Pass --input-json <path> explicitly or use "
+                f"--attacks-dir <dir>.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # List campaigns and exit
     if args.list_campaigns:
