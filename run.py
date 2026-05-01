@@ -48,8 +48,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--model",
         choices=["qwen", "claude"],
-        default="qwen",
-        help="Target model to probe (default: qwen)",
+        default="claude",
+        help="Target model to probe (default: claude)",
     )
     p.add_argument(
         "--qwen-key",
