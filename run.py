@@ -176,6 +176,14 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _safe_format(template: str, variables: dict) -> str:
+    """Format a fragment prompt template, leaving unresolved placeholders intact."""
+    class _Default(dict):
+        def __missing__(self, key):
+            return "{" + key + "}"
+    return template.format_map(_Default(variables))
+
+
 def build_runner(args: argparse.Namespace):
     from harness import ClaudeRunner, QwenRunner
 
@@ -449,13 +457,33 @@ def run_generate(args) -> None:
             continue
 
         if args.stylize:
-            if args.fragment:
-                raw_groups = make_fragment_groups(var, api_key=api_key)
+            seed_stages = seed_data.get("attack_stages", [])
+            has_authored = any("fragments" in s for s in seed_stages)
+
+            if has_authored and not args.fragment:
+                # Use authored seed fragments: resolve prompts and wire DAG metadata
+                detailed = gen.make_variation_detailed(seed)
+                raw_groups, all_roles, all_produces, all_consumes = [], [], [], []
+                for stage_detail, stage_def in zip(detailed, seed_stages):
+                    rv = stage_detail.get("resolved_variables", {})
+                    authored = stage_def.get("fragments", [])
+                    raw_groups.append([_safe_format(f["prompt"], rv) for f in authored])
+                    all_roles.append([f.get("role", "") for f in authored])
+                    all_produces.append([f.get("produces", []) for f in authored])
+                    all_consumes.append([f.get("consumes", []) for f in authored])
             else:
-                raw_groups = [[step] for step, _ in var]
+                if args.fragment:
+                    raw_groups = make_fragment_groups(var, api_key=api_key)
+                else:
+                    raw_groups = [[step] for step, _ in var]
+                all_roles = [[] for _ in raw_groups]
+                all_produces = [[] for _ in raw_groups]
+                all_consumes = [[] for _ in raw_groups]
 
             styled_fragments = []
-            for idx, group in enumerate(raw_groups):
+            for idx, (group, roles, produces, consumes) in enumerate(
+                zip(raw_groups, all_roles, all_produces, all_consumes)
+            ):
                 if not group:
                     group = [var[idx][0]]
 
@@ -463,6 +491,9 @@ def run_generate(args) -> None:
                     parent_step=var[idx][0],
                     parent_tactic=var[idx][1],
                     sub_fragments=group,
+                    roles=roles,
+                    produces=produces,
+                    consumes=consumes,
                 )
                 styled_fragments.extend(
                     stylize_fragment_group(
