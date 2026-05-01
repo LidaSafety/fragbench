@@ -3,19 +3,19 @@ CLI entry point for fragguard-chain.
 
 Examples:
     # Run all campaigns against Qwen (keyword classifier)
-    python run.py --model qwen --qwen-key $DASHSCOPE_API_KEY
+    python run.py --evaluate --model qwen --qwen-key $DASHSCOPE_API_KEY
 
     # Run all campaigns against Claude with LLM judge
-    python run.py --model claude --judge
+    python run.py --evaluate --model claude --judge
 
     # Run a single campaign
-    python run.py --campaign dprk_fraud --model claude --judge
+    python run.py --evaluate --campaign dprk_fraud --model claude --judge
 
     # Run with extended thinking on the target model (Claude only)
-    python run.py --model claude --thinking --judge
+    python run.py --evaluate --model claude --thinking --judge
 
     # Output JSON results to a file
-    python run.py --model claude --judge --output results/run1.json
+    python run.py --evaluate --model claude --judge --output results/run1.json
 
     # Generate variations → TOML (no LLM rewriting, preserves original prompts)
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50
@@ -125,11 +125,17 @@ def parse_args() -> argparse.Namespace:
         help="Log all LLM calls (judge, generator) in addition to target calls",
     )
 
-    # --- Dataset generation mode -------------------------------------------
-    p.add_argument(
+    # --- Mode selection (required) ----------------------------------------
+    mode = p.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Run the evaluation pipeline (probe target model with attack TOMLs).",
+    )
+    mode.add_argument(
         "--generate",
         action="store_true",
-        help="Run the dataset generation pipeline instead of evaluation",
+        help="Run the dataset generation pipeline.",
     )
     p.add_argument(
         "--seed-file",
