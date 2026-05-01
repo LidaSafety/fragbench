@@ -234,6 +234,59 @@ def print_result_row(style: str, verdict: str, justification: str = "") -> None:
     print(f"  {color}{verdict:8s}{reset}  {style}{just}")
 
 
+def _build_authored_fragment_groups(seed_data: dict, gen, seed: int):
+    """
+    Build FragmentGroups from each stage's authored ``fragments[]`` array,
+    rendering each fragment's prompt template with the variation's resolved
+    variables. Carries roles/produces/consumes onto the group so the JSON
+    output preserves the artifact-chain wiring.
+
+    Returns None if no stage in the seed has an authored ``fragments[]``.
+    """
+    from generator import FragmentGroup
+    from variations.base import MitreType
+
+    stages = seed_data.get("attack_stages", [])
+    if not any(s.get("fragments") for s in stages):
+        return None
+
+    detailed = gen.make_variation_detailed(seed)
+    if len(detailed) != len(stages):
+        raise ValueError(
+            f"make_variation_detailed returned {len(detailed)} stages, "
+            f"seed has {len(stages)}"
+        )
+
+    groups: list = []
+    for stage, dvar in zip(stages, detailed):
+        parent_step = dvar.get("prompt", "")
+        parent_tactic = MitreType(stage["mitre_tactic"])
+        resolved = dvar.get("resolved_variables", {})
+        authored = stage.get("fragments", [])
+
+        if authored:
+            sub_fragments = [f["prompt"].format(**resolved) for f in authored]
+            roles = [f.get("role", "") for f in authored]
+            produces = [list(f.get("produces", [])) for f in authored]
+            consumes = [list(f.get("consumes", [])) for f in authored]
+        else:
+            sub_fragments = [parent_step]
+            roles = []
+            produces = []
+            consumes = []
+
+        groups.append(FragmentGroup(
+            parent_step=parent_step,
+            parent_tactic=parent_tactic,
+            sub_fragments=sub_fragments,
+            roles=roles,
+            produces=produces,
+            consumes=consumes,
+        ))
+
+    return groups
+
+
 def _shape_generated_fragments(
     var: list[tuple[str, str]],
     stage_descriptions: list[str],
@@ -455,6 +508,18 @@ def run_generate(args) -> None:
             )
             sys.exit(1)
 
+    seed_has_authored = any(
+        s.get("fragments") for s in seed_data.get("attack_stages", [])
+    )
+    if args.stylize and args.fragment and seed_has_authored:
+        print(
+            "ERROR: --fragment is incompatible with seeds that define authored "
+            "fragments[] per stage (this seed does). The authored chain wiring "
+            "would be lost. Drop --fragment to use the authored breakdown.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
     if args.stylize:
@@ -480,22 +545,29 @@ def run_generate(args) -> None:
         t0 = _time.perf_counter()
 
         if args.stylize:
-            if args.fragment:
-                raw_groups = make_fragment_groups(var, api_key=api_key)
-            else:
-                raw_groups = [[step] for step, _ in var]
-
-            styled_fragments = []
-            for idx, group in enumerate(raw_groups):
-                if not group:
-                    group = [var[idx][0]]
-
-                fragment_group = FragmentGroup(
-                    parent_step=var[idx][0],
-                    parent_tactic=var[idx][1],
-                    sub_fragments=group,
+            if seed_has_authored:
+                groups_to_stylize = _build_authored_fragment_groups(
+                    seed_data, gen, seed
                 )
-                use_templates = args.style_templates is not False
+            else:
+                if args.fragment:
+                    raw_groups = make_fragment_groups(var, api_key=api_key)
+                else:
+                    raw_groups = [[step] for step, _ in var]
+
+                groups_to_stylize = []
+                for idx, group in enumerate(raw_groups):
+                    if not group:
+                        group = [var[idx][0]]
+                    groups_to_stylize.append(FragmentGroup(
+                        parent_step=var[idx][0],
+                        parent_tactic=var[idx][1],
+                        sub_fragments=group,
+                    ))
+
+            use_templates = args.style_templates is not False
+            styled_fragments = []
+            for fragment_group in groups_to_stylize:
                 styled_fragments.extend(
                     stylize_fragment_group(
                         fragment_group,
