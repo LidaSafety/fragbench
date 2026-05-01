@@ -97,12 +97,13 @@ class PromptStealVariation(BaseVariation):
             if "fragments" in stage:
                 stage_dict["fragments"] = [
                     {
+                        "fragment_index": frag_i,
                         "role": frag["role"],
                         "prompt": frag["prompt"].format(**stage_vars),
                         "produces": list(frag.get("produces", [])),
                         "consumes": list(frag.get("consumes", [])),
                     }
-                    for frag in stage["fragments"]
+                    for frag_i, frag in enumerate(stage["fragments"])
                 ]
 
             result.append(stage_dict)
