@@ -27,7 +27,7 @@ Examples:
 
     # Generate with LLM style variations
     python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize --styles direct,sysadmin,ctf
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize --style direct,sysadmin,ctf
 """
 
 from __future__ import annotations
@@ -99,7 +99,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--style",
         default=None,
-        help="Comma-separated list of styles to run (e.g. direct,ctf,sysadmin). Omit to run all.",
+        help="Comma-separated list of styles (e.g. direct,ctf,sysadmin). "
+             "In eval mode: filter which styles to probe. "
+             "In --generate mode: filter which styles to produce. "
+             "Omit to use all 10 styles.",
     )
     p.add_argument(
         "--attacks-dir",
@@ -161,10 +164,11 @@ def parse_args() -> argparse.Namespace:
         help="Apply LLM style variations (rephrase each fragment into 10 styles)",
     )
     p.add_argument(
-        "--styles",
+        "--style-templates",
+        action=argparse.BooleanOptionalAction,
         default=None,
-        help="Comma-separated list of styles to generate (default: all 10). "
-             "E.g. --styles direct,sysadmin,ctf",
+        help="Use template-based stylization during --stylize (default). "
+             "Pass --no-style-templates to use Haiku for LLM rephrasing instead.",
     )
     p.add_argument(
         "--output-json",
@@ -173,7 +177,30 @@ def parse_args() -> argparse.Namespace:
              "E.g. --output-json results/promptsteal_fragments.json",
     )
 
-    return p.parse_args()
+    args = p.parse_args()
+
+    if not args.generate:
+        gen_only = []
+        if args.seed_file is not None:
+            gen_only.append("--seed-file")
+        if args.seed is not None:
+            gen_only.append("--seed")
+        if args.stylize:
+            gen_only.append("--stylize")
+        if args.style_templates is not None:
+            gen_only.append("--style-templates" if args.style_templates else "--no-style-templates")
+        if args.fragment:
+            gen_only.append("--fragment")
+        if args.legitimize:
+            gen_only.append("--legitimize")
+        if args.output_json is not None:
+            gen_only.append("--output-json")
+        if gen_only:
+            p.error(
+                f"the following flags require --generate: {', '.join(gen_only)}"
+            )
+
+    return args
 
 
 def build_runner(args: argparse.Namespace):
@@ -382,6 +409,7 @@ def run_generate(args) -> None:
     """Dataset generation pipeline: seed file → vary → [fragment] → [stylize] → [legitimize] → TOML."""
     import json as _json
     import random as _random
+    import time as _time
 
     from generator import (
         FragmentGroup,
@@ -417,8 +445,8 @@ def run_generate(args) -> None:
 
     # Parse style filter
     styles = None
-    if args.styles:
-        styles = [s.strip() for s in args.styles.split(",") if s.strip()]
+    if args.style:
+        styles = [s.strip() for s in args.style.split(",") if s.strip()]
         invalid = [s for s in styles if s not in STYLES]
         if invalid:
             print(
@@ -448,6 +476,9 @@ def run_generate(args) -> None:
                 print(f"    ({tactic})  {step}")
             continue
 
+        print(f"  [{i+1}/{args.num_variations}] seed={seed}  stages={len(var)}", flush=True)
+        t0 = _time.perf_counter()
+
         if args.stylize:
             if args.fragment:
                 raw_groups = make_fragment_groups(var, api_key=api_key)
@@ -464,11 +495,12 @@ def run_generate(args) -> None:
                     parent_tactic=var[idx][1],
                     sub_fragments=group,
                 )
+                use_templates = args.style_templates is not False
                 styled_fragments.extend(
                     stylize_fragment_group(
                         fragment_group,
                         styles=styles,
-                        api_key=api_key,
+                        api_key=None if use_templates else api_key,
                     )
                 )
 
@@ -481,18 +513,24 @@ def run_generate(args) -> None:
                         )
 
             final_frag_list.append(styled_fragments)
+            n_frags = len(styled_fragments)
+            n_vars = sum(len(f.variations) for f in styled_fragments)
         else:
-            final_frag_list.append(
-                _shape_generated_fragments(
-                    var,
-                    stage_descriptions,
-                    fragment=args.fragment,
-                    legitimize=args.legitimize,
-                    api_key=api_key,
-                    make_fragment_groups_fn=make_fragment_groups,
-                    legitimize_fragment_fn=legitimize_fragment,
-                )
+            shaped = _shape_generated_fragments(
+                var,
+                stage_descriptions,
+                fragment=args.fragment,
+                legitimize=args.legitimize,
+                api_key=api_key,
+                make_fragment_groups_fn=make_fragment_groups,
+                legitimize_fragment_fn=legitimize_fragment,
             )
+            final_frag_list.append(shaped)
+            n_frags = len(shaped)
+            n_vars = sum(len(f.variations) for f in shaped)
+
+        elapsed = _time.perf_counter() - t0
+        print(f"      → fragments={n_frags}  variations={n_vars}  ({elapsed:.1f}s)", flush=True)
 
     if args.dry_run:
         return

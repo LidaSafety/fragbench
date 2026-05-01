@@ -206,7 +206,7 @@ python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10
 python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --stylize
 
 # With specific styles only
-python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --stylize --styles direct,sysadmin,ctf
+python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --stylize --style direct,sysadmin,ctf
 
 # With LLM fragmentation + stylization + legitimization
 python run.py --generate --seed-file seeds/promptsteal.json --num-variations 10 --fragment --stylize --legitimize
@@ -243,7 +243,7 @@ python run.py --model claude --campaign PROMPTSTEAL --dry-run
 | `--seed <n>` | gen | Base seed for reproducibility |
 | `--fragment` | gen | LLM split into sub-steps |
 | `--stylize` | gen | Rephrase into 10 styles |
-| `--styles <list>` | gen | Filter styles (e.g. `direct,sysadmin,ctf`) |
+| `--style <list>` | both | Filter styles (e.g. `direct,sysadmin,ctf`) |
 | `--legitimize` | gen | LLM add cover stories |
 
 ---
