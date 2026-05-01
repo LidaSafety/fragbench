@@ -52,14 +52,6 @@ log = logging.getLogger(__name__)
 # Data structures
 # ---------------------------------------------------------------------------
 
-@dataclass
-class GeneratedFragment:
-    """Structured generated fragment for TOML serialization."""
-
-    description: str
-    variations: list[str]
-
-
 STYLES: list[str] = [
     "direct",
     "command_form",
@@ -503,19 +495,16 @@ def _toml_str(value: str) -> str:
 
 def generate_toml(
     metadata: dict,
-    fragments_list: list[GeneratedFragment | StyledFragmentGroup | list[str]],
+    fragments_list: list[StyledFragmentGroup],
     seed: int,
 ) -> str:
     """
     Build a TOML attack-spec string compatible with harness.load_attack().
 
     *metadata* should be the 'metadata' dict from the seed JSON file.
-    *fragments_list* is either:
-      - a list of GeneratedFragment objects, one per fragment, or
-      - a list of StyledFragmentGroup objects, one per fragment, or
-      - a list of fragment-variation lists, one per fragment (legacy form)
-    Each fragment becomes one [[fragments]] block, and each variation string
-    inside that fragment becomes one [[fragments.variations]] entry.
+    *fragments_list* is a list of StyledFragmentGroup objects, one per
+    fragment. Each fragment becomes one [[fragments]] block, and each
+    variation inside that fragment becomes one [[fragments.variations]] entry.
     """
     campaign_id = f"{metadata['id']}_{seed}"
     technique   = metadata.get("technique", "T0000")
@@ -534,40 +523,18 @@ def generate_toml(
     ]
 
     for frag_idx, fragment in enumerate(fragments_list):
-        if isinstance(fragment, StyledFragmentGroup):
-            lines += [
-                "[[fragments]]",
-                f"index = {frag_idx}",
-                f"description = {_toml_str(fragment.parent_step[:80])}",
-                f"# parent_tactic = {fragment.parent_tactic}",
-                "",
-            ]
-            for variation in fragment.variations:
-                lines += [
-                    "[[fragments.variations]]",
-                    f'style = "{variation.style}"',
-                    f"prompt = {_toml_str(variation.prompt)}",
-                    "",
-                ]
-            continue
-
-        if isinstance(fragment, GeneratedFragment):
-            frag_description = fragment.description
-            frags = fragment.variations
-        else:
-            frag_description = f"Generated fragment {frag_idx} (seed={seed})"
-            frags = fragment
         lines += [
             "[[fragments]]",
             f"index = {frag_idx}",
-            f"description = {_toml_str(frag_description)}",
+            f"description = {_toml_str(fragment.parent_step[:80])}",
+            f"# parent_tactic = {fragment.parent_tactic}",
             "",
         ]
-        for frag_text in frags:
+        for variation in fragment.variations:
             lines += [
                 "[[fragments.variations]]",
-                'style = "generated"',
-                f"prompt = {_toml_str(frag_text)}",
+                f'style = "{variation.style}"',
+                f"prompt = {_toml_str(variation.prompt)}",
                 "",
             ]
 
@@ -580,7 +547,7 @@ def generate_toml(
 
 def generate_json(
     metadata: dict,
-    fragments: list[StyledFragmentGroup] | list[FragmentGroup],
+    fragments: list[StyledFragmentGroup],
     seed: int,
 ) -> dict:
     """
@@ -593,42 +560,22 @@ def generate_json(
 
     frag_list = []
     for frag_idx, frag in enumerate(fragments):
-        if isinstance(frag, StyledFragmentGroup):
-            entry = {
-                "fragment_index": frag_idx,
-                "parent_prompt": frag.parent_step,
-                "parent_tactic": getattr(frag.parent_tactic, "value", str(frag.parent_tactic)),
-                "variations": [
-                    {"style": sv.style, "prompt": sv.prompt}
-                    for sv in frag.variations
-                ],
-            }
-            if frag.role:
-                entry["role"] = frag.role
-            if frag.produces:
-                entry["produces"] = list(frag.produces)
-            if frag.consumes:
-                entry["consumes"] = list(frag.consumes)
-            frag_list.append(entry)
-        elif isinstance(frag, GeneratedFragment):
-            frag_list.append({
-                "fragment_index": frag_idx,
-                "parent_prompt": frag.description,
-                "variations": [{"style": "direct", "prompt": v} for v in frag.variations],
-            })
-        elif isinstance(frag, FragmentGroup):
-            frag_list.append({
-                "fragment_index": frag_idx,
-                "parent_prompt": frag.parent_step,
-                "parent_tactic": getattr(frag.parent_tactic, "value", str(frag.parent_tactic)),
-                "sub_fragments": frag.sub_fragments,
-            })
-        else:
-            # Legacy: list[str]
-            frag_list.append({
-                "fragment_index": frag_idx,
-                "sub_fragments": frag,
-            })
+        entry = {
+            "fragment_index": frag_idx,
+            "parent_prompt": frag.parent_step,
+            "parent_tactic": getattr(frag.parent_tactic, "value", str(frag.parent_tactic)),
+            "variations": [
+                {"style": sv.style, "prompt": sv.prompt}
+                for sv in frag.variations
+            ],
+        }
+        if frag.role:
+            entry["role"] = frag.role
+        if frag.produces:
+            entry["produces"] = list(frag.produces)
+        if frag.consumes:
+            entry["consumes"] = list(frag.consumes)
+        frag_list.append(entry)
 
     # Artifact-chain summary: who produces each artifact, who consumes it.
     artifact_chain: dict[str, dict] = {}

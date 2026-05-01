@@ -17,17 +17,19 @@ Examples:
     # Output JSON results to a file
     python run.py --evaluate --model claude --judge --output results/run1.json
 
-    # Generate variations → TOML (no LLM rewriting, preserves original prompts)
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50
+    # Generate variations to JSON (templates by default — no Haiku calls)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --output-json out.json
 
-    # Generate with optional LLM fragmentation and/or legitimization
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --legitimize
+    # Preserve original prompts (no template wrapping)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 50 --style direct --output-json out.json
 
-    # Generate with LLM style variations
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize
-    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --stylize --style direct,sysadmin,ctf
+    # Filter to specific styles, or use Haiku for LLM-rephrased styles
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --style direct,sysadmin,ctf --output-json out.json
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --no-style-templates --output-json out.json
+
+    # Apply LLM fragmentation or legitimization (seeds without authored fragments[] only)
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --fragment --output-json out.json
+    python run.py --generate --seed-file seeds/vibe_extortion.json --num-variations 10 --legitimize --output-json out.json
 """
 
 from __future__ import annotations
@@ -165,15 +167,10 @@ def parse_args() -> argparse.Namespace:
         help="Apply LLM legitimization (reframe steps with cover stories)",
     )
     p.add_argument(
-        "--stylize",
-        action="store_true",
-        help="Apply LLM style variations (rephrase each fragment into 10 styles)",
-    )
-    p.add_argument(
         "--style-templates",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Use template-based stylization during --stylize (default). "
+        help="Use template-based stylization (default — no Haiku calls). "
              "Pass --no-style-templates to use Haiku for LLM rephrasing instead.",
     )
     p.add_argument(
@@ -197,8 +194,6 @@ def parse_args() -> argparse.Namespace:
             gen_only.append("--seed-file")
         if args.seed is not None:
             gen_only.append("--seed")
-        if args.stylize:
-            gen_only.append("--stylize")
         if args.style_templates is not None:
             gen_only.append("--style-templates" if args.style_templates else "--no-style-templates")
         if args.fragment:
@@ -302,55 +297,6 @@ def _build_authored_fragment_groups(seed_data: dict, gen, seed: int):
         ))
 
     return groups
-
-
-def _shape_generated_fragments(
-    var: list[tuple[str, str]],
-    stage_descriptions: list[str],
-    *,
-    fragment: bool,
-    legitimize: bool,
-    api_key: str | None,
-    make_fragment_groups_fn,
-    legitimize_fragment_fn,
-) -> list:
-    """
-    Convert one generated variation into TOML-ready fragment blocks while
-    preserving the original stage boundary, stage-aligned fragment indices,
-    and human-meaningful descriptions.
-    """
-    from generator import GeneratedFragment
-
-    if len(stage_descriptions) != len(var):
-        raise ValueError("stage_descriptions must have the same length as var")
-
-    if fragment:
-        fragment_groups = make_fragment_groups_fn(var, api_key=api_key)
-    else:
-        fragment_groups = [[step] for step, _ in var]
-
-    if len(fragment_groups) != len(var):
-        raise ValueError("fragment_groups must preserve one outer group per input stage")
-
-    shaped: list[GeneratedFragment] = []
-    for idx, (group, description) in enumerate(zip(fragment_groups, stage_descriptions)):
-        if not group:
-            group = [var[idx][0]]
-
-        variations = []
-        for frag_text in group:
-            if legitimize:
-                frag_text = legitimize_fragment_fn(frag_text, api_key=api_key)
-            variations.append(frag_text)
-
-        shaped.append(
-            GeneratedFragment(
-                description=description or f"Stage {idx}",
-                variations=variations,
-            )
-        )
-
-    return shaped
 
 
 def run_campaign(spec, runner, args) -> dict:
@@ -476,7 +422,7 @@ def run_campaign(spec, runner, args) -> dict:
 
 
 def run_generate(args) -> None:
-    """Dataset generation pipeline: seed file → vary → [fragment] → [stylize] → [legitimize] → TOML."""
+    """Dataset generation pipeline: seed file → vary → [fragment] → stylize → [legitimize] → JSON."""
     import json as _json
     import random as _random
     import time as _time
@@ -528,7 +474,7 @@ def run_generate(args) -> None:
     seed_has_authored = any(
         s.get("fragments") for s in seed_data.get("attack_stages", [])
     )
-    if args.stylize and args.fragment and seed_has_authored:
+    if args.fragment and seed_has_authored:
         print(
             "ERROR: --fragment is incompatible with seeds that define authored "
             "fragments[] per stage (this seed does). The authored chain wiring "
@@ -537,15 +483,11 @@ def run_generate(args) -> None:
         )
         sys.exit(1)
 
+    use_templates = args.style_templates is not False
+
     print(f"Generating {args.num_variations} variation(s) "
           f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
-    if args.stylize:
-        print(f"  Styles: {', '.join(styles or STYLES)}")
-
-    stage_descriptions = [
-        stage.get("description", f"Stage {idx}")
-        for idx, stage in enumerate(seed_data.get("attack_stages", []))
-    ]
+    print(f"  Styles: {', '.join(styles or STYLES)}")
 
     final_frag_list: list[list] = []
     for i in range(args.num_variations):
@@ -561,62 +503,47 @@ def run_generate(args) -> None:
         print(f"  [{i+1}/{args.num_variations}] seed={seed}  stages={len(var)}", flush=True)
         t0 = _time.perf_counter()
 
-        if args.stylize:
-            if seed_has_authored:
-                groups_to_stylize = _build_authored_fragment_groups(
-                    seed_data, gen, seed
-                )
-            else:
-                if args.fragment:
-                    raw_groups = make_fragment_groups(var, api_key=api_key)
-                else:
-                    raw_groups = [[step] for step, _ in var]
-
-                groups_to_stylize = []
-                for idx, group in enumerate(raw_groups):
-                    if not group:
-                        group = [var[idx][0]]
-                    groups_to_stylize.append(FragmentGroup(
-                        parent_step=var[idx][0],
-                        parent_tactic=var[idx][1],
-                        sub_fragments=group,
-                    ))
-
-            use_templates = args.style_templates is not False
-            styled_fragments = []
-            for fragment_group in groups_to_stylize:
-                styled_fragments.extend(
-                    stylize_fragment_group(
-                        fragment_group,
-                        styles=styles,
-                        api_key=None if use_templates else api_key,
-                    )
-                )
-
-            if args.legitimize:
-                for styled_group in styled_fragments:
-                    for variation in styled_group.variations:
-                        variation.prompt = legitimize_fragment(
-                            variation.prompt,
-                            api_key=api_key,
-                        )
-
-            final_frag_list.append(styled_fragments)
-            n_frags = len(styled_fragments)
-            n_vars = sum(len(f.variations) for f in styled_fragments)
-        else:
-            shaped = _shape_generated_fragments(
-                var,
-                stage_descriptions,
-                fragment=args.fragment,
-                legitimize=args.legitimize,
-                api_key=api_key,
-                make_fragment_groups_fn=make_fragment_groups,
-                legitimize_fragment_fn=legitimize_fragment,
+        if seed_has_authored:
+            groups_to_stylize = _build_authored_fragment_groups(
+                seed_data, gen, seed
             )
-            final_frag_list.append(shaped)
-            n_frags = len(shaped)
-            n_vars = sum(len(f.variations) for f in shaped)
+        else:
+            if args.fragment:
+                raw_groups = make_fragment_groups(var, api_key=api_key)
+            else:
+                raw_groups = [[step] for step, _ in var]
+
+            groups_to_stylize = []
+            for idx, group in enumerate(raw_groups):
+                if not group:
+                    group = [var[idx][0]]
+                groups_to_stylize.append(FragmentGroup(
+                    parent_step=var[idx][0],
+                    parent_tactic=var[idx][1],
+                    sub_fragments=group,
+                ))
+
+        styled_fragments = []
+        for fragment_group in groups_to_stylize:
+            styled_fragments.extend(
+                stylize_fragment_group(
+                    fragment_group,
+                    styles=styles,
+                    api_key=None if use_templates else api_key,
+                )
+            )
+
+        if args.legitimize:
+            for styled_group in styled_fragments:
+                for variation in styled_group.variations:
+                    variation.prompt = legitimize_fragment(
+                        variation.prompt,
+                        api_key=api_key,
+                    )
+
+        final_frag_list.append(styled_fragments)
+        n_frags = len(styled_fragments)
+        n_vars = sum(len(f.variations) for f in styled_fragments)
 
         elapsed = _time.perf_counter() - t0
         print(f"      → fragments={n_frags}  variations={n_vars}  ({elapsed:.1f}s)", flush=True)
