@@ -11,6 +11,6 @@ all: $(MANUAL_RESULT_FILES)
 slow: all $(LLM_RESULT_FILES)
 
 results/%_manual.json: seeds/%.json
-	$(PYTHON) run.py --generate --seed-file $< --output-json $@
+	$(PYTHON) run.py --generate --seed-file $< --seed 0 --output-json $@
 results/%_llm.json: seeds/%.json
 	$(PYTHON) run.py --generate --seed-file $< --output-json $@ --no-style-templates --max-concurrency $(MAX_CONCURRENCY)
