@@ -39,6 +39,7 @@ COPY variations/ ./variations/
 COPY attack_picker.py ./
 COPY attack_success.py ./
 COPY attack_runner.py ./
+COPY attack_sysprompt*.txt ./
 
 # Make all writable dirs world-writable so they work whether the container
 # runs as root, fragbench, or `--user $(id -u):$(id -g)` from the Makefile.
