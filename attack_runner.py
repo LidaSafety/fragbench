@@ -701,7 +701,9 @@ async def _run_async(args: argparse.Namespace) -> int:
         os.environ.get("OPENROUTER_API_KEY")
         or os.environ.get("ANTHROPIC_API_KEY")
     )
-    if args.judge and not judge_api_key:
+    # ollama judge needs no API key (uses a dummy "ollama" key against the
+    # local OpenAI-compatible endpoint), so suppress the warning for it.
+    if args.judge and args.judge_backend != "ollama" and not judge_api_key:
         _log(
             "[attack_runner] --judge set but no OPENROUTER_API_KEY/ANTHROPIC_API_KEY; "
             "judge will fall back to keyword classifier per fragment."
@@ -717,9 +719,10 @@ async def _run_async(args: argparse.Namespace) -> int:
     target_backend, target_model = _extract_target_model(extra_args)
     judge_model_used = args.judge_model if args.judge else None
     if target_model or target_backend:
+        judge_label = f"{args.judge_backend}:{judge_model_used}" if judge_model_used else None
         _log(
             f"[attack_runner] target model: {target_backend or '?'}:{target_model or '?'}"
-            + (f"  judge: {judge_model_used}" if judge_model_used else "")
+            + (f"  judge: {judge_label}" if judge_label else "")
         )
     started_at = datetime.now(timezone.utc).isoformat()
 
