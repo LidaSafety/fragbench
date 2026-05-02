@@ -413,7 +413,7 @@ def llm_judge_fragment(
                 note=f"(anthropic judge error: {exc}, fell back to keyword)",
             )
 
-    # OpenRouter path (default)
+    # OpenAI-compatible path (openrouter, ollama)
     try:
         from openai import OpenAI
     except ImportError:
@@ -422,12 +422,19 @@ def llm_judge_fragment(
             note="(openai not installed, fell back to keyword)",
         )
 
-    resolved_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-    if not resolved_key:
-        return _keyword_fragment_result(
-            fragment, response=response, tool_results=tool_results,
-            note="(no API key for OpenRouter, fell back to keyword)",
-        )
+    if backend == "ollama":
+        # Ollama exposes an OpenAI-compatible endpoint at /v1. Auth is
+        # ignored but the SDK requires a non-empty key.
+        ollama_root = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        base_url = ollama_root if ollama_root.endswith("/v1") else ollama_root + "/v1"
+        resolved_key = "ollama"
+    else:
+        resolved_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+        if not resolved_key:
+            return _keyword_fragment_result(
+                fragment, response=response, tool_results=tool_results,
+                note="(no API key for OpenRouter, fell back to keyword)",
+            )
 
     try:
         client = OpenAI(api_key=resolved_key, base_url=base_url)

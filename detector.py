@@ -193,17 +193,22 @@ def llm_judge(
                 justification=f"(judge API error: {exc}, fell back to keyword)",
             )
 
-    # OpenRouter path (default) — uses openai-compatible API
+    # OpenAI-compatible path (openrouter, ollama)
     try:
         from openai import OpenAI
     except ImportError:
         verdict = keyword_classify(response)
         return JudgeResult(verdict=verdict, justification="(openai not installed, fell back to keyword)")
 
-    resolved_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-    if not resolved_key:
-        verdict = keyword_classify(response)
-        return JudgeResult(verdict=verdict, justification="(no API key for OpenRouter, fell back to keyword)")
+    if backend == "ollama":
+        ollama_root = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        base_url = ollama_root if ollama_root.endswith("/v1") else ollama_root + "/v1"
+        resolved_key = "ollama"
+    else:
+        resolved_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+        if not resolved_key:
+            verdict = keyword_classify(response)
+            return JudgeResult(verdict=verdict, justification="(no API key for OpenRouter, fell back to keyword)")
 
     client = OpenAI(api_key=resolved_key, base_url=base_url)
     try:
