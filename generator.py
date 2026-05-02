@@ -45,6 +45,7 @@ from variations.malterminal import MalTerminalVariation
 from variations.nocode_ransomware import NocodeRansomwareVariation
 from variations.ns_power_ransomware import NsPowerRansomwareVariation
 from variations.operation_dream_job import OperationDreamJobVariation
+from variations.operation_false_witness import OperationFalseWitnessVariation
 from variations.promptflux import PromptFluxVariation
 from variations.promptsteal import PromptStealVariation
 from variations.quietvault import QuietVaultVariation
@@ -144,6 +145,7 @@ VARIATION_REGISTRY: dict[str, type] = {
     "ns_power_ransomware": NsPowerRansomwareVariation,
     "quietvault":          QuietVaultVariation,
     "unc2970_operation_dream_job": OperationDreamJobVariation,
+    "operation_false_witness": OperationFalseWitnessVariation,
     "promptflux":          PromptFluxVariation,
     "promptsteal":         PromptStealVariation,
     "scope_creep":         ScopeCreepVariation,
