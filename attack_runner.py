@@ -246,6 +246,18 @@ async def _run_variation(
                     f"in {duration_ms / 1000:6.1f}s  → "
                     f"{session_path.name if session_path else '(no session)'}"
                 )
+                if rc != 0 and tail.strip():
+                    # Surface the tail of mcp_cli's merged stdout/stderr so the
+                    # actual error (e.g. ollama 404, OpenRouter 429, API key
+                    # missing) lands in attack_runner's log instead of getting
+                    # silently dropped into per_frag_meta. Capped to ~30 lines.
+                    snippet = "\n".join(tail.splitlines()[-30:])
+                    _log(
+                        f"  [{_ts()}] seed={picked.seed:<3} frag={frag.index:<2} "
+                        f"stdout tail (last 30 lines):\n{snippet}\n"
+                        f"  [{_ts()}] seed={picked.seed:<3} frag={frag.index:<2} "
+                        f"end-tail"
+                    )
                 per_frag_meta[frag.index] = {
                     "returncode": rc,
                     "session_path": str(session_path) if session_path else None,
