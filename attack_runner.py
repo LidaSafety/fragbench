@@ -419,9 +419,7 @@ def _build_graph_entry(
                 "justification": fo.justification if fo else "no outcome",
                 "classifier": fo.classifier if fo else "none",
                 "tools_executed": fo.tools_executed if fo else [],
-                "final_response_preview": (fo.final_response[:600] + "…")
-                if fo and len(fo.final_response) > 600
-                else (fo.final_response if fo else ""),
+                "final_response": fo.final_response if fo else "",
                 "artifacts_resolved": fo.artifacts_resolved if fo else {},
                 "artifacts_found": fo.artifacts_found if fo else {},
                 "session_path": fo.session_path if fo else meta.get("session_path"),
@@ -744,6 +742,8 @@ async def _run_async(args: argparse.Namespace) -> int:
         f"{args.max_parallel_variations * args.max_parallel_fragments} subprocesses concurrently"
     )
 
+    user_id_by_seed = {s: i for i, s in enumerate(seeds)}
+
     async def run_seed(s: int) -> tuple[int, VariationOutcome, dict[int, dict[str, Any]]]:
         oc, meta = await _run_variation(
             attacks[s],
@@ -765,6 +765,50 @@ async def _run_async(args: argparse.Namespace) -> int:
             f"  [{_ts()}] seed={s:<3} VARIATION {verdict}  classifier={cls_tag}  "
             f"frags=[{per_frag}]"
         )
+
+        # Flush this seed's chain + graph files as soon as it finishes so
+        # downstream consumers (viewer, eval scripts, crash recovery) see
+        # partial results without waiting for the slowest variation.
+        attack = attacks[s]
+        seed_ended_at = datetime.now(timezone.utc).isoformat()
+        campaign_label = attack.campaign_id or attack.campaign
+        chain_path = results_dir / chain_filename(run_id, s, campaign_label)
+        graph_path = results_dir / graph_filename(run_id, s, campaign_label)
+        try:
+            write_chain_file(
+                chain_path,
+                run_id=run_id,
+                seed=s,
+                attack=attack,
+                outcome=oc,
+                style=args.style,
+                fragments_path=str(fragments_path),
+                started_at=started_at,
+                ended_at=seed_ended_at,
+                target_model=target_model,
+                target_backend=target_backend,
+                judge_model=judge_model_used,
+            )
+            write_graph_entry_file(
+                graph_path,
+                run_id=run_id,
+                user_id=user_id_by_seed[s],
+                attack=attack,
+                outcome=oc,
+                fragment_meta=meta,
+                style=args.style,
+                fragments_path=str(fragments_path),
+                started_at=started_at,
+                ended_at=seed_ended_at,
+                target_model=target_model,
+                target_backend=target_backend,
+                judge_model=judge_model_used,
+            )
+            _log(f"  [{_ts()}] seed={s:<3} wrote {chain_path.name}")
+            _log(f"  [{_ts()}] seed={s:<3} wrote {graph_path.name}")
+        except Exception as exc:  # noqa: BLE001
+            _log(f"  [{_ts()}] seed={s:<3} ERROR writing per-seed files: {exc!r}")
+
         return s, oc, meta
 
     tasks = [asyncio.create_task(run_seed(s)) for s in seeds]
@@ -772,58 +816,10 @@ async def _run_async(args: argparse.Namespace) -> int:
     ended_at = datetime.now(timezone.utc).isoformat()
 
     outcomes: dict[int, VariationOutcome] = {}
-    metas: dict[int, dict[int, dict[str, Any]]] = {}
-    for seed, outcome, meta in results:
+    for seed, outcome, _meta in results:
         outcomes[seed] = outcome
-        metas[seed] = meta
 
     _print_summary(seeds, outcomes)
-
-    # Per-seed output: one chain file + one graph file per variation.
-    # Layout in ``results/runs/``:
-    #   <run_id>_seed_<seed>_<CAMPAIGN>.json              (chain)
-    #   attack_graph_<run_id_suffix>_seed_<seed>_<CAMPAIGN>.json  (graph)
-    written_chain: list[Path] = []
-    written_graph: list[Path] = []
-    for user_id, seed in enumerate(seeds):
-        attack = attacks.get(seed)
-        outcome = outcomes.get(seed)
-        if attack is None or outcome is None:
-            continue
-        campaign_label = attack.campaign_id or attack.campaign
-        chain_path = results_dir / chain_filename(run_id, seed, campaign_label)
-        graph_path = results_dir / graph_filename(run_id, seed, campaign_label)
-        write_chain_file(
-            chain_path,
-            run_id=run_id,
-            seed=seed,
-            attack=attack,
-            outcome=outcome,
-            style=args.style,
-            fragments_path=str(fragments_path),
-            started_at=started_at,
-            ended_at=ended_at,
-            target_model=target_model,
-            target_backend=target_backend,
-            judge_model=judge_model_used,
-        )
-        write_graph_entry_file(
-            graph_path,
-            run_id=run_id,
-            user_id=user_id,
-            attack=attack,
-            outcome=outcome,
-            fragment_meta=metas.get(seed, {}),
-            style=args.style,
-            fragments_path=str(fragments_path),
-            started_at=started_at,
-            ended_at=ended_at,
-            target_model=target_model,
-            target_backend=target_backend,
-            judge_model=judge_model_used,
-        )
-        written_chain.append(chain_path)
-        written_graph.append(graph_path)
 
     # Mark the meta marker as complete so the viewer can prefer per-seed
     # graph files going forward. Best-effort — losing this only affects the
@@ -842,11 +838,22 @@ async def _run_async(args: argparse.Namespace) -> int:
     except OSError:
         pass
 
+    # End-of-run filename summary. Filenames are deterministic from
+    # (run_id, seed, campaign_label) so we reconstruct them rather than
+    # threading lists out of run_seed.
     _log("")
-    for p in written_chain:
-        _log(f"[attack_runner] wrote chain  {p.name}")
-    for p in written_graph:
-        _log(f"[attack_runner] wrote graph  {p.name}")
+    for s in seeds:
+        attack = attacks.get(s)
+        if attack is None or s not in outcomes:
+            continue
+        campaign_label = attack.campaign_id or attack.campaign
+        _log(f"[attack_runner] wrote chain  {chain_filename(run_id, s, campaign_label)}")
+    for s in seeds:
+        attack = attacks.get(s)
+        if attack is None or s not in outcomes:
+            continue
+        campaign_label = attack.campaign_id or attack.campaign
+        _log(f"[attack_runner] wrote graph  {graph_filename(run_id, s, campaign_label)}")
     _log(f"[attack_runner] viewer: http://localhost:8787/graph.html?run={run_id}")
 
     return 0
