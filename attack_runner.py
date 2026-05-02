@@ -41,7 +41,7 @@ from attack_picker import PickedAttack, PickedFragment, list_seeds, pick_attack
 from attack_success import (
     JUDGE_SYSTEM,  # noqa: F401  (re-exported so callers can introspect)
     VariationOutcome,
-    check_variation,
+    check_variation_async,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -267,14 +267,19 @@ async def _run_variation(
                 per_frag_meta.setdefault(idx, {})["error"] = repr(exc)
                 sessions[idx] = None
 
-    outcome = check_variation(
-        picked,
-        sessions,
-        use_judge=use_judge,
-        judge_model=judge_model,
-        judge_backend=judge_backend,
-        judge_api_key=judge_api_key,
-    )
+        # Judge inside the variation semaphore so a variation's judge fan-out
+        # counts against MAX_PARALLEL_VARIATIONS rather than letting a fresh
+        # variation grab the slot and overlap its fragment work with the
+        # judge burst — caps total OpenRouter request concurrency.
+        outcome = await check_variation_async(
+            picked,
+            sessions,
+            use_judge=use_judge,
+            judge_model=judge_model,
+            judge_backend=judge_backend,
+            judge_api_key=judge_api_key,
+        )
+
     return outcome, per_frag_meta
 
 

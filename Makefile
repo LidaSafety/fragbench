@@ -363,7 +363,7 @@ clean-runtime:
 #   FRAGMENTS=<path>             default: results/promptsteal_fragments.json
 #   STYLE=<style>                default: direct
 #   SEEDS=<spec>                 default: all (e.g. 0-9 or 0,1,5)
-#   MAX_PARALLEL_VARIATIONS=<n>  default: 2
+#   MAX_PARALLEL_VARIATIONS=<n>  default: 4
 #   MAX_PARALLEL_FRAGMENTS=<n>   default: 2
 #   JUDGE=0|1                    default: 0 (uses keyword fallback)
 #   JUDGE_MODEL=<id>             default: anthropic/claude-haiku-4.5
@@ -375,7 +375,7 @@ clean-runtime:
 FRAGMENTS ?= results/promptsteal_fragments.json
 STYLE ?= direct
 SEEDS ?=
-MAX_PARALLEL_VARIATIONS ?= 2
+MAX_PARALLEL_VARIATIONS ?= 4
 MAX_PARALLEL_FRAGMENTS ?= 2
 ATTACK_RUN_ID ?=
 
