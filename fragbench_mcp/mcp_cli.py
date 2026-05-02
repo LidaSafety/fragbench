@@ -531,7 +531,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     p.add_argument("--judge", action="store_true", help="Run LLM-as-judge after each variation (background thread).")
     p.add_argument("--judge-model", default="anthropic/claude-haiku-4.5", help="Model id for LLM judge (OpenRouter format by default).")
-    p.add_argument("--judge-backend", choices=["openrouter", "anthropic"], default="openrouter", help="Backend for LLM judge (default: openrouter).")
+    p.add_argument("--judge-backend", choices=["openrouter", "anthropic", "ollama"], default="openrouter", help="Backend for LLM judge (default: openrouter; ollama uses OLLAMA_BASE_URL).")
     return p.parse_args(argv)
 
 

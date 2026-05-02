@@ -581,9 +581,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--judge-backend",
-        choices=["openrouter", "anthropic"],
+        choices=["openrouter", "anthropic", "ollama"],
         default="openrouter",
-        help="Backend for the success judge (default: openrouter).",
+        help="Backend for the success judge (default: openrouter). "
+             "ollama uses OLLAMA_BASE_URL (default http://127.0.0.1:11434).",
     )
     p.add_argument(
         "--no-forward-judge",

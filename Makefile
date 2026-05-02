@@ -367,7 +367,8 @@ clean-runtime:
 #   MAX_PARALLEL_FRAGMENTS=<n>   default: 2
 #   JUDGE=0|1                    default: 0 (uses keyword fallback)
 #   JUDGE_MODEL=<id>             default: anthropic/claude-haiku-4.5
-#   JUDGE_BACKEND=openrouter|anthropic   default: openrouter
+#   JUDGE_MODEL_BACKEND=openrouter|anthropic|ollama  default: openrouter
+#                                          (legacy alias: JUDGE_BACKEND)
 #   MODEL_BACKEND=ollama|openrouter|vllm default: ollama
 #   MODEL=<id>                   default: huihui_ai/qwen3.5-abliterated:35b
 #   ATTACK_RUN_ID=<id>           override generated run id
@@ -395,10 +396,15 @@ DOCKER_REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.docker.toml
 DOCKER_OLLAMA_URL ?= http://host.docker.internal:11434
 DOCKER_VLLM_URL ?= http://host.docker.internal:8000/v1
 
-# Verdict judge config — set JUDGE=1 to enable LLM-as-judge after each variation
+# Verdict judge config — set JUDGE=1 to enable LLM-as-judge after each variation.
+# JUDGE_MODEL_BACKEND is the canonical name (mirrors MCP_MODEL_BACKEND).
+# JUDGE_BACKEND is a legacy alias kept for backward-compat with existing
+# scripts. Setting either has the same effect; if both are set,
+# JUDGE_MODEL_BACKEND wins.
 JUDGE ?= 0
 JUDGE_MODEL ?= anthropic/claude-haiku-4.5
-JUDGE_BACKEND ?= openrouter
+JUDGE_MODEL_BACKEND ?= $(or $(JUDGE_BACKEND),openrouter)
+JUDGE_BACKEND := $(JUDGE_MODEL_BACKEND)
 
 .PHONY: docker-up docker-down docker-status docker-ensure-up docker-cli docker-attack-run docker-chain-run docker-clean
 
