@@ -11,4 +11,5 @@ build/
 *.log
 logs/*.jsonl
 *.lock
-/key.txt
+/key*.txt
+/results/runs
