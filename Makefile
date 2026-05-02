@@ -534,10 +534,22 @@ docker-chain-run: docker-ensure-up
 # Legacy aliases MODEL_BACKEND / MODEL are still accepted (set near top of
 # Makefile so $(MODEL) and $(MCP_MODEL) always resolve to the same value).
 # Other knobs: FRAGMENTS, STYLE, SEEDS, MAX_PARALLEL_*, ATTACK_RUN_ID.
+SYSTEM_PROMPT ?=
 docker-attack-graph-run: docker-ensure-up
 	@EFFECTIVE_MODEL="$(MCP_MODEL)"; \
 	if [ "$(MCP_MODEL_BACKEND)" = "ollama" ]; then \
 	  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
+	fi; \
+	SYSPROMPT_MOUNT=""; \
+	SYSPROMPT_RUNNER_ARG=""; \
+	if [ -n "$(SYSTEM_PROMPT)" ]; then \
+	  SP_HOST="$$( $(PY) -c 'import sys,os; print(os.path.abspath(sys.argv[1]))' "$(SYSTEM_PROMPT)" )"; \
+	  if [ ! -f "$$SP_HOST" ]; then echo "ERROR: SYSTEM_PROMPT not found: $$SP_HOST"; exit 2; fi; \
+	  SYSPROMPT_MOUNT="-v $$SP_HOST:/app/attack_sysprompt_override.txt:ro"; \
+	  SYSPROMPT_RUNNER_ARG="--system-prompt /app/attack_sysprompt_override.txt"; \
+	  echo "System prompt: $$SP_HOST -> /app/attack_sysprompt_override.txt"; \
+	else \
+	  echo "System prompt: (default — /app/attack_sysprompt1.txt baked into image)"; \
 	fi; \
 	echo "MCP target:  $(MCP_MODEL_BACKEND):$$EFFECTIVE_MODEL"; \
 	if [ "$(JUDGE)" = "1" ]; then echo "JUDGE LLM:   $(JUDGE_BACKEND):$(JUDGE_MODEL)"; \
@@ -554,6 +566,7 @@ docker-attack-graph-run: docker-ensure-up
 		-e MCP_MODEL_BACKEND="$(MCP_MODEL_BACKEND)" \
 		-e MCP_MODEL="$$EFFECTIVE_MODEL" \
 		-e PYTHONUNBUFFERED=1 \
+		$$SYSPROMPT_MOUNT \
 		--entrypoint python \
 		mcp-client -u attack_runner.py \
 			--fragments "$(FRAGMENTS)" \
@@ -562,6 +575,7 @@ docker-attack-graph-run: docker-ensure-up
 			--max-parallel-variations "$(MAX_PARALLEL_VARIATIONS)" \
 			--max-parallel-fragments "$(MAX_PARALLEL_FRAGMENTS)" \
 			--log-dir "$(LOG_DIR)" \
+			$$SYSPROMPT_RUNNER_ARG \
 			--mcp-arg=--model-backend --mcp-arg="$(MCP_MODEL_BACKEND)" \
 			--mcp-arg=--model --mcp-arg="$$EFFECTIVE_MODEL" \
 			$(if $(filter 1,$(JUDGE)),--judge --judge-model "$(JUDGE_MODEL)" --judge-backend "$(JUDGE_BACKEND)") \

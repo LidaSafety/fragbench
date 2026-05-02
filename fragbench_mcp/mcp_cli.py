@@ -523,6 +523,11 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--stage-index", type=int, default=None, help="TOML fragment/stage index for this run.")
     p.add_argument("--variation-index", type=int, default=None, help="Variation index within the stage.")
     p.add_argument("--style", default=None, help="Style of the picked variation (e.g. direct, sysadmin).")
+    p.add_argument(
+        "--system-prompt-file",
+        default=None,
+        help="Path to a file whose contents are used as the system prompt for the MCP model.",
+    )
     p.add_argument("--judge", action="store_true", help="Run LLM-as-judge after each variation (background thread).")
     p.add_argument("--judge-model", default="anthropic/claude-haiku-4.5", help="Model id for LLM judge (OpenRouter format by default).")
     p.add_argument("--judge-backend", choices=["openrouter", "anthropic"], default="openrouter", help="Backend for LLM judge (default: openrouter).")
@@ -537,6 +542,15 @@ async def main(argv: Optional[List[str]] = None) -> None:
         print("Error: OPENROUTER_API_KEY not set.")
         return
 
+    system_prompt: Optional[str] = None
+    if args.system_prompt_file:
+        sp_path = Path(args.system_prompt_file)
+        if not sp_path.exists():
+            print(f"Error: --system-prompt-file not found: {sp_path}")
+            return
+        system_prompt = sp_path.read_text(encoding="utf-8")
+        print(f"System prompt loaded from {sp_path} ({len(system_prompt)} chars)")
+
     client = MCPOpenRouterClientV1(
         model=args.model,
         base_url=args.base_url,
@@ -544,6 +558,7 @@ async def main(argv: Optional[List[str]] = None) -> None:
         ollama_base_url=args.ollama_base_url,
         vllm_base_url=args.vllm_base_url,
         vllm_api_key=args.vllm_api_key,
+        system_prompt=system_prompt,
         default_max_iterations=args.max_iterations,
         temperature=args.temperature,
         max_tokens=args.max_tokens,

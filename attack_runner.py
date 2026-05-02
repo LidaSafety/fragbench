@@ -48,6 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 DEFAULT_FRAGMENTS = REPO_ROOT / "results" / "promptsteal_fragments.json"
 DEFAULT_RESULTS_DIR = REPO_ROOT / "results" / "runs"
 DEFAULT_LOG_DIR = REPO_ROOT / "logs"
+DEFAULT_SYSTEM_PROMPT = REPO_ROOT / "attack_sysprompt1.txt"
 MCP_CLI_PATH = REPO_ROOT / "fragbench_mcp" / "mcp_cli.py"
 
 
@@ -556,6 +557,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--system-prompt",
+        default=str(DEFAULT_SYSTEM_PROMPT),
+        help=(
+            "Path to a file whose contents are used as the system prompt for "
+            "the MCP target model. Defaults to attack_sysprompt1.txt at the "
+            "repo root."
+        ),
+    )
+    p.add_argument(
         "--judge",
         action="store_true",
         help="Use the LLM judge for fragment success (mirror of mcp_cli.py --judge). "
@@ -653,6 +663,24 @@ async def _run_async(args: argparse.Namespace) -> int:
 
     var_sem = asyncio.Semaphore(max(1, args.max_parallel_variations))
     extra_args = list(args.mcp_arg or [])
+
+    sysprompt_path = Path(args.system_prompt).resolve()
+    user_specified_sysprompt = args.system_prompt != str(DEFAULT_SYSTEM_PROMPT)
+    if sysprompt_path.exists():
+        extra_args.extend(["--system-prompt-file", str(sysprompt_path)])
+        _log(f"[attack_runner] system prompt: {sysprompt_path}")
+    elif user_specified_sysprompt:
+        print(
+            f"ERROR: system prompt file not found: {sysprompt_path}",
+            file=sys.stderr,
+        )
+        return 2
+    else:
+        _log(
+            f"[attack_runner] default system prompt {sysprompt_path} not found; "
+            "running with no system prompt."
+        )
+
     judge_api_key = (
         os.environ.get("OPENROUTER_API_KEY")
         or os.environ.get("ANTHROPIC_API_KEY")
