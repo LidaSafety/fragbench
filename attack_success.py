@@ -623,3 +623,45 @@ def check_variation(
         passed=passed,
         fragments=fragments_outcome,
     )
+
+
+async def check_variation_async(
+    attack: PickedAttack,
+    session_paths_by_fragment: dict[int, str | Path | None],
+    *,
+    use_judge: bool = True,
+    judge_model: str = "anthropic/claude-haiku-4.5",
+    judge_backend: str = "openrouter",
+    judge_api_key: str | None = None,
+) -> VariationOutcome:
+    """Concurrent variant of :func:`check_variation`.
+
+    ``check_fragment`` uses the synchronous OpenAI/Anthropic SDKs, so each
+    call would otherwise block the event loop. We dispatch every fragment's
+    judge call to a worker thread via ``asyncio.to_thread`` and gather them,
+    which collapses N sequential ~1–3s judge HTTP calls into a single
+    parallel batch — meaningful tail-latency win on long variations.
+    """
+    import asyncio
+
+    coros = [
+        asyncio.to_thread(
+            check_fragment,
+            f,
+            session_paths_by_fragment.get(f.index),
+            use_judge=use_judge,
+            judge_model=judge_model,
+            judge_backend=judge_backend,
+            judge_api_key=judge_api_key,
+        )
+        for f in attack.fragments
+    ]
+    fragments_outcome = list(await asyncio.gather(*coros))
+    passed = all(fo.passed for fo in fragments_outcome)
+    return VariationOutcome(
+        seed=attack.seed,
+        style=attack.style,
+        campaign_id=attack.campaign_id,
+        passed=passed,
+        fragments=fragments_outcome,
+    )
