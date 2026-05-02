@@ -83,6 +83,7 @@ help:
 	@echo "Targets (Docker-isolated):"
 	@echo "  make docker-up         - Start MCP servers + viewer in containers"
 	@echo "  make docker-down       - Stop all containers"
+	@echo "  make docker-clean      - Remove all containers/networks for this project (incl. orphans)"
 	@echo "  make docker-status     - Show container status"
 	@echo "  make docker-cli        - Interactive MCP CLI inside container"
 	@echo "  make docker-attack-run - Single TOML stage/variation in container"
@@ -399,7 +400,7 @@ JUDGE ?= 0
 JUDGE_MODEL ?= anthropic/claude-haiku-4.5
 JUDGE_BACKEND ?= openrouter
 
-.PHONY: docker-up docker-down docker-status docker-ensure-up docker-cli docker-attack-run docker-chain-run
+.PHONY: docker-up docker-down docker-status docker-ensure-up docker-cli docker-attack-run docker-chain-run docker-clean
 
 docker-up:
 	@$(DOCKER_COMPOSE) up -d
@@ -419,6 +420,25 @@ docker-down:
 
 docker-status:
 	@$(DOCKER_COMPOSE) ps
+
+# Tear down EVERY container/network/volume associated with this project,
+# including orphans left behind by an earlier project name (e.g. when the
+# repo directory was renamed and Docker Compose started prefixing
+# containers differently). Removes both `fragbench-*` and `fragbench2-*`
+# stacks and their networks. Volumes that bind-mount host paths
+# (./logs, ./results) are NOT touched — only Docker-managed volumes.
+docker-clean:
+	@echo "Stopping current compose project ..."
+	@$(DOCKER_COMPOSE) down --remove-orphans --volumes 2>/dev/null || true
+	@echo "Removing any stray fragbench-/fragbench2- containers ..."
+	@IDS="$$(docker ps -aq --filter 'name=^fragbench-' --filter 'name=^fragbench2-' 2>/dev/null)"; \
+	if [ -n "$$IDS" ]; then docker rm -f $$IDS; else echo "  (none)"; fi
+	@echo "Removing stray fragbench/fragbench2 networks ..."
+	@for net in fragbench_internal_mgmt fragbench_egress_pipe fragbench_viewer-net \
+	            fragbench2_internal_mgmt fragbench2_egress_pipe fragbench2_viewer-net; do \
+	  docker network rm "$$net" >/dev/null 2>&1 && echo "  removed $$net" || true; \
+	done
+	@echo "Done. Run 'make docker-up' to start a clean stack."
 
 define DOCKER_CLIENT_CMD
 EFFECTIVE_MODEL="$(MODEL)"; \

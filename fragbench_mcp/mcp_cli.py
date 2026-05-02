@@ -10,6 +10,7 @@ import json
 import os
 import re
 import signal
+import sys
 import threading
 import time
 import uuid
@@ -534,20 +535,20 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-async def main(argv: Optional[List[str]] = None) -> None:
+async def main(argv: Optional[List[str]] = None) -> int:
     _load_env_file()
     args = _parse_args(argv)
 
     if args.model_backend == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
         print("Error: OPENROUTER_API_KEY not set.")
-        return
+        return 1
 
     system_prompt: Optional[str] = None
     if args.system_prompt_file:
         sp_path = Path(args.system_prompt_file)
         if not sp_path.exists():
             print(f"Error: --system-prompt-file not found: {sp_path}")
-            return
+            return 1
         system_prompt = sp_path.read_text(encoding="utf-8")
         print(f"System prompt loaded from {sp_path} ({len(system_prompt)} chars)")
 
@@ -610,6 +611,20 @@ async def main(argv: Optional[List[str]] = None) -> None:
                 print(f"Connected toolkit set: {connected_toolkits if connected_toolkits else '[none]'}")
                 if conv_logger:
                     conv_logger.update_toolkits(connected_toolkits)
+                if not connected_toolkits:
+                    # Fail loud: running with --auto-toolkits but zero toolkits
+                    # connected means no `tools=[…]` reaches the LLM call, so the
+                    # model can only hallucinate `<tool_call>` blocks in plain
+                    # text and no real tools execute. Treat as a hard error so
+                    # attack_runner surfaces the failure (rc != 0) instead of
+                    # silently producing fake-tool-call sessions.
+                    print(
+                        "Error: --auto-toolkits set but zero toolkits connected. "
+                        "Check the registry path (MCP_REGISTRY_PATH) and that the "
+                        "MCP server containers are reachable on the same Docker "
+                        "network as this client."
+                    )
+                    return 1
             else:
                 if args.transport == "sse":
                     await client.connect_to_http_server(
@@ -624,21 +639,22 @@ async def main(argv: Optional[List[str]] = None) -> None:
                 print(f"Connected: {args.server_name} -> {args.server_url} ({args.transport})")
         except Exception as exc:
             print(f"Failed to connect to {args.server_url}: {exc}")
-            return
+            return 1
 
         await asyncio.sleep(0.1)
 
         try:
             if args.prompt:
                 print(await client.process_query(args.prompt))
-                return
+                return 0
 
             if args.non_interactive:
                 prompt = input("prompt: ")
                 print(await client.process_query(prompt))
-                return
+                return 0
 
             await _interactive_loop(client)
+            return 0
         finally:
             if conv_logger:
                 conv_logger.close()
@@ -650,8 +666,9 @@ if __name__ == "__main__":
     asyncio.set_event_loop(loop)
     _configure_signal_handlers(loop)
     task = loop.create_task(main())
+    exit_code = 0
     try:
-        loop.run_until_complete(task)
+        exit_code = loop.run_until_complete(task) or 0
     except KeyboardInterrupt:
         with suppress(Exception):
             signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -664,5 +681,7 @@ if __name__ == "__main__":
             t.cancel()
         with suppress(asyncio.CancelledError):
             loop.run_until_complete(asyncio.gather(*pending))
+        exit_code = 130
     finally:
         loop.close()
+    sys.exit(exit_code)
