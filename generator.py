@@ -51,6 +51,7 @@ from variations.promptflux import PromptFluxVariation
 from variations.promptsteal import PromptStealVariation
 from variations.quietvault import QuietVaultVariation
 from variations.scope_creep import ScopeCreepVariation
+from variations.ru_malware_clusters import RuMalwareClustersVariation
 from variations.coral_sleet import CoralSleetVariation
 from variations.tycoon2fa import Tycoon2FAVariation
 from variations.dprk_fraud import DPRKFraudVariation
@@ -153,6 +154,7 @@ VARIATION_REGISTRY: dict[str, type] = {
     "promptflux":          PromptFluxVariation,
     "promptsteal":         PromptStealVariation,
     "scope_creep":         ScopeCreepVariation,
+    "ru_malware_clusters": RuMalwareClustersVariation,
     "coral_sleet":         CoralSleetVariation,
     "tycoon2fa":           Tycoon2FAVariation,
     "vibe_extortion":      VibeExtortionVariation,
