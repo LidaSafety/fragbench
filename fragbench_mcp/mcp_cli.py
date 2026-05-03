@@ -449,10 +449,14 @@ class ConversationLogger:
                 model=self._judge_model,
                 backend=self._judge_backend,
             )
+            raw = result.raw_judge_response or ""
+            if len(raw) > 800:
+                raw = raw[:800] + "…"
             self._emit("verdict", {
                 "verdict": result.verdict,
                 "classifier": "llm_judge",
                 "justification": result.justification,
+                "raw_judge_response": raw,
             })
         except Exception:
             pass

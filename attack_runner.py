@@ -372,6 +372,11 @@ def write_chain_file(
                 "verdict": fo.verdict if fo else None,
                 "justification": fo.justification if fo else "no outcome",
                 "classifier": fo.classifier if fo else "none",
+                "raw_judge_response": (
+                    (fo.raw_judge_response[:800] + "…")
+                    if fo and len(fo.raw_judge_response) > 800
+                    else (fo.raw_judge_response if fo else "")
+                ),
             }
         )
     target_label = (
@@ -435,6 +440,11 @@ def _build_graph_entry(
                 "verdict": fo.verdict if fo else None,
                 "justification": fo.justification if fo else "no outcome",
                 "classifier": fo.classifier if fo else "none",
+                "raw_judge_response": (
+                    (fo.raw_judge_response[:800] + "…")
+                    if fo and len(fo.raw_judge_response) > 800
+                    else (fo.raw_judge_response if fo else "")
+                ),
                 "tools_executed": fo.tools_executed if fo else [],
                 "final_response": fo.final_response if fo else "",
                 "artifacts_resolved": fo.artifacts_resolved if fo else {},
