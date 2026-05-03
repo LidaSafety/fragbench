@@ -48,7 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 DEFAULT_FRAGMENTS = REPO_ROOT / "results" / "promptsteal_fragments.json"
 DEFAULT_RESULTS_DIR = REPO_ROOT / "results" / "runs"
 DEFAULT_LOG_DIR = REPO_ROOT / "logs"
-DEFAULT_SYSTEM_PROMPT = REPO_ROOT / "attack_sysprompt1.txt"
+DEFAULT_SYSTEM_PROMPT = REPO_ROOT / "attack_sysprompt2.txt"
 MCP_CLI_PATH = REPO_ROOT / "fragbench_mcp" / "mcp_cli.py"
 
 
