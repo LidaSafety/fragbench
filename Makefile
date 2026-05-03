@@ -562,6 +562,8 @@ docker-chain-run: docker-ensure-up
 # Other knobs: FRAGMENTS, STYLE, SEEDS, MAX_PARALLEL_*, ATTACK_RUN_ID.
 SYSTEM_PROMPT ?=
 docker-attack-graph-run: docker-ensure-up
+	@echo "Resetting /workspace (restarting server-filesystem) ..."
+	@$(DOCKER_COMPOSE) restart server-filesystem >/dev/null 2>&1 || true
 	@EFFECTIVE_MODEL="$(MCP_MODEL)"; \
 	if [ "$(MCP_MODEL_BACKEND)" = "ollama" ]; then \
 	  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \

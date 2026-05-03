@@ -74,8 +74,12 @@ services:
     build:
       context: .
       dockerfile: fragbench_mcp/servers/filesystem/Dockerfile
-    volumes:
-      - ./fragbench_mcp/servers/filesystem/data/mock_fs:/workspace:ro
+    # /workspace is a writable tmpfs seeded from /workspace-seed (baked
+    # into the image) at container start. Fragments and variations within
+    # one filesystem-server lifetime see each other's writes; restart this
+    # container to reset to a fresh seed (e.g. between attack_runner runs).
+    tmpfs:
+      - /workspace:size=128m
 
   server-shell:
     <<: *server-base
