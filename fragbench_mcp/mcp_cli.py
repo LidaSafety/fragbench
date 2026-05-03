@@ -261,6 +261,7 @@ class ConversationLogger:
             tool_calls = message.get("tool_calls") or []
             tool_names: List[str] = []
             tool_call_details: List[Dict[str, Any]] = []
+            tool_call_full: List[Dict[str, Any]] = []
             for tc in tool_calls:
                 if isinstance(tc, dict):
                     fn = tc.get("function") or {}
@@ -271,13 +272,19 @@ class ConversationLogger:
                     name = getattr(fn, "name", "?")
                     raw_args = getattr(fn, "arguments", "")
                 tool_names.append(name)
-                args_preview = raw_args if isinstance(raw_args, str) else json.dumps(raw_args, default=str)
-                if len(args_preview) > 1200:
-                    args_preview = args_preview[:1200] + "…"
+                args_str = raw_args if isinstance(raw_args, str) else json.dumps(raw_args, default=str)
+                args_preview = args_str if len(args_str) <= 1200 else args_str[:1200] + "…"
                 tool_call_details.append(
                     {
                         "name": name,
                         "arguments_preview": args_preview,
+                    }
+                )
+                tool_call_full.append(
+                    {
+                        "name": name,
+                        "arguments": args_str,
+                        "arguments_bytes": len(args_str),
                     }
                 )
             self._tool_calls_this_iter = len(tool_calls)
@@ -313,6 +320,19 @@ class ConversationLogger:
                 "is_final": len(tool_calls) == 0,
             })
 
+            # Per-call tool_call events with the FULL arguments string
+            # (no length cap) — paired with subsequent tool_result events
+            # so the JSONL is self-sufficient for replay/debugging without
+            # needing to reconstruct intent from the truncated preview.
+            for i, tc_full in enumerate(tool_call_full, start=1):
+                self._emit("tool_call", {
+                    "iteration": iteration,
+                    "tool": tc_full["name"],
+                    "arguments": tc_full["arguments"],
+                    "arguments_bytes": tc_full["arguments_bytes"],
+                    "tool_call_index": f"{i}/{len(tool_call_full)}",
+                })
+
         elif role == "tool":
             self._tool_results_this_iter += 1
             tool_name = message.get("name", "?")
@@ -322,7 +342,7 @@ class ConversationLogger:
             if "error" in raw.lower()[:200] or "validation error" in raw.lower()[:200]:
                 success = False
 
-            result_preview = raw[:400] + "…" if len(raw) > 400 else raw
+            result_preview = raw[:8000] + "…" if len(raw) > 8000 else raw
             # try to parse for structured preview
             try:
                 parsed = json.loads(raw)
@@ -332,11 +352,11 @@ class ConversationLogger:
                         inner = first["text"]
                         try:
                             inner_parsed = json.loads(inner)
-                            result_preview = json.dumps(inner_parsed, indent=None, default=str)[:400]
+                            result_preview = json.dumps(inner_parsed, indent=None, default=str)[:8000]
                             if isinstance(inner_parsed, dict):
                                 success = inner_parsed.get("success", success)
                         except (json.JSONDecodeError, TypeError):
-                            result_preview = inner[:400]
+                            result_preview = inner[:8000]
             except (json.JSONDecodeError, TypeError):
                 pass
 
