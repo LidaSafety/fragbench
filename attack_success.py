@@ -174,6 +174,7 @@ class FragmentOutcome:
     tools_executed: list[list[str]]
     final_response: str
     session_path: str | None = None
+    raw_judge_response: str = ""
 
 
 @dataclass
@@ -413,7 +414,7 @@ def llm_judge_fragment(
                 note=f"(anthropic judge error: {exc}, fell back to keyword)",
             )
 
-    # OpenRouter path (default)
+    # OpenAI-compatible path (openrouter, ollama)
     try:
         from openai import OpenAI
     except ImportError:
@@ -422,12 +423,19 @@ def llm_judge_fragment(
             note="(openai not installed, fell back to keyword)",
         )
 
-    resolved_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-    if not resolved_key:
-        return _keyword_fragment_result(
-            fragment, response=response, tool_results=tool_results,
-            note="(no API key for OpenRouter, fell back to keyword)",
-        )
+    if backend == "ollama":
+        # Ollama exposes an OpenAI-compatible endpoint at /v1. Auth is
+        # ignored but the SDK requires a non-empty key.
+        ollama_root = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        base_url = ollama_root if ollama_root.endswith("/v1") else ollama_root + "/v1"
+        resolved_key = "ollama"
+    else:
+        resolved_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+        if not resolved_key:
+            return _keyword_fragment_result(
+                fragment, response=response, tool_results=tool_results,
+                note="(no API key for OpenRouter, fell back to keyword)",
+            )
 
     try:
         client = OpenAI(api_key=resolved_key, base_url=base_url)
@@ -588,6 +596,7 @@ def check_fragment(
         classifier=judge.classifier,
         artifacts_resolved=artifacts_resolved,
         artifacts_found=artifacts_found,
+        raw_judge_response=getattr(judge, "raw_judge_response", "") or "",
         tools_executed=tool_calls,
         final_response=response[:4000],
         session_path=str(session_path) if session_path else None,
@@ -615,6 +624,48 @@ def check_variation(
                 judge_api_key=judge_api_key,
             )
         )
+    passed = all(fo.passed for fo in fragments_outcome)
+    return VariationOutcome(
+        seed=attack.seed,
+        style=attack.style,
+        campaign_id=attack.campaign_id,
+        passed=passed,
+        fragments=fragments_outcome,
+    )
+
+
+async def check_variation_async(
+    attack: PickedAttack,
+    session_paths_by_fragment: dict[int, str | Path | None],
+    *,
+    use_judge: bool = True,
+    judge_model: str = "anthropic/claude-haiku-4.5",
+    judge_backend: str = "openrouter",
+    judge_api_key: str | None = None,
+) -> VariationOutcome:
+    """Concurrent variant of :func:`check_variation`.
+
+    ``check_fragment`` uses the synchronous OpenAI/Anthropic SDKs, so each
+    call would otherwise block the event loop. We dispatch every fragment's
+    judge call to a worker thread via ``asyncio.to_thread`` and gather them,
+    which collapses N sequential ~1–3s judge HTTP calls into a single
+    parallel batch — meaningful tail-latency win on long variations.
+    """
+    import asyncio
+
+    coros = [
+        asyncio.to_thread(
+            check_fragment,
+            f,
+            session_paths_by_fragment.get(f.index),
+            use_judge=use_judge,
+            judge_model=judge_model,
+            judge_backend=judge_backend,
+            judge_api_key=judge_api_key,
+        )
+        for f in attack.fragments
+    ]
+    fragments_outcome = list(await asyncio.gather(*coros))
     passed = all(fo.passed for fo in fragments_outcome)
     return VariationOutcome(
         seed=attack.seed,

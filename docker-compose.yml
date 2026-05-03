@@ -13,6 +13,13 @@ services:
       dockerfile: Dockerfile
       target: mcp-client
     networks: [internal_mgmt, egress_pipe]
+    # Linux Docker doesn't provide host.docker.internal by default; the
+    # `host-gateway` magic value tells Docker to resolve it to the host's
+    # bridge IP at container start, so the default OLLAMA_BASE_URL works
+    # without a per-host IP override. No-op on Mac/Windows where Docker
+    # Desktop already provides this alias.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - OPENROUTER_API_KEY
       - OPENAI_API_KEY
@@ -67,8 +74,12 @@ services:
     build:
       context: .
       dockerfile: fragbench_mcp/servers/filesystem/Dockerfile
-    volumes:
-      - ./fragbench_mcp/servers/filesystem/data/mock_fs:/workspace:ro
+    # /workspace is a writable tmpfs seeded from /workspace-seed (baked
+    # into the image) at container start. Fragments and variations within
+    # one filesystem-server lifetime see each other's writes; restart this
+    # container to reset to a fresh seed (e.g. between attack_runner runs).
+    tmpfs:
+      - /workspace:size=128m
 
   server-shell:
     <<: *server-base
