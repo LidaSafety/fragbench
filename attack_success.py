@@ -174,6 +174,7 @@ class FragmentOutcome:
     tools_executed: list[list[str]]
     final_response: str
     session_path: str | None = None
+    raw_judge_response: str = ""
 
 
 @dataclass
@@ -595,6 +596,7 @@ def check_fragment(
         classifier=judge.classifier,
         artifacts_resolved=artifacts_resolved,
         artifacts_found=artifacts_found,
+        raw_judge_response=getattr(judge, "raw_judge_response", "") or "",
         tools_executed=tool_calls,
         final_response=response[:4000],
         session_path=str(session_path) if session_path else None,
