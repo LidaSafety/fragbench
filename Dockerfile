@@ -28,7 +28,6 @@ RUN pip install --no-cache-dir -e '.[all]' 2>/dev/null || pip install --no-cache
 
 COPY fragbench_mcp/ ./fragbench_mcp/
 COPY seeds/ ./seeds/
-COPY attacks/ ./attacks/
 COPY frontend/ ./frontend/
 COPY generator.py ./
 COPY run.py ./
