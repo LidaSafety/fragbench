@@ -188,9 +188,9 @@ function renderFragmentCard(f) {
         <div class="frag-line"><strong>Consumes:</strong> ${escapeHtml(consumes)}</div>
         <div class="tool-section-title" style="margin-top:0.5rem">Tools Executed (${(f.tools_executed || []).length})</div>
         <div class="tool-list-flat">${renderToolsExecuted(f.tools_executed)}</div>
-        ${f.final_response_preview ? `
+        ${(f.final_response || f.final_response_preview) ? `
           <div class="tool-section-title" style="margin-top:0.5rem">Final Response</div>
-          <pre class="mono response-preview">${escapeHtml(f.final_response_preview)}</pre>` : ""}
+          <pre class="mono response-preview">${escapeHtml(f.final_response || f.final_response_preview)}</pre>` : ""}
       </div>
     </details>`;
 }

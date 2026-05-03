@@ -10,6 +10,7 @@ import json
 import os
 import re
 import signal
+import sys
 import threading
 import time
 import uuid
@@ -260,6 +261,7 @@ class ConversationLogger:
             tool_calls = message.get("tool_calls") or []
             tool_names: List[str] = []
             tool_call_details: List[Dict[str, Any]] = []
+            tool_call_full: List[Dict[str, Any]] = []
             for tc in tool_calls:
                 if isinstance(tc, dict):
                     fn = tc.get("function") or {}
@@ -270,13 +272,19 @@ class ConversationLogger:
                     name = getattr(fn, "name", "?")
                     raw_args = getattr(fn, "arguments", "")
                 tool_names.append(name)
-                args_preview = raw_args if isinstance(raw_args, str) else json.dumps(raw_args, default=str)
-                if len(args_preview) > 1200:
-                    args_preview = args_preview[:1200] + "…"
+                args_str = raw_args if isinstance(raw_args, str) else json.dumps(raw_args, default=str)
+                args_preview = args_str if len(args_str) <= 1200 else args_str[:1200] + "…"
                 tool_call_details.append(
                     {
                         "name": name,
                         "arguments_preview": args_preview,
+                    }
+                )
+                tool_call_full.append(
+                    {
+                        "name": name,
+                        "arguments": args_str,
+                        "arguments_bytes": len(args_str),
                     }
                 )
             self._tool_calls_this_iter = len(tool_calls)
@@ -312,6 +320,19 @@ class ConversationLogger:
                 "is_final": len(tool_calls) == 0,
             })
 
+            # Per-call tool_call events with the FULL arguments string
+            # (no length cap) — paired with subsequent tool_result events
+            # so the JSONL is self-sufficient for replay/debugging without
+            # needing to reconstruct intent from the truncated preview.
+            for i, tc_full in enumerate(tool_call_full, start=1):
+                self._emit("tool_call", {
+                    "iteration": iteration,
+                    "tool": tc_full["name"],
+                    "arguments": tc_full["arguments"],
+                    "arguments_bytes": tc_full["arguments_bytes"],
+                    "tool_call_index": f"{i}/{len(tool_call_full)}",
+                })
+
         elif role == "tool":
             self._tool_results_this_iter += 1
             tool_name = message.get("name", "?")
@@ -321,7 +342,7 @@ class ConversationLogger:
             if "error" in raw.lower()[:200] or "validation error" in raw.lower()[:200]:
                 success = False
 
-            result_preview = raw[:400] + "…" if len(raw) > 400 else raw
+            result_preview = raw[:8000] + "…" if len(raw) > 8000 else raw
             # try to parse for structured preview
             try:
                 parsed = json.loads(raw)
@@ -331,11 +352,11 @@ class ConversationLogger:
                         inner = first["text"]
                         try:
                             inner_parsed = json.loads(inner)
-                            result_preview = json.dumps(inner_parsed, indent=None, default=str)[:400]
+                            result_preview = json.dumps(inner_parsed, indent=None, default=str)[:8000]
                             if isinstance(inner_parsed, dict):
                                 success = inner_parsed.get("success", success)
                         except (json.JSONDecodeError, TypeError):
-                            result_preview = inner[:400]
+                            result_preview = inner[:8000]
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -448,10 +469,14 @@ class ConversationLogger:
                 model=self._judge_model,
                 backend=self._judge_backend,
             )
+            raw = result.raw_judge_response or ""
+            if len(raw) > 800:
+                raw = raw[:800] + "…"
             self._emit("verdict", {
                 "verdict": result.verdict,
                 "classifier": "llm_judge",
                 "justification": result.justification,
+                "raw_judge_response": raw,
             })
         except Exception:
             pass
@@ -499,9 +524,9 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--server-name", default=SERVER_NAME)
     p.add_argument("--transport", choices=["sse", "streamable-http"], default="sse")
     p.add_argument("--auto-toolkits", action="store_true", help="Connect toolkits selected from registry profile.")
-    p.add_argument("--max-iterations", type=int, default=6)
+    p.add_argument("--max-iterations", type=int, default=16)
     p.add_argument("--temperature", type=float, default=0.6)
-    p.add_argument("--max-tokens", type=int, default=4000)
+    p.add_argument("--max-tokens", type=int, default=16000)
     p.add_argument("--prompt", help="One-shot prompt, then exit.")
     p.add_argument("--non-interactive", action="store_true")
     p.add_argument("--log-dir", default="logs", help="Directory for session JSONL logs.")
@@ -530,24 +555,24 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     p.add_argument("--judge", action="store_true", help="Run LLM-as-judge after each variation (background thread).")
     p.add_argument("--judge-model", default="anthropic/claude-haiku-4.5", help="Model id for LLM judge (OpenRouter format by default).")
-    p.add_argument("--judge-backend", choices=["openrouter", "anthropic"], default="openrouter", help="Backend for LLM judge (default: openrouter).")
+    p.add_argument("--judge-backend", choices=["openrouter", "anthropic", "ollama"], default="openrouter", help="Backend for LLM judge (default: openrouter; ollama uses OLLAMA_BASE_URL).")
     return p.parse_args(argv)
 
 
-async def main(argv: Optional[List[str]] = None) -> None:
+async def main(argv: Optional[List[str]] = None) -> int:
     _load_env_file()
     args = _parse_args(argv)
 
     if args.model_backend == "openrouter" and not os.getenv("OPENROUTER_API_KEY"):
         print("Error: OPENROUTER_API_KEY not set.")
-        return
+        return 1
 
     system_prompt: Optional[str] = None
     if args.system_prompt_file:
         sp_path = Path(args.system_prompt_file)
         if not sp_path.exists():
             print(f"Error: --system-prompt-file not found: {sp_path}")
-            return
+            return 1
         system_prompt = sp_path.read_text(encoding="utf-8")
         print(f"System prompt loaded from {sp_path} ({len(system_prompt)} chars)")
 
@@ -610,6 +635,20 @@ async def main(argv: Optional[List[str]] = None) -> None:
                 print(f"Connected toolkit set: {connected_toolkits if connected_toolkits else '[none]'}")
                 if conv_logger:
                     conv_logger.update_toolkits(connected_toolkits)
+                if not connected_toolkits:
+                    # Fail loud: running with --auto-toolkits but zero toolkits
+                    # connected means no `tools=[…]` reaches the LLM call, so the
+                    # model can only hallucinate `<tool_call>` blocks in plain
+                    # text and no real tools execute. Treat as a hard error so
+                    # attack_runner surfaces the failure (rc != 0) instead of
+                    # silently producing fake-tool-call sessions.
+                    print(
+                        "Error: --auto-toolkits set but zero toolkits connected. "
+                        "Check the registry path (MCP_REGISTRY_PATH) and that the "
+                        "MCP server containers are reachable on the same Docker "
+                        "network as this client."
+                    )
+                    return 1
             else:
                 if args.transport == "sse":
                     await client.connect_to_http_server(
@@ -624,21 +663,22 @@ async def main(argv: Optional[List[str]] = None) -> None:
                 print(f"Connected: {args.server_name} -> {args.server_url} ({args.transport})")
         except Exception as exc:
             print(f"Failed to connect to {args.server_url}: {exc}")
-            return
+            return 1
 
         await asyncio.sleep(0.1)
 
         try:
             if args.prompt:
                 print(await client.process_query(args.prompt))
-                return
+                return 0
 
             if args.non_interactive:
                 prompt = input("prompt: ")
                 print(await client.process_query(prompt))
-                return
+                return 0
 
             await _interactive_loop(client)
+            return 0
         finally:
             if conv_logger:
                 conv_logger.close()
@@ -650,8 +690,9 @@ if __name__ == "__main__":
     asyncio.set_event_loop(loop)
     _configure_signal_handlers(loop)
     task = loop.create_task(main())
+    exit_code = 0
     try:
-        loop.run_until_complete(task)
+        exit_code = loop.run_until_complete(task) or 0
     except KeyboardInterrupt:
         with suppress(Exception):
             signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -664,5 +705,7 @@ if __name__ == "__main__":
             t.cancel()
         with suppress(asyncio.CancelledError):
             loop.run_until_complete(asyncio.gather(*pending))
+        exit_code = 130
     finally:
         loop.close()
+    sys.exit(exit_code)

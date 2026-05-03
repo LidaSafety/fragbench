@@ -83,6 +83,7 @@ help:
 	@echo "Targets (Docker-isolated):"
 	@echo "  make docker-up         - Start MCP servers + viewer in containers"
 	@echo "  make docker-down       - Stop all containers"
+	@echo "  make docker-clean      - Remove all containers/networks for this project (incl. orphans)"
 	@echo "  make docker-status     - Show container status"
 	@echo "  make docker-cli        - Interactive MCP CLI inside container"
 	@echo "  make docker-attack-run - Single TOML stage/variation in container"
@@ -362,11 +363,12 @@ clean-runtime:
 #   FRAGMENTS=<path>             default: results/promptsteal_fragments.json
 #   STYLE=<style>                default: direct
 #   SEEDS=<spec>                 default: all (e.g. 0-9 or 0,1,5)
-#   MAX_PARALLEL_VARIATIONS=<n>  default: 2
+#   MAX_PARALLEL_VARIATIONS=<n>  default: 4
 #   MAX_PARALLEL_FRAGMENTS=<n>   default: 2
 #   JUDGE=0|1                    default: 0 (uses keyword fallback)
 #   JUDGE_MODEL=<id>             default: anthropic/claude-haiku-4.5
-#   JUDGE_BACKEND=openrouter|anthropic   default: openrouter
+#   JUDGE_MODEL_BACKEND=openrouter|anthropic|ollama  default: openrouter
+#                                          (legacy alias: JUDGE_BACKEND)
 #   MODEL_BACKEND=ollama|openrouter|vllm default: ollama
 #   MODEL=<id>                   default: huihui_ai/qwen3.5-abliterated:35b
 #   ATTACK_RUN_ID=<id>           override generated run id
@@ -374,7 +376,7 @@ clean-runtime:
 FRAGMENTS ?= results/promptsteal_fragments.json
 STYLE ?= direct
 SEEDS ?=
-MAX_PARALLEL_VARIATIONS ?= 2
+MAX_PARALLEL_VARIATIONS ?= 4
 MAX_PARALLEL_FRAGMENTS ?= 2
 ATTACK_RUN_ID ?=
 
@@ -394,12 +396,17 @@ DOCKER_REGISTRY_PATH ?= fragbench_mcp/registry/toolkits.docker.toml
 DOCKER_OLLAMA_URL ?= http://host.docker.internal:11434
 DOCKER_VLLM_URL ?= http://host.docker.internal:8000/v1
 
-# Verdict judge config — set JUDGE=1 to enable LLM-as-judge after each variation
+# Verdict judge config — set JUDGE=1 to enable LLM-as-judge after each variation.
+# JUDGE_MODEL_BACKEND is the canonical name (mirrors MCP_MODEL_BACKEND).
+# JUDGE_BACKEND is a legacy alias kept for backward-compat with existing
+# scripts. Setting either has the same effect; if both are set,
+# JUDGE_MODEL_BACKEND wins.
 JUDGE ?= 0
 JUDGE_MODEL ?= anthropic/claude-haiku-4.5
-JUDGE_BACKEND ?= openrouter
+JUDGE_MODEL_BACKEND ?= $(or $(JUDGE_BACKEND),openrouter)
+JUDGE_BACKEND := $(JUDGE_MODEL_BACKEND)
 
-.PHONY: docker-up docker-down docker-status docker-ensure-up docker-cli docker-attack-run docker-chain-run
+.PHONY: docker-up docker-down docker-status docker-ensure-up docker-cli docker-attack-run docker-chain-run docker-clean
 
 docker-up:
 	@$(DOCKER_COMPOSE) up -d
@@ -419,6 +426,25 @@ docker-down:
 
 docker-status:
 	@$(DOCKER_COMPOSE) ps
+
+# Tear down EVERY container/network/volume associated with this project,
+# including orphans left behind by an earlier project name (e.g. when the
+# repo directory was renamed and Docker Compose started prefixing
+# containers differently). Removes both `fragbench-*` and `fragbench2-*`
+# stacks and their networks. Volumes that bind-mount host paths
+# (./logs, ./results) are NOT touched — only Docker-managed volumes.
+docker-clean:
+	@echo "Stopping current compose project ..."
+	@$(DOCKER_COMPOSE) down --remove-orphans --volumes 2>/dev/null || true
+	@echo "Removing any stray fragbench-/fragbench2- containers ..."
+	@IDS="$$(docker ps -aq --filter 'name=^fragbench-' --filter 'name=^fragbench2-' 2>/dev/null)"; \
+	if [ -n "$$IDS" ]; then docker rm -f $$IDS; else echo "  (none)"; fi
+	@echo "Removing stray fragbench/fragbench2 networks ..."
+	@for net in fragbench_internal_mgmt fragbench_egress_pipe fragbench_viewer-net \
+	            fragbench2_internal_mgmt fragbench2_egress_pipe fragbench2_viewer-net; do \
+	  docker network rm "$$net" >/dev/null 2>&1 && echo "  removed $$net" || true; \
+	done
+	@echo "Done. Run 'make docker-up' to start a clean stack."
 
 define DOCKER_CLIENT_CMD
 EFFECTIVE_MODEL="$(MODEL)"; \
@@ -536,6 +562,8 @@ docker-chain-run: docker-ensure-up
 # Other knobs: FRAGMENTS, STYLE, SEEDS, MAX_PARALLEL_*, ATTACK_RUN_ID.
 SYSTEM_PROMPT ?=
 docker-attack-graph-run: docker-ensure-up
+	@echo "Resetting /workspace (restarting server-filesystem) ..."
+	@$(DOCKER_COMPOSE) restart server-filesystem >/dev/null 2>&1 || true
 	@EFFECTIVE_MODEL="$(MCP_MODEL)"; \
 	if [ "$(MCP_MODEL_BACKEND)" = "ollama" ]; then \
 	  case "$$EFFECTIVE_MODEL" in *:*) ;; *) EFFECTIVE_MODEL="huihui_ai/qwen3.5-abliterated:35b";; esac; \
