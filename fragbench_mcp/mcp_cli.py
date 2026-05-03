@@ -524,7 +524,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--server-name", default=SERVER_NAME)
     p.add_argument("--transport", choices=["sse", "streamable-http"], default="sse")
     p.add_argument("--auto-toolkits", action="store_true", help="Connect toolkits selected from registry profile.")
-    p.add_argument("--max-iterations", type=int, default=6)
+    p.add_argument("--max-iterations", type=int, default=16)
     p.add_argument("--temperature", type=float, default=0.6)
     p.add_argument("--max-tokens", type=int, default=16000)
     p.add_argument("--prompt", help="One-shot prompt, then exit.")
