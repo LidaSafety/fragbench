@@ -14,20 +14,18 @@ results/gtg1002_manual.json
 results/honestcue_manual.json
 results/jasper_sleet_manual.json
 results/london_drugs_lockbit_manual.json
-
-cedric spar3a:
 results/malterminal_manual.json
 results/nocode_ransomware_manual.json
+
+cedric spar3a:
 results/ns_power_ransomware_manual.json
 results/operation_dream_job_manual.json
-
-dwk spar3b:
 results/operation_false_witness_manual.json
 results/promptflux_manual.json
 results/promptsteal_manual.json
 results/quietvault_manual.json
 
-dwk spar3c:
+dwk spar4a:
 results/ru_malware_clusters_manual.json
 results/scope_creep_manual.json
 results/tycoon2fa_manual.json
@@ -41,14 +39,14 @@ SEEDS=0-4
 
 astha:
 
-spar4a:
+spar4b:
 results/ad_discovery_llm.json
 results/ai-phishing_llm.json
 results/clickfix_llm.json
 results/coinbait_llm.json
 results/coral_sleet_llm.json
 
-spar4b:
+spar4c:
 results/deepfake-id-fraud_llm.json
 results/dprk_fraud_llm.json
 results/gtg1002_llm.json
@@ -56,7 +54,7 @@ results/honestcue_llm.json
 results/jasper_sleet_llm.json
 results/london_drugs_lockbit_llm.json
 
-spar4c:
+spar4d:
 results/malterminal_llm.json
 results/nocode_ransomware_llm.json
 results/ns_power_ransomware_llm.json
@@ -64,7 +62,7 @@ results/operation_dream_job_llm.json
 results/operation_false_witness_llm.json
 results/promptflux_llm.json
 
-spar4d:
+spar4e:
 results/promptsteal_llm.json
 results/quietvault_llm.json
 results/ru_malware_clusters_llm.json
