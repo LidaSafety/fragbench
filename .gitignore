@@ -13,3 +13,9 @@ logs/*.jsonl
 *.lock
 /key*.txt
 /results/runs
+.eggs/
+*.so
+fragbench-structural-graph/checkpoints/
+fragbench-structural-graph/dataset/synthetic/fragguard_100k_campaigns.jsonl
+fragbench-structural-graph/fragbench_dataset_generator/fragbench_pack/rl_checkpoints/disclosure/
+
