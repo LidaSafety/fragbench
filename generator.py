@@ -220,6 +220,7 @@ async def _llm_complete(
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         )
         content = resp.choices[0].message.content or ""
+        log.debug("ollama raw response: %r", content[:200])
         # Strip <think>...</think> blocks (qwen3.5 and other reasoning models)
         content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
         return content
