@@ -1,16 +1,31 @@
 PYTHON = python
 MAX_CONCURRENCY = 32
+OLLAMA_CONCURRENCY ?= 4
+OLLAMA_BASE_URL ?= http://localhost:11434/v1
+OLLAMA_MODEL ?= huihui_ai/qwen3.5-abliterated:9b
 
 SEED_FILES = $(wildcard seeds/*.json)
 MANUAL_RESULT_FILES := $(patsubst seeds/%.json,results/%_manual.json,$(SEED_FILES))
 LLM_RESULT_FILES := $(patsubst seeds/%.json,results/%_llm.json,$(SEED_FILES))
 
-.PHONY: all slow
+.PHONY: all slow ollama
+
 all: $(MANUAL_RESULT_FILES)
 
 slow: all $(LLM_RESULT_FILES)
 
+ollama: $(LLM_RESULT_FILES)
+
+# Target-specific flags: slow uses Anthropic/Haiku, ollama uses local model
+slow: LLM_GEN_FLAGS = --no-style-templates --max-concurrency $(MAX_CONCURRENCY)
+ollama: LLM_GEN_FLAGS = --no-style-templates \
+	--gen-backend ollama \
+	--gen-model $(OLLAMA_MODEL) \
+	--gen-base-url $(OLLAMA_BASE_URL) \
+	--max-concurrency $(OLLAMA_CONCURRENCY)
+
 results/%_manual.json: seeds/%.json
 	$(PYTHON) run.py --generate --seed-file $< --seed 0 --output-json $@
+
 results/%_llm.json: seeds/%.json
-	$(PYTHON) run.py --generate --seed-file $< --output-json $@ --no-style-templates --max-concurrency $(MAX_CONCURRENCY)
+	$(PYTHON) run.py --generate --seed-file $< --output-json $@ $(LLM_GEN_FLAGS)
