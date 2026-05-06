@@ -18,7 +18,7 @@ PY ?= python3
 # with existing targets and shell scripts.
 # ----------------------------------------------------------------------------
 
-MCP_MODEL_BACKEND ?= $(or $(MODEL_BACKEND),ollama)
+MCP_MODEL_BACKEND ?= $(or $(MODEL_BACKEND),openrouter)
 
 ifeq ($(MCP_MODEL_BACKEND),ollama)
 _DEFAULT_MCP_MODEL := huihui_ai/qwen3.5-abliterated:35b
