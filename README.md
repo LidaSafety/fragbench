@@ -24,7 +24,7 @@ uv pip install -e .
 
 ## 1. Dataset generation
 
-FragBench builds its datasets from **public cyber-incident reporting**, which is distilled into **attack campaigns**. Each campaign lives as one JSON seed under `seeds/`; it describes the ordered steps an adversary would execute.
+FragBench builds its datasets from **public cyber-incident reporting**, which is distilled into **attack campaigns**. Each campaign lives as one JSON seed under `seeds/`; it describes the ordered steps an adversary would execute. Note that `seeds/` contains real campaign templates derived from public threat intel (GTIG, Anthropic TI, OpenAI disruption reports, Microsoft AI tradecraft report).
 
 **Dataset generation** expands that seed into a **fragmented** benchmark: the story is broken into discrete steps, each wrapped in **benign cover** so rewritten prompts still read like plausible user or operator sessions rather than bare attack text. The pipeline emits the fragments JSON (`variations`, per-fragment styles, and `produces` / `consumes` links) which are further rewritten using RL (optional) or validated using the MCP harness.
 
