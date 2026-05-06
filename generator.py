@@ -218,6 +218,7 @@ async def _llm_complete(
         resp = await client.chat.completions.create(
             model=model, max_tokens=max_tokens,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            extra_body={"think": False},
         )
         msg = resp.choices[0].message
         content = msg.content or ""
