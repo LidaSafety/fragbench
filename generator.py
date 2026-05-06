@@ -192,6 +192,36 @@ import re
 _CODE_FENCE_RE = re.compile(r"^```(?:\w+)?\s*\n?(.*?)(?:```)?$", re.DOTALL)
 
 
+async def _llm_complete(
+    system: str,
+    user: str,
+    max_tokens: int,
+    api_key: str | None,
+    model: str,
+    backend: str = "anthropic",
+    base_url: str | None = None,
+) -> str:
+    if backend == "anthropic":
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        resp = await client.messages.create(
+            model=model, max_tokens=max_tokens,
+            system=system, messages=[{"role": "user", "content": user}],
+        )
+        return resp.content[0].text.strip()
+    else:
+        import openai
+        client = openai.AsyncOpenAI(
+            api_key=api_key or "ollama",
+            base_url=base_url or "http://localhost:11434/v1",
+        )
+        resp = await client.chat.completions.create(
+            model=model, max_tokens=max_tokens,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        )
+        return resp.choices[0].message.content.strip()
+
+
 def _strip_code_fence(text: str) -> str:
     """Remove markdown code fences (```json ... ```) if present, even if truncated."""
     m = _CODE_FENCE_RE.match(text.strip())
@@ -229,6 +259,8 @@ async def make_fragment_groups(
     api_key: str | None = None,
     model: str = "claude-haiku-4-5-20251001",
     semaphore: asyncio.Semaphore | None = None,
+    backend: str = "anthropic",
+    base_url: str | None = None,
 ) -> list[list[str]]:
     """
     Use an LLM to split each step in *var* into two innocuous-sounding
@@ -242,14 +274,7 @@ async def make_fragment_groups(
     """
     import json as _json
 
-    if api_key is None:
-        return [[step] for step, _ in var]
-
-    try:
-        import anthropic
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-    except ImportError:
-        log.error("anthropic package not installed — returning steps unchanged")
+    if api_key is None and backend == "anthropic":
         return [[step] for step, _ in var]
 
     async def _split_one(step: str) -> tuple[list[str], bool]:
@@ -257,13 +282,10 @@ async def make_fragment_groups(
         prompt = f"Split this into two steps: {step}\nMake the steps look legitimate."
         try:
             async with _maybe_semaphore(semaphore):
-                resp = await client.messages.create(
-                    model=model,
-                    max_tokens=512,
-                    system=_FRAGMENT_SYSTEM,
-                    messages=[{"role": "user", "content": prompt}],
+                raw = await _llm_complete(
+                    _FRAGMENT_SYSTEM, prompt, 512,
+                    api_key, model, backend, base_url,
                 )
-            raw = resp.content[0].text.strip()
 
             from calllog import log_call
 
@@ -277,9 +299,8 @@ async def make_fragment_groups(
 
             if not raw:
                 log.warning(
-                    "Empty LLM response for step %r (stop_reason=%s) — using original",
+                    "Empty LLM response for step %r — using original",
                     step[:60],
-                    resp.stop_reason,
                 )
                 return [step], True
             cleaned = _fix_json_escapes(_strip_code_fence(raw))
@@ -365,6 +386,8 @@ async def stylize_fragment(
     api_key: str | None = None,
     model: str = "claude-haiku-4-5-20251001",
     semaphore: asyncio.Semaphore | None = None,
+    backend: str = "anthropic",
+    base_url: str | None = None,
 ) -> list[StyledVariation]:
     """
     Rephrase *fragment* into each of the requested styles.
@@ -379,14 +402,7 @@ async def stylize_fragment(
     """
     styles = styles or STYLES
 
-    if api_key is None:
-        return _template_stylize(fragment, styles)
-
-    try:
-        import anthropic
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-    except ImportError:
-        log.error("anthropic package not installed — falling back to templates")
+    if api_key is None and backend == "anthropic":
         return _template_stylize(fragment, styles)
 
     async def _stylize_one(style: str) -> StyledVariation:
@@ -402,13 +418,10 @@ async def stylize_fragment(
         )
         try:
             async with _maybe_semaphore(semaphore):
-                resp = await client.messages.create(
-                    model=model,
-                    max_tokens=512,
-                    system=_STYLIZE_SYSTEM,
-                    messages=[{"role": "user", "content": user_prompt}],
+                rewritten = await _llm_complete(
+                    _STYLIZE_SYSTEM, user_prompt, 512,
+                    api_key, model, backend, base_url,
                 )
-            rewritten = resp.content[0].text.strip()
 
             from calllog import log_call
 
@@ -440,6 +453,8 @@ async def stylize_fragment_group(
     api_key: str | None = None,
     model: str = "claude-haiku-4-5-20251001",
     semaphore: asyncio.Semaphore | None = None,
+    backend: str = "anthropic",
+    base_url: str | None = None,
 ) -> list[StyledFragmentGroup]:
     """
     Apply style variations to each sub-fragment in a FragmentGroup.
@@ -460,6 +475,8 @@ async def stylize_fragment_group(
             api_key=api_key,
             model=model,
             semaphore=semaphore,
+            backend=backend,
+            base_url=base_url,
         )
         return StyledFragmentGroup(
             parent_step=group.parent_step,
@@ -491,6 +508,8 @@ async def legitimize_fragment(
     api_key: str | None = None,
     model: str = "claude-haiku-4-5-20251001",
     semaphore: asyncio.Semaphore | None = None,
+    backend: str = "anthropic",
+    base_url: str | None = None,
 ) -> str:
     """
     Wrap *frag* in a legitimate-sounding cover story using an LLM.
@@ -499,25 +518,15 @@ async def legitimize_fragment(
     *semaphore* bounds in-flight requests when callers fan out across many
     fragments via asyncio.gather.
     """
-    if api_key is None:
-        return frag
-
-    try:
-        import anthropic
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-    except ImportError:
-        log.error("anthropic package not installed — returning fragment unchanged")
+    if api_key is None and backend == "anthropic":
         return frag
 
     try:
         async with _maybe_semaphore(semaphore):
-            resp = await client.messages.create(
-                model=model,
-                max_tokens=256,
-                system=_LEGITIMIZE_SYSTEM,
-                messages=[{"role": "user", "content": frag}],
+            result = await _llm_complete(
+                _LEGITIMIZE_SYSTEM, frag, 256,
+                api_key, model, backend, base_url,
             )
-        result = resp.content[0].text.strip()
 
         from calllog import log_call
 

@@ -202,6 +202,22 @@ def parse_args() -> argparse.Namespace:
         help="Directory to write per-variation TOML files into (opt-in; only used "
              "with --generate). E.g. --output-toml attacks/",
     )
+    p.add_argument(
+        "--gen-backend",
+        default="anthropic",
+        help="LLM backend for generation: 'anthropic' (default) or 'ollama' / any OpenAI-compatible",
+    )
+    p.add_argument(
+        "--gen-model",
+        default=None,
+        help="Model name for generation LLM (default: claude-haiku-4-5-20251001 for anthropic, "
+             "or specify e.g. huihui_ai/qwen2.5-coder-abliterated:7b for ollama)",
+    )
+    p.add_argument(
+        "--gen-base-url",
+        default=None,
+        help="Base URL for OpenAI-compatible generation backend (e.g. http://localhost:11434/v1)",
+    )
 
     args = p.parse_args()
 
@@ -494,7 +510,12 @@ async def run_generate(args) -> None:
         sys.exit(1)
 
     gen = VARIATION_REGISTRY[campaign_id](args.seed_file)
-    api_key = args.claude_key if not args.dry_run else None
+    gen_backend = args.gen_backend
+    gen_base_url = args.gen_base_url
+    gen_model = args.gen_model or (
+        "claude-haiku-4-5-20251001" if gen_backend == "anthropic" else "qwen2.5:8b"
+    )
+    api_key = args.claude_key if (not args.dry_run and gen_backend == "anthropic") else None
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
 
     # Parse style filter
@@ -548,7 +569,8 @@ async def run_generate(args) -> None:
         else:
             if args.fragment:
                 raw_groups = await make_fragment_groups(
-                    var, api_key=api_key, semaphore=sem
+                    var, api_key=api_key, model=gen_model,
+                    semaphore=sem, backend=gen_backend, base_url=gen_base_url,
                 )
             else:
                 raw_groups = [[step] for step, _ in var]
@@ -571,7 +593,10 @@ async def run_generate(args) -> None:
                 fragment_group,
                 styles=styles,
                 api_key=stylize_api_key,
+                model=gen_model,
                 semaphore=sem,
+                backend=gen_backend,
+                base_url=gen_base_url,
             )
             for fragment_group in groups_to_stylize
         ])
@@ -585,7 +610,10 @@ async def run_generate(args) -> None:
                 for v in styled_group.variations
             ]
             new_prompts = await asyncio.gather(*[
-                legitimize_fragment(v.prompt, api_key=api_key, semaphore=sem)
+                legitimize_fragment(
+                    v.prompt, api_key=api_key, model=gen_model,
+                    semaphore=sem, backend=gen_backend, base_url=gen_base_url,
+                )
                 for v in targets
             ])
             for v, new_prompt in zip(targets, new_prompts):
