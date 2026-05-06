@@ -155,6 +155,9 @@ class OperationDreamJobVariation(BaseVariation):
                 lookup = var_def["values_by_dimension"]
                 result[var_name] = lookup[chosen_value]
 
+            elif var_type == "filename":
+                result[var_name] = rng.choice(var_def["name_pool"])
+
             elif var_type == "integer_range":
                 result[var_name] = rng.randint(var_def["min"], var_def["max"])
 
