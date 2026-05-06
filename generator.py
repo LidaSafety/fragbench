@@ -219,7 +219,10 @@ async def _llm_complete(
             model=model, max_tokens=max_tokens,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         )
-        return resp.choices[0].message.content.strip()
+        content = resp.choices[0].message.content or ""
+        # Strip <think>...</think> blocks (qwen3.5 and other reasoning models)
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+        return content
 
 
 def _strip_code_fence(text: str) -> str:
