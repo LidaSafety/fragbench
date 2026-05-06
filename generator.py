@@ -210,27 +210,29 @@ async def _llm_complete(
         )
         return resp.content[0].text.strip()
     else:
-        import openai
-        client = openai.AsyncOpenAI(
-            api_key=api_key or "ollama",
-            base_url=base_url or "http://localhost:11434/v1",
-        )
-        resp = await client.chat.completions.create(
-            model=model, max_tokens=max_tokens,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            extra_body={"think": False},
-        )
-        msg = resp.choices[0].message
-        content = msg.content or ""
-        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
-        if not content:
-            # qwen3 thinking models put everything in reasoning and leave content empty;
-            # extract the last non-empty paragraph as the final answer
-            reasoning = (msg.model_dump().get("reasoning") or "").strip()
-            if reasoning:
-                paragraphs = [p.strip() for p in reasoning.split("\n") if p.strip()]
-                content = paragraphs[-1] if paragraphs else ""
-        return content
+        # Use Ollama's native /api/chat with think=false.
+        # The OpenAI-compat endpoint has a known bug where thinking models return
+        # empty content; the native API is the only reliable path.
+        import httpx
+        ollama_base = (base_url or "http://localhost:11434/v1").rstrip("/")
+        if ollama_base.endswith("/v1"):
+            ollama_base = ollama_base[:-3]
+        async with httpx.AsyncClient(timeout=120.0) as http:
+            r = await http.post(
+                f"{ollama_base}/api/chat",
+                json={
+                    "model": model,
+                    "think": False,
+                    "stream": False,
+                    "options": {"num_predict": max_tokens},
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                },
+            )
+            r.raise_for_status()
+            return (r.json()["message"]["content"] or "").strip()
 
 
 def _strip_code_fence(text: str) -> str:
