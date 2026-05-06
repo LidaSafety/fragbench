@@ -219,10 +219,16 @@ async def _llm_complete(
             model=model, max_tokens=max_tokens,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
         )
-        content = resp.choices[0].message.content or ""
-        log.debug("ollama raw response: %r", content[:200])
-        # Strip <think>...</think> blocks (qwen3.5 and other reasoning models)
+        msg = resp.choices[0].message
+        content = msg.content or ""
         content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+        if not content:
+            # qwen3 thinking models put everything in reasoning and leave content empty;
+            # extract the last non-empty paragraph as the final answer
+            reasoning = (msg.model_dump().get("reasoning") or "").strip()
+            if reasoning:
+                paragraphs = [p.strip() for p in reasoning.split("\n") if p.strip()]
+                content = paragraphs[-1] if paragraphs else ""
         return content
 
 
