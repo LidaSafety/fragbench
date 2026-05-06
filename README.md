@@ -100,6 +100,8 @@ The generated JSON files (`results/<seed>_manual.json` / `results/<seed>_llm.jso
 
 Optional step: judge or RL-rewrite generated JSON fragments using [fragbench_generated_rl.py](fragbench-structural-graph/fragbench_dataset_generator/fragbench_pack/fragbench_generated_rl.py) to improve pass rate and reduce refusals.
 
+The input dataset **must** be placed under `fragbench-structural-graph/dataset/` before running this step. For example, `results/promptsteal_manual.json` from §1 should be copied or staged as `fragbench-structural-graph/dataset/promptsteal_manual.json`, then referenced as `--input dataset/promptsteal_manual.json` from inside `fragbench-structural-graph`.
+
 ### 2.1 API keys
 
 The required keys depend on the selected `--judge-backend` and `--rewriter-backend`:
@@ -128,7 +130,7 @@ python -u fragbench_dataset_generator/fragbench_pack/fragbench_generated_rl.py \
 >Backends can be mixed (e.g. OpenRouter judge + Anthropic rewriter) as long as the matching key is present.
 
 - **`MODE`**: `judge` (pass-rate only) or `rl` (rewrite loop).
-- **`--input`**: path to a generator JSON (e.g. `../results/promptsteal_manual.json`).
+- **`--input`**: path under the local `dataset/` directory (e.g. `dataset/promptsteal_manual.json`).
 - **`--output`**: optional; if omitted, the script picks a path under `runs/`.
 - Set `jb` / `rb` / models to match the available keys (e.g. OpenRouter judge + rewriter for full RL without local Ollama).
 
