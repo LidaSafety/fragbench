@@ -29,6 +29,7 @@
     "path": "cr:path",
     "personalSensitiveInformation": "cr:personalSensitiveInformation",
     "prov": "http://www.w3.org/ns/prov#",
+    "rai": "http://mlcommons.org/croissant/RAI/",
     "recordSet": "cr:recordSet",
     "references": "cr:references",
     "regex": "cr:regex",
@@ -57,11 +58,13 @@
     "name": "anonfragbenchneurips",
     "url": "https://huggingface.co/anon-fragbench-neurips"
   },
-  "dataBiases": "Campaign selection over-represents English-language, DPRK-attributed, and ransomware actors with heavy public threat-intelligence reporting. LLM rewriters (Claude Sonnet 4.6, Claude Opus 4.7, DeepSeek V4 Flash) and judges (gpt-oss:20b, Claude Sonnet 4.6, Claude Opus 4.7, Llama-Guard-4-12B, GPT-4.1-mini) inherit biases from their training data; judge verdicts introduce annotation bias correlated with each model's safety calibration.",
-  "personalSensitiveInformation": "None. All prompts are synthetically generated from templated seed files with procedurally substituted placeholders. The dataset contains no real personal information, credentials, or attack infrastructure.",
-  "dataCollection": "Validated use cases: (1) benchmarking single-turn safety classifiers against cross-session fragmentation, reported as fragment-level judge pass rate; (2) evaluating graph-based cross-session detectors (GCN, GraphSAGE, GAT, GIN, SVM, MLP, GBT), where aggregate event-level F1 ranges from 0.878 to 0.956. Not validated: training production safety systems, evaluating non-English campaigns, or measuring real-world attack success rates. Limitations: covers 24 campaigns as of early 2026 on a single target model; results are upper-bound estimates under a case-study construction and do not measure real-world attack success probability.",
-  "cr:dataSocialImpact": "FragBench enables researchers to evaluate defenses against cross-session fragmentation attacks that evade per-prompt safety classifiers. The primary misuse risk is that adversarially rewritten prompts could assist malicious actors if extracted directly. Mitigations: the most sensitive pipeline outputs are withheld in the gated companion dataset pending coordinated disclosure; the dataset is released under CC BY 4.0 with explicit use-case documentation.",
-  "cr:hasSyntheticData": true,
+  "rai:dataLimitations": "FragBench covers 24 campaigns drawn from publicly reported incidents as of early 2026, evaluated against a single target model (qwen/qwen3.5-122b-a10b) on a synthetic split. Results are upper-bound estimates under a case-study construction and do not measure real-world attack success probability. The dataset is not recommended for generating operational attack tooling.",
+  "rai:dataBiases": "Campaign selection over-represents English-language, DPRK-attributed, and ransomware actors with heavy public threat-intelligence reporting. LLM rewriters (Claude Sonnet 4.6, Claude Opus 4.7, DeepSeek V4 Flash) and judges (gpt-oss:20b, Claude Sonnet 4.6, Claude Opus 4.7, Llama-Guard-4-12B, GPT-4.1-mini) inherit biases from their training data; judge verdicts introduce annotation bias correlated with each model's safety calibration.",
+  "rai:personalSensitiveInformation": "None. All prompts are synthetically generated from templated seed files with procedurally substituted placeholders. The dataset contains no real personal information, credentials, or attack infrastructure.",
+  "rai:dataUseCases": "Validated: (1) benchmarking single-turn safety classifiers against cross-session fragmentation, reported as fragment-level judge pass rate; (2) evaluating graph-based cross-session detectors (GCN, GraphSAGE, GAT, GIN, SVM, MLP, GBT), where aggregate event-level F1 ranges from 0.878 to 0.956. Not validated: training production safety systems, evaluating non-English campaigns, or measuring real-world attack success rates.",
+  "rai:dataSocialImpact": "FragBench enables researchers to evaluate defenses against cross-session fragmentation attacks that evade per-prompt safety classifiers. The primary misuse risk is that adversarially rewritten prompts could assist malicious actors if extracted directly. Mitigations: the most sensitive pipeline outputs are withheld in the gated companion dataset pending coordinated disclosure; the dataset is released under CC BY 4.0 with explicit use-case documentation.",
+  "rai:hasSyntheticData": true,
+  "prov:wasDerivedFrom": "https://anonymous.4open.science/r/fragbench-FE86/seeds/",
   "isBasedOn": [
     {
       "@type": "sc:Dataset",
