@@ -1,0 +1,22 @@
+# Core (required by GradientBoostedTree/ and the dataset generator)
+numpy
+scikit-learn
+
+# GNN training and inference (PrecomputedMLPGNN/)
+torch>=2.0
+
+# Anthropic SDK for the rewriter / judge API paths
+# (fragbench_llm_rl.py, fragbench_judge_rl.py, fragbench_generated_rl.py with --use_api)
+anthropic
+
+# --- Optional ---
+
+# Faster GBT backend; fragguard_gbt.py falls back to sklearn if absent.
+# xgboost
+
+# Embedding KV store for the production serving path
+# (PrecomputedMLPGNN/embedder.py, server.py); imported lazily.
+# rocksdb
+
+# Note: Llama Guard 3 is served via a separate Ollama process, not pip.
+#   ollama pull llama-guard3:8b

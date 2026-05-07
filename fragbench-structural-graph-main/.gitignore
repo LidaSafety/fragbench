@@ -1,0 +1,12 @@
+__pycache__/
+.DS_Store
+.env
+logs/
+runs/
+*.pyc
+*.egg-info/
+.eggs/
+*.so
+checkpoints/
+dataset/synthetic/fragguard_100k_campaigns.jsonl
+fragbench_dataset_generator/fragbench_pack/rl_checkpoints/disclosure/
