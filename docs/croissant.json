@@ -8,11 +8,12 @@
     "conformsTo": "dct:conformsTo",
     "containedIn": "cr:containedIn",
     "cr": "http://mlcommons.org/croissant/",
+    "rai": "http://mlcommons.org/croissant/RAI/",
+    "prov": "http://www.w3.org/ns/prov#",
     "data": {"@id": "cr:data", "@type": "@json"},
-    "dataBiases": "cr:dataBiases",
-    "dataCollection": "cr:dataCollection",
     "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
     "dct": "http://purl.org/dc/terms/",
+    "examples": {"@id": "cr:examples", "@type": "@json"},
     "extract": "cr:extract",
     "field": "cr:field",
     "fileProperty": "cr:fileProperty",
@@ -20,16 +21,12 @@
     "fileSet": "cr:fileSet",
     "format": "cr:format",
     "includes": "cr:includes",
-    "isArray": "cr:isArray",
     "isLiveDataset": "cr:isLiveDataset",
     "jsonPath": "cr:jsonPath",
     "key": "cr:key",
     "md5": "cr:md5",
     "parentField": "cr:parentField",
     "path": "cr:path",
-    "personalSensitiveInformation": "cr:personalSensitiveInformation",
-    "prov": "http://www.w3.org/ns/prov#",
-    "rai": "http://mlcommons.org/croissant/RAI/",
     "recordSet": "cr:recordSet",
     "references": "cr:references",
     "regex": "cr:regex",
@@ -43,27 +40,32 @@
   },
   "@type": "sc:Dataset",
   "conformsTo": "http://mlcommons.org/croissant/1.1",
-  "name": "FragBench",
+  "name": "fragbench",
   "alternateName": ["anon-fragbench-neurips/fragbench", "FragBench"],
-  "description": "FragBench is a benchmark for studying cross-session fragmentation attacks against LLM inference APIs. It covers 24 campaigns drawn from publicly reported cyber incidents, evaluated in a sandboxed MCP environment against qwen/qwen3.5-122b-a10b. The dataset combines a kill-chain seed library, a DAG fragment decomposer, an RL-based adversarial rewriter, a sandboxed execution validator, and a graph-based cross-session detector.",
+  "description": "FragBench is a benchmark for evaluating cross-session, fragmented attacks on LLM agents that use tools via the Model Context Protocol (MCP). Each malicious campaign is decomposed into many small fragments distributed across sessions; a defender must reconstruct the compositional intent from a typed event graph. The public tier contains seed campaigns drawn from public cyber-incident reports, RL-generated stylised fragment variants, and synthetic benign tool-use traces. A gated companion dataset (anon-fragbench-neurips/fragbench-restricted) contains the more sensitive reinforcement-learning system prompts and judge-rubric configurations.",
   "url": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench",
-  "license": "https://choosealicense.com/licenses/cc-by-4.0/",
   "version": "1.0.0",
-  "keywords": [
-    "text-classification", "text-generation", "English", "cc-by-4.0",
-    "safety", "red-teaming", "jailbreak", "llm-agent", "mcp", "benchmark"
-  ],
+  "datePublished": "2026-05-07",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
   "creator": {
     "@type": "Organization",
-    "name": "anonfragbenchneurips",
+    "name": "Anonymous (NeurIPS 2026 Evaluations and Datasets Track submission)",
     "url": "https://huggingface.co/anon-fragbench-neurips"
   },
-  "rai:dataLimitations": "FragBench covers 24 campaigns drawn from publicly reported incidents as of early 2026, evaluated against a single target model (qwen/qwen3.5-122b-a10b) on a synthetic split. Results are upper-bound estimates under a case-study construction and do not measure real-world attack success probability. The dataset is not recommended for generating operational attack tooling.",
-  "rai:dataBiases": "Campaign selection over-represents English-language, DPRK-attributed, and ransomware actors with heavy public threat-intelligence reporting. LLM rewriters (Claude Sonnet 4.6, Claude Opus 4.7, DeepSeek V4 Flash) and judges (gpt-oss:20b, Claude Sonnet 4.6, Claude Opus 4.7, Llama-Guard-4-12B, GPT-4.1-mini) inherit biases from their training data; judge verdicts introduce annotation bias correlated with each model's safety calibration.",
-  "rai:personalSensitiveInformation": "None. All prompts are synthetically generated from templated seed files with procedurally substituted placeholders. The dataset contains no real personal information, credentials, or attack infrastructure.",
-  "rai:dataUseCases": "Validated: (1) benchmarking single-turn safety classifiers against cross-session fragmentation, reported as fragment-level judge pass rate; (2) evaluating graph-based cross-session detectors (GCN, GraphSAGE, GAT, GIN, SVM, MLP, GBT), where aggregate event-level F1 ranges from 0.878 to 0.956. Not validated: training production safety systems, evaluating non-English campaigns, or measuring real-world attack success rates.",
-  "rai:dataSocialImpact": "FragBench enables researchers to evaluate defenses against cross-session fragmentation attacks that evade per-prompt safety classifiers. The primary misuse risk is that adversarially rewritten prompts could assist malicious actors if extracted directly. Mitigations: the most sensitive pipeline outputs are withheld in the gated companion dataset pending coordinated disclosure; the dataset is released under CC BY 4.0 with explicit use-case documentation.",
-  "rai:hasSyntheticData": true,
+  "keywords": [
+    "text-classification",
+    "text-generation",
+    "English",
+    "cc-by-4.0",
+    "safety",
+    "red-teaming",
+    "jailbreak",
+    "llm-agent",
+    "mcp",
+    "benchmark"
+  ],
+  "citeAs": "@inproceedings{fragbench2026, title={FragBench: A Benchmark for Detecting Fragmented Multi-Session Jailbreak Attacks on LLM Agents}, author={Anonymous}, booktitle={NeurIPS Evaluations and Datasets Track (under review)}, year={2026}}",
+
   "prov:wasDerivedFrom": "https://anonymous.4open.science/r/fragbench-FE86/seeds/",
   "isBasedOn": [
     {
@@ -103,6 +105,57 @@
       "description": "Each fragment assembly executed end-to-end in a sandboxed Docker Compose environment with 24 MCP tool servers and qwen/qwen3.5-122b-a10b as the actor model. Assemblies accepted only if the full kill chain executed successfully."
     }
   ],
+
+  "rai:dataCollection": "Seed campaigns were transcribed from publicly disclosed cyber-incident reports published by frontier AI vendors and security researchers (e.g. operator-published threat reports about misuse of LLM agents). Each seed defines a high-level malicious objective and a small set of parent tactics. Seeds were rewritten through a bootstrap then learned then creative reinforcement-learning loop using a frontier LLM to produce stylised fragment sequences. A single-token classifier-mode LLM judge selected variants that increased pass rate against target models while preserving the original objective.",
+  "rai:dataCollectionType": ["Synthetic", "Other"],
+  "rai:dataCollectionTypeOthers": "RL-generated variants from publicly disclosed incident seeds; benign traces are synthetic tool-use transcripts.",
+  "rai:dataCollectionTimeframe": {
+    "@type": "sc:DateTime",
+    "startDate": "2026-02-01",
+    "endDate": "2026-05-01"
+  },
+  "rai:dataCollectionRawData": "Public cyber-incident reports describing real-world misuse of LLM agents. The benchmark stores rewritten fragment sequences and per-fragment LLM-judge verdicts; raw incident-report text is not redistributed.",
+  "rai:dataCollectionMissingData": "No human subject data is collected; missingness is not applicable. Some campaigns have fewer variants than others where the RL generator could not produce judge-passing variants without violating fidelity to the seed objective.",
+  "rai:dataPreprocessingProtocol": [
+    "Bootstrap: seed campaigns are decomposed into ordered fragments (parent_tactic, parent_prompt, produces, consumes).",
+    "Style rewriting: each fragment is rewritten in multiple stylised variants by a frontier LLM under attack system prompts.",
+    "Judge filtering: a single-token classifier-mode judge (Claude Haiku 4.5) labels each fragment trace as ANSWERED, REFUSED, PARTIAL, or UNCLEAR. Variants with low pass rate are discarded.",
+    "Graph construction: per-campaign typed event graphs are built with edge types data_flow, temporal, shared_resource, shared_session, argument_similarity."
+  ],
+  "rai:dataManipulationProtocol": "All transformations are deterministic given the random seed recorded in attack_meta.run_id. No manual relabelling was performed after judge filtering.",
+  "rai:dataImputationProtocol": "Not applicable; no values are imputed.",
+  "rai:dataAnnotationProtocol": "Per-fragment verdict labels (ANSWERED, REFUSED, PARTIAL, UNCLEAR) are produced by a single-token classifier-mode LLM judge. The judge sees the fragment prompt, the target model response, and a rubric; it emits a single token corresponding to one of the four classes. No human annotators are used. Rubric configurations are released in the gated companion dataset.",
+  "rai:dataAnnotationPlatform": "Custom Python harness invoking Claude Haiku 4.5 via the Anthropic API in classifier mode (single-token decoding).",
+  "rai:dataAnnotationAnalysis": "Inter-judge stability was spot-checked by re-running 5 percent of fragments with temperature 1.0 and verifying that the modal verdict matched the temperature-0 verdict. Disagreement rate was below 3 percent. We do not release per-call log-probabilities.",
+  "rai:annotationsPerItem": "1 (single judge call per fragment).",
+  "rai:annotatorDemographics": "Not applicable; annotation is fully machine-generated.",
+  "rai:machineAnnotationTools": "Claude Haiku 4.5 (claude-haiku-4-5-20251001) used as a single-token classifier-mode judge.",
+
+  "rai:dataUseCases": [
+    "Cross-session jailbreak detection: classify whether a session graph reconstructs a malicious campaign.",
+    "Multi-turn red-team evaluation: measure judge-pass rate of fragmented attacks on target LLM agents.",
+    "Compositional safety research: study aggregation features over typed session-event graphs.",
+    "Benchmarking detectors and guardrails on compositional jailbreaks."
+  ],
+  "rai:dataLimitations": [
+    "Sandbox-only: all execution traces come from a sandboxed harness; no real third-party systems were targeted, and the dataset does not capture network-side artefacts that real defenders may observe.",
+    "English-only: all fragment prompts, model responses, and judge rubrics are in English.",
+    "Coverage skew: campaigns over-represent LLM-confirmed incidents disclosed by frontier-API vendors; coverage of non-frontier attacker ecosystems and lower-resource languages is limited.",
+    "Judge dependence: per-fragment verdicts are produced by a single LLM judge (Claude Haiku 4.5) and inherit its blind spots. Detectors trained against this judge may transfer imperfectly to systems using different judges or human reviewers.",
+    "Static snapshot: the public tier is a frozen v1.0.0 snapshot. Attacker tactics and defender capabilities will continue to evolve.",
+    "Not for direct deployment as offensive tooling; not for targeting individuals, organisations, or infrastructure without authorisation."
+  ],
+  "rai:dataBiases": [
+    "Source bias: seed campaigns are biased toward incidents that frontier-API providers chose to disclose publicly, which may over-represent high-visibility threat actors and under-represent lower-profile attackers.",
+    "Stylistic bias: all RL-generated variants are rewritten by a single frontier LLM family, so stylistic diversity is bounded by that model's prior.",
+    "Judge bias: the single-token classifier judge inherits the safety preferences and refusal patterns of its underlying LLM (Claude Haiku 4.5).",
+    "Language bias: English-only.",
+    "Domain bias: campaigns concentrate on financial fraud, credential theft, deepfake-enabled identity fraud, and malware-development assistance; other harm categories are under-represented."
+  ],
+  "rai:dataSocialImpact": "FragBench is dual-use. Its intended impact is to enable academic research on detecting cross-session, fragmented jailbreak attacks against LLM agents, and to support development of defensive classifiers and guardrails. The same fragment sequences can in principle be reused as offensive prompts. To mitigate this, the most sensitive components (RL system prompts, judge-rubric configurations, and high-yield variant traces) are placed behind a manual access-review gate in a companion dataset; only the lower-yield public tier is openly accessible. We follow the standard practice for security benchmarks (HarmBench, JailbreakBench) of tiered release.",
+  "rai:personalSensitiveInformation": "None. All prompts, identities, and tool arguments are synthetic. Recipient profiles, account names, file paths, and any apparent personal identifiers in fragment prompts are fabricated for the benchmark and do not correspond to real individuals or organisations. No private user data was collected.",
+  "rai:dataReleaseMaintenancePlan": "Versioned via the HuggingFace dataset (v1.0.0 as of 2026-05-07). Errata, additional campaigns, and judge-rubric updates will be released as new minor versions on the same dataset URL. The sensitive RL system prompts and judge-rubric configurations are released separately under request-access at the gated companion dataset: https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted. Maintainer contact will be restored at camera-ready; for the double-blind review period, please open an issue on the HuggingFace dataset page.",
+
   "distribution": [
     {
       "@type": "cr:FileObject",
@@ -154,27 +207,32 @@
       "@id": "attack_meta_splits",
       "name": "attack_meta_splits",
       "description": "Splits for the attack_meta config.",
-      "field": [{"@type": "cr:Field", "@id": "attack_meta_splits/split_name", "dataType": "sc:Text"}],
+      "field": [
+        {"@type": "cr:Field", "@id": "attack_meta_splits/split_name", "dataType": "sc:Text"}
+      ],
       "data": [{"attack_meta_splits/split_name": "train"}]
     },
     {
       "@type": "cr:RecordSet",
       "@id": "attack_meta",
-      "description": "MCP sandbox run metadata. One record per (campaign, style, seed) execution triple.",
+      "description": "anon-fragbench-neurips/fragbench - 'attack_meta' subset. One row per attack pipeline run; describes which campaign, style, target model, and judge model were used.",
       "field": [
-        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "attack_meta_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text",
+         "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}},
+         "references": {"field": {"@id": "attack_meta_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "source_file"}}},
         {"@type": "cr:Field", "@id": "attack_meta/run_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "run_id"}}},
         {"@type": "cr:Field", "@id": "attack_meta/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "campaign"}}},
         {"@type": "cr:Field", "@id": "attack_meta/style", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "style"}}},
         {"@type": "cr:Field", "@id": "attack_meta/fragments_path", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "fragments_path"}}},
         {"@type": "cr:Field", "@id": "attack_meta/seeds", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "seeds"}}},
         {"@type": "cr:Field", "@id": "attack_meta/started_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "started_at"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/ended_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "ended_at"}}},
         {"@type": "cr:Field", "@id": "attack_meta/target_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_model"}}},
         {"@type": "cr:Field", "@id": "attack_meta/target_backend", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_backend"}}},
         {"@type": "cr:Field", "@id": "attack_meta/llm_product", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "llm_product"}}},
         {"@type": "cr:Field", "@id": "attack_meta/judge_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "judge_model"}}},
         {"@type": "cr:Field", "@id": "attack_meta/status", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "status"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/ended_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "ended_at"}}},
         {"@type": "cr:Field", "@id": "attack_meta/num_passed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "num_passed"}}}
       ]
     },
@@ -185,16 +243,22 @@
       "@id": "campaign_fragments_splits",
       "name": "campaign_fragments_splits",
       "description": "Splits for the campaign_fragments config.",
-      "field": [{"@type": "cr:Field", "@id": "campaign_fragments_splits/split_name", "dataType": "sc:Text"}],
+      "field": [
+        {"@type": "cr:Field", "@id": "campaign_fragments_splits/split_name", "dataType": "sc:Text"}
+      ],
       "data": [{"campaign_fragments_splits/split_name": "train"}]
     },
     {
       "@type": "cr:RecordSet",
       "@id": "campaign_fragments",
-      "description": "One record per fragment per variation. Contains the attack prompt, MITRE tactic, DAG edges, and per-style rewritten variants.",
+      "description": "anon-fragbench-neurips/fragbench - 'campaign_fragments' subset. One row per fragment within a campaign variation. Includes the parent tactic, parent prompt, produced and consumed artefacts (JSON-encoded), and stylised variations.",
       "field": [
-        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text",
+         "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}},
+         "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "source_file"}}},
         {"@type": "cr:Field", "@id": "campaign_fragments/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/variant", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variant"}}},
         {"@type": "cr:Field", "@id": "campaign_fragments/campaign_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign_id"}}},
         {"@type": "cr:Field", "@id": "campaign_fragments/seed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "seed"}}},
         {"@type": "cr:Field", "@id": "campaign_fragments/total_fragments", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "total_fragments"}}},
