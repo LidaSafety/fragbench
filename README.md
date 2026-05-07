@@ -150,6 +150,14 @@ Runs execute through the same **Docker-isolated** MCP stack used for serious eva
 
 This path is **Docker-only**; there is no bare-metal graph runner.
 
+### MCP harness architecture
+
+**MCP harness architecture.** A central `mcp-client` ingests campaign JSON files, selects the attack based on the style and seed, and routes tool calls to a fleet of 24 specialised MCP servers via FastMCP (HTTP + SSE). All agent interactions are captured as structured `.jsonl` session logs served through a viewer at port 8787. Support is available for self-hosted LLMs as well as those accessed via OpenRouter.
+
+![MCP harness architecture](./images/mcp-architecture.png)
+
+**[Open Figure 3 (vector PDF)](./images/mcp-architecture.pdf)** — use this PDF for clearer version.
+
 ### 3.1 Check Docker and start the stack
 
 Confirm the tooling and daemon:
@@ -266,6 +274,16 @@ Per-fragment sessions are **JSONL** streams (`session_<timestamp>_<id>.jsonl`). 
 ### 3.6 Viewer
 
 The web UI runs at [http://localhost:8787](http://localhost:8787). The **Live** view shows sessions while fragments execute; the **Graph** view shows pass/fail vectors and fragment-level details after completion. A run can be opened directly with `http://localhost:8787/graph.html?run=<run_id>`.
+
+**MCP validation frontend views.** The **Live** view streams fragment execution in real time, including MCP agent sessions, model responses, tool calls, and intermediate status. The **Graph** view summarizes completed validation runs by campaign phase and reports per-fragment pass/fail outcomes, judge rationales, tool executions, and artifact dependencies used for downstream defense analysis. Green indicates fragments that passed the LLM judge’s evaluation for having completed the task; red indicates those that failed.
+
+**(a) Live view.**
+
+![Live view of the MCP validation frontend](./images/live-view.png)
+
+**(b) Graph view.**
+
+![Graph view of the MCP validation frontend](./images/graph-view.png)
 
 ### 3.7 Tear down
 
