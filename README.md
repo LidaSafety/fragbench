@@ -1,6 +1,6 @@
 # fragbench
 
-FragBench is a benchmark pipeline for evaluating whether LLM agents can complete multi-step attack chains when prompts are fragmented, rewritten, and executed through tool access. The workflow has three stages: **generate** fragment datasets from campaign seeds, optionally **rewrite** them with the RL/judge loop in `fragbench-structural-graph`, then **validate** execution through the Dockerized MCP agent harness.
+FragBench is a benchmark pipeline for evaluating whether LLM agents can complete multi-step attack chains when prompts are fragmented, rewritten, and executed through tool access. The workflow has three stages: **generate** fragment datasets from campaign seeds, optionally **rewrite** them with the RL/judge loop in `fragbench-structural-graph-main`, then **validate** execution through the Dockerized MCP agent harness.
 
 ---
 
@@ -96,11 +96,11 @@ The generated JSON files (`results/<seed>_manual.json` / `results/<seed>_llm.jso
 
 ---
 
-## 2. Reinforcement Learning based Rewriting (`fragbench-structural-graph`) (Optional)
+## 2. Reinforcement Learning based Rewriting (`fragbench-structural-graph-main`) (Optional)
 
-Optional step: judge or RL-rewrite generated JSON fragments using [fragbench_generated_rl.py](fragbench-structural-graph/fragbench_dataset_generator/fragbench_pack/fragbench_generated_rl.py) to improve pass rate and reduce refusals.
+Optional step: judge or RL-rewrite generated JSON fragments using [fragbench_generated_rl.py](fragbench-structural-graph-main/fragbench_dataset_generator/fragbench_pack/fragbench_generated_rl.py) to improve pass rate and reduce refusals.
 
-The input dataset **must** be placed under `fragbench-structural-graph/dataset/` before running this step. For example, `results/promptsteal_manual.json` from §1 should be copied or staged as `fragbench-structural-graph/dataset/promptsteal_manual.json`, then referenced as `--input dataset/promptsteal_manual.json` from inside `fragbench-structural-graph`.
+The input dataset **must** be placed under `fragbench-structural-graph-main/dataset/` before running this step. For example, `results/promptsteal_manual.json` from §1 should be copied or staged as `fragbench-structural-graph-main/dataset/promptsteal_manual.json`, then referenced as `--input dataset/promptsteal_manual.json` from inside `fragbench-structural-graph-main`.
 
 ### 2.1 API keys
 
@@ -112,7 +112,7 @@ export OPENROUTER_API_KEY=sk-or-...
 ```
 
 ```bash
-cd fragbench-structural-graph
+cd fragbench-structural-graph-main
 
 
 python -u fragbench_dataset_generator/fragbench_pack/fragbench_generated_rl.py \
