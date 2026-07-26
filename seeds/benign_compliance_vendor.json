@@ -137,9 +137,9 @@
         "question_count": {
           "type": "choice",
           "values": [
-            "40",
-            "60",
-            "80"
+            "22",
+            "30",
+            "38"
           ]
         },
         "vendor": {

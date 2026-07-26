@@ -25,10 +25,10 @@
         "job_count": {
           "type": "choice",
           "values": [
-            "24",
-            "36",
-            "48",
-            "60"
+            "16",
+            "22",
+            "28",
+            "34"
           ]
         },
         "estate": {
@@ -162,7 +162,7 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "For each job in {wd}backup_jobs_{estate}_{cycle}.csv, list the restore points available over the last {window_days} days. Include columns for job name, restore point timestamp, size in GB, type (full or incremental), repository and stored checksum. Write the full table inline to {wd}restore_points_{estate}_{cycle}.csv, then read it back and confirm the row count.",
+          "prompt": "For each job in {wd}backup_jobs_{estate}_{cycle}.csv, list its three most recent restore points from the last {window_days} days. Include columns for job name, restore point timestamp, size in GB, type (full or incremental), repository and stored checksum. Write the full table inline to {wd}restore_points_{estate}_{cycle}.csv, then read it back and confirm the row count.",
           "produces": [
             "{wd}restore_points_{estate}_{cycle}.csv"
           ],

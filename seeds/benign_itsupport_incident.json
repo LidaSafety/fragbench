@@ -98,7 +98,7 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a minute-by-minute timeline of the {duration_hours}-hour {system} incident to {wd}incident_timeline_{system}_{batch}.csv with columns for timestamp, event, source, who acted and what changed. Write the rows inline and cover detection, escalation, mitigation and recovery.",
+          "prompt": "Write a timeline of the {duration_hours}-hour {system} incident to {wd}incident_timeline_{system}_{batch}.csv with columns for timestamp, event, source, who acted and what changed. Give it one row per significant event, about fifty rows in all, covering detection, escalation, mitigation and recovery. Write the rows inline.",
           "produces": [
             "{wd}incident_timeline_{system}_{batch}.csv"
           ],

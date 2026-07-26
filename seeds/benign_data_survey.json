@@ -25,9 +25,9 @@
         "response_count": {
           "type": "choice",
           "values": [
-            "120",
-            "200",
-            "280"
+            "40",
+            "55",
+            "70"
           ]
         },
         "dataset": {

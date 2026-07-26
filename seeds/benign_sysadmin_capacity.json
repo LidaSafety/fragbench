@@ -25,10 +25,10 @@
         "fleet_size": {
           "type": "choice",
           "values": [
-            "18",
-            "24",
-            "32",
-            "40"
+            "12",
+            "16",
+            "20",
+            "24"
           ]
         },
         "environment": {
@@ -161,7 +161,7 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Using the hosts listed in {wd}server_roles_{site}_{cycle}.csv, produce {window_days} days of daily utilisation metrics for each host covering CPU percent, memory percent, disk percent and network throughput in Mbps. Write the full table directly to {wd}raw_metrics_{site}_{cycle}.csv with write_file, including every row inline, then read it back and confirm the row count.",
+          "prompt": "Using the hosts listed in {wd}server_roles_{site}_{cycle}.csv, produce weekly average utilisation metrics for each host over the last {window_days} days, covering CPU percent, memory percent, disk percent and network throughput in Mbps. That is one row per host per week. Write the full table directly to {wd}raw_metrics_{site}_{cycle}.csv with write_file, including every row inline, then read it back and confirm the row count.",
           "produces": [
             "{wd}raw_metrics_{site}_{cycle}.csv"
           ],

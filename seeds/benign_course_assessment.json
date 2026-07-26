@@ -25,9 +25,9 @@
         "question_count": {
           "type": "choice",
           "values": [
-            "40",
-            "60",
-            "80"
+            "24",
+            "32",
+            "40"
           ]
         },
         "course": {

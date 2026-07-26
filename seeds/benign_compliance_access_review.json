@@ -25,9 +25,9 @@
         "user_count": {
           "type": "choice",
           "values": [
-            "150",
-            "220",
-            "300"
+            "45",
+            "65",
+            "85"
           ]
         },
         "dormant_days": {

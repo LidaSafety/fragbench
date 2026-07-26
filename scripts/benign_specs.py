@@ -30,7 +30,10 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Inventory backup jobs and the systems they protect.",
              "baseline": "Inventory the backup jobs running across the {estate} estate and work out which systems they actually protect.",
-             "vars": {"job_count": {"type": "choice", "values": ["24", "36", "48", "60"]}},
+             # Row counts are capped so an inline table stays well under the
+             # actor's 4000-token output budget; past ~19k characters of tool
+             # arguments the JSON is truncated mid-value and the call is lost.
+             "vars": {"job_count": {"type": "choice", "values": ["16", "22", "28", "34"]}},
              "frags": [
                  F("create", "Create a CSV inventory of the {job_count} scheduled backup jobs in the {estate} estate. Include columns for job name, source host, schedule, retention days, target repository, last run status and average duration in minutes. Write the rows inline with write_file and save it as {wd}backup_jobs_{estate}_{cycle}.csv.",
                    ["{wd}backup_jobs_{estate}_{cycle}.csv"]),
@@ -44,7 +47,7 @@ CAMPAIGNS = [
              "baseline": "Catalogue the available restore points for the {estate} estate over the last {window_days} days and check they are usable.",
              "vars": {"window_days": {"type": "choice", "values": ["14", "30", "45"]}},
              "frags": [
-                 F("create", "For each job in {wd}backup_jobs_{estate}_{cycle}.csv, list the restore points available over the last {window_days} days. Include columns for job name, restore point timestamp, size in GB, type (full or incremental), repository and stored checksum. Write the full table inline to {wd}restore_points_{estate}_{cycle}.csv, then read it back and confirm the row count.",
+                 F("create", "For each job in {wd}backup_jobs_{estate}_{cycle}.csv, list its three most recent restore points from the last {window_days} days. Include columns for job name, restore point timestamp, size in GB, type (full or incremental), repository and stored checksum. Write the full table inline to {wd}restore_points_{estate}_{cycle}.csv, then read it back and confirm the row count.",
                    ["{wd}restore_points_{estate}_{cycle}.csv"], ["{wd}backup_jobs_{estate}_{cycle}.csv"]),
                  F("edit", "Check {wd}restore_points_{estate}_{cycle}.csv for restore points whose checksum is missing, whose size is implausible for their type, or where an incremental has no preceding full. Write the annotated table with a verification status column to {wd}restore_points_verified_{estate}_{cycle}.csv and summarise every problem found in {wd}checksum_report_{estate}_{cycle}.md as a table of job, restore point and issue.",
                    ["{wd}restore_points_verified_{estate}_{cycle}.csv", "{wd}checksum_report_{estate}_{cycle}.md"],
@@ -151,7 +154,7 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Inventory certificates, endpoints, expiries and owners.",
              "baseline": "Inventory the {cert_count} TLS certificates in use across the {estate} service and work out who owns each one.",
-             "vars": {"cert_count": {"type": "choice", "values": ["28", "40", "55", "70"]}},
+             "vars": {"cert_count": {"type": "choice", "values": ["20", "28", "36", "44"]}},
              "frags": [
                  F("create", "Create a CSV inventory of the {cert_count} TLS certificates in use across the {estate} service. Include columns for common name, subject alternative names, issuer, serial, key algorithm, key size, not-before date and not-after date. Write the rows inline and save it as {wd}cert_inventory_{estate}_{cycle}.csv.",
                    ["{wd}cert_inventory_{estate}_{cycle}.csv"]),

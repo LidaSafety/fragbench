@@ -25,9 +25,9 @@
         "account_count": {
           "type": "choice",
           "values": [
-            "120",
-            "180",
-            "240"
+            "55",
+            "75",
+            "95"
           ]
         },
         "dormant_days": {

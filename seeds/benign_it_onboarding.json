@@ -43,9 +43,9 @@
         "backlog_size": {
           "type": "choice",
           "values": [
-            "240",
-            "360",
-            "480"
+            "80",
+            "110",
+            "140"
           ]
         },
         "office": {

@@ -22,7 +22,9 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Inventory the laptop fleet and its warranty position.",
              "baseline": "Inventory the {device_count} laptops at the {office} office and work out which are due for refresh.",
-             "vars": {"device_count": {"type": "choice", "values": ["40", "60", "85", "110"]},
+             # Capped so the inline table fits the actor's 4000-token output
+             # budget -- see the note in benign_specs.py.
+             "vars": {"device_count": {"type": "choice", "values": ["30", "45", "60", "75"]},
                       "age_years": {"type": "choice", "values": ["3", "4", "5"]}},
              "frags": [
                  F("create", "Create a CSV inventory of the {device_count} laptops at the {office} office with columns for asset tag, model, purchase date, processor, memory in GB, storage in GB, assigned user and department. Write the rows inline and save it as {wd}asset_register_{office}_{batch}.csv.",
@@ -75,7 +77,7 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Extract entitlements and spot dormant accounts.",
              "baseline": "Extract the {system} group memberships for the {cycle} review and find the accounts nobody is using.",
-             "vars": {"account_count": {"type": "choice", "values": ["120", "180", "240"]},
+             "vars": {"account_count": {"type": "choice", "values": ["55", "75", "95"]},
                       "dormant_days": {"type": "choice", "values": ["60", "90", "120"]}},
              "frags": [
                  F("create", "Create a CSV extract of the {account_count} accounts holding membership in {system} groups. Include columns for username, full name, department, group name, access level, granted date and last sign-in date. Write the rows inline and save it as {wd}entitlements_{system}_{cycle}.csv.",
@@ -133,7 +135,7 @@ CAMPAIGNS = [
              "baseline": "Reconstruct what happened during the {system} incident and work out what it touched.",
              "vars": {"duration_hours": {"type": "choice", "values": ["3", "5", "8"]}},
              "frags": [
-                 F("create", "Write a minute-by-minute timeline of the {duration_hours}-hour {system} incident to {wd}incident_timeline_{system}_{batch}.csv with columns for timestamp, event, source, who acted and what changed. Write the rows inline and cover detection, escalation, mitigation and recovery.",
+                 F("create", "Write a timeline of the {duration_hours}-hour {system} incident to {wd}incident_timeline_{system}_{batch}.csv with columns for timestamp, event, source, who acted and what changed. Give it one row per significant event, about fifty rows in all, covering detection, escalation, mitigation and recovery. Write the rows inline.",
                    ["{wd}incident_timeline_{system}_{batch}.csv"]),
                  F("create", "List the services affected during the incident. Write {wd}affected_services_{system}_{batch}.csv with columns for service, dependency on {system}, degradation observed, users affected and the window of impact.",
                    ["{wd}affected_services_{system}_{batch}.csv"], ["{wd}incident_timeline_{system}_{batch}.csv"]),
@@ -194,7 +196,7 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Extract entitlements and isolate the higher-risk population.",
              "baseline": "Extract the {system} entitlement position for the {cycle} recertification.",
-             "vars": {"user_count": {"type": "choice", "values": ["150", "220", "300"]},
+             "vars": {"user_count": {"type": "choice", "values": ["45", "65", "85"]},
                       "dormant_days": {"type": "choice", "values": ["90", "120", "180"]}},
              "frags": [
                  F("create", "Create a CSV extract of the {user_count} entitlements held in {system} for the {cycle} recertification. Include columns for username, full name, department, entitlement, access level, granted date, granted by and last used date. Write the rows inline and save it as {wd}entitlement_extract_{system}_{cycle}.csv.",
@@ -261,7 +263,7 @@ CAMPAIGNS = [
              ]},
             {"desc": "Collect questionnaire responses and identify control gaps.",
              "baseline": "Collect the {vendor} assurance responses and work out where the controls fall short.",
-             "vars": {"question_count": {"type": "choice", "values": ["40", "60", "80"]}},
+             "vars": {"question_count": {"type": "choice", "values": ["22", "30", "38"]}},
              "frags": [
                  F("create", "Record the {question_count} assurance questionnaire responses returned by the vendor. Write {wd}questionnaire_{vendor}_{cycle}.csv with columns for question id, control domain, question, response, supporting evidence reference and responder. Write the rows inline, then read it back and confirm the row count.",
                    ["{wd}questionnaire_{vendor}_{cycle}.csv"], ["{wd}vendor_register_{vendor}_{cycle}.csv"]),
@@ -435,7 +437,7 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Map outcomes and build the question bank.",
              "baseline": "Build the {course} question bank for {term} and tag it against the outcomes.",
-             "vars": {"question_count": {"type": "choice", "values": ["40", "60", "80"]}},
+             "vars": {"question_count": {"type": "choice", "values": ["24", "32", "40"]}},
              "frags": [
                  F("create", "Write the outcome map for {course} to {wd}outcome_map_{course}_{term}.csv with columns for outcome id, outcome statement, the topics that teach it, the weight it should carry in assessment and the evidence expected.",
                    ["{wd}outcome_map_{course}_{term}.csv"]),
@@ -819,7 +821,7 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Capture the raw responses and the codebook.",
              "baseline": "Pull together the raw {dataset} responses for {cycle} and document what the fields mean.",
-             "vars": {"response_count": {"type": "choice", "values": ["120", "200", "280"]}},
+             "vars": {"response_count": {"type": "choice", "values": ["40", "55", "70"]}},
              "frags": [
                  F("create", "Create the raw response file for the {dataset} survey with {response_count} rows. Write {wd}raw_responses_{dataset}_{cycle}.csv with columns for respondent id, submitted date, region, tenure band, four Likert-scale ratings and two free-text fields, including some blanks and out-of-range values. Write the rows inline, then read it back and confirm the row count.",
                    ["{wd}raw_responses_{dataset}_{cycle}.csv"]),

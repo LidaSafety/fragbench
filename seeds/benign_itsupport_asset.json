@@ -25,10 +25,10 @@
         "device_count": {
           "type": "choice",
           "values": [
-            "40",
+            "30",
+            "45",
             "60",
-            "85",
-            "110"
+            "75"
           ]
         },
         "age_years": {
