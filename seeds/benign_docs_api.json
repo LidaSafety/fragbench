@@ -25,9 +25,9 @@
         "endpoint_count": {
           "type": "choice",
           "values": [
+            "10",
             "14",
-            "20",
-            "28"
+            "18"
           ]
         },
         "system": {
@@ -106,7 +106,7 @@
         },
         {
           "role": "create",
-          "prompt": "Document the request and response schemas for the endpoints in {wd}endpoint_inventory_{system}_{release}.csv. Write the long-format table inline to {wd}schema_extract_{system}_{release}.csv with columns for path, method, direction, field, type, required, constraints and description, then read it back and confirm the row count.",
+          "prompt": "Document the request and response schemas for the endpoints in {wd}endpoint_inventory_{system}_{release}.csv, covering up to four fields per direction. Write the long-format table inline to {wd}schema_extract_{system}_{release}.csv with columns for path, method, direction, field, type, required, constraints and description, then read it back and confirm the row count.",
           "produces": [
             "{wd}schema_extract_{system}_{release}.csv"
           ],

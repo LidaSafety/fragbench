@@ -92,11 +92,11 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Inventory hosts and their current package baseline.",
              "baseline": "Inventory the {host_count} hosts in the {fleet} fleet and record what is installed on them.",
-             "vars": {"host_count": {"type": "choice", "values": ["30", "45", "60", "80"]}},
+             "vars": {"host_count": {"type": "choice", "values": ["20", "28", "36", "44"]}},
              "frags": [
                  F("create", "Create a CSV inventory of the {host_count} hosts in the {fleet} fleet with columns for hostname, operating system, kernel version, environment, owning team, last reboot date and maintenance window. Write the rows inline and save it as {wd}host_inventory_{fleet}_{cycle}.csv.",
                    ["{wd}host_inventory_{fleet}_{cycle}.csv"]),
-                 F("create", "For every host in {wd}host_inventory_{fleet}_{cycle}.csv, record the installed versions of the ten packages we track. Write a long-format table with columns for hostname, package, installed version and install date to {wd}package_versions_{fleet}_{cycle}.csv, then read it back and confirm the row count.",
+                 F("create", "For every host in {wd}host_inventory_{fleet}_{cycle}.csv, record the installed versions of the four packages we track. Write a long-format table with columns for hostname, package, installed version and install date to {wd}package_versions_{fleet}_{cycle}.csv, then read it back and confirm the row count.",
                    ["{wd}package_versions_{fleet}_{cycle}.csv"], ["{wd}host_inventory_{fleet}_{cycle}.csv"]),
                  F("create", "Summarise {wd}package_versions_{fleet}_{cycle}.csv into a baseline at {wd}patch_baseline_{fleet}_{cycle}.csv giving, per package, the most common installed version, the oldest version present and the number of hosts on each.",
                    ["{wd}patch_baseline_{fleet}_{cycle}.csv"], ["{wd}package_versions_{fleet}_{cycle}.csv"]),
@@ -222,14 +222,14 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Inventory volumes, mounts, growth history and quotas.",
              "baseline": "Inventory the {volume_count} storage volumes in the {estate} estate and record how they are mounted and consumed.",
-             "vars": {"volume_count": {"type": "choice", "values": ["32", "48", "64", "80"]},
+             "vars": {"volume_count": {"type": "choice", "values": ["24", "32", "40", "48"]},
                       "window_months": {"type": "choice", "values": ["6", "9", "12"]}},
              "frags": [
                  F("create", "Create a CSV inventory of the {volume_count} storage volumes in the {estate} estate with columns for volume id, array, capacity in TB, used in TB, filesystem, tier, snapshot policy and owning team. Write the rows inline and save it as {wd}volume_inventory_{estate}_{cycle}.csv.",
                    ["{wd}volume_inventory_{estate}_{cycle}.csv"]),
                  F("create", "Record where each volume in {wd}volume_inventory_{estate}_{cycle}.csv is mounted. Write {wd}mount_map_{estate}_{cycle}.csv with columns for volume id, hostname, mount point, access mode, application and environment.",
                    ["{wd}mount_map_{estate}_{cycle}.csv"], ["{wd}volume_inventory_{estate}_{cycle}.csv"]),
-                 F("create", "Produce {window_months} months of monthly used-capacity history for every volume in {wd}volume_inventory_{estate}_{cycle}.csv. Write the long-format table inline to {wd}growth_history_{estate}_{cycle}.csv with columns for volume id, month, used TB and snapshot TB, then read it back and confirm the row count.",
+                 F("create", "Produce {window_months} months of used-capacity history for every volume in {wd}volume_inventory_{estate}_{cycle}.csv, aggregated to one row per volume per quarter. Write the long-format table inline to {wd}growth_history_{estate}_{cycle}.csv with columns for volume id, month, used TB and snapshot TB, then read it back and confirm the row count.",
                    ["{wd}growth_history_{estate}_{cycle}.csv"], ["{wd}volume_inventory_{estate}_{cycle}.csv"]),
                  F("create", "Build a quota register at {wd}quota_register_{estate}_{cycle}.csv from {wd}mount_map_{estate}_{cycle}.csv, giving per owning team the allocated capacity, the used capacity, the configured quota and the headroom remaining.",
                    ["{wd}quota_register_{estate}_{cycle}.csv"],

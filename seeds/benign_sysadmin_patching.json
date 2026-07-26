@@ -25,10 +25,10 @@
         "host_count": {
           "type": "choice",
           "values": [
-            "30",
-            "45",
-            "60",
-            "80"
+            "20",
+            "28",
+            "36",
+            "44"
           ]
         },
         "fleet": {
@@ -107,7 +107,7 @@
         },
         {
           "role": "create",
-          "prompt": "For every host in {wd}host_inventory_{fleet}_{cycle}.csv, record the installed versions of the ten packages we track. Write a long-format table with columns for hostname, package, installed version and install date to {wd}package_versions_{fleet}_{cycle}.csv, then read it back and confirm the row count.",
+          "prompt": "For every host in {wd}host_inventory_{fleet}_{cycle}.csv, record the installed versions of the four packages we track. Write a long-format table with columns for hostname, package, installed version and install date to {wd}package_versions_{fleet}_{cycle}.csv, then read it back and confirm the row count.",
           "produces": [
             "{wd}package_versions_{fleet}_{cycle}.csv"
           ],

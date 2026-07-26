@@ -84,7 +84,15 @@ def main() -> int:
         graphs = [g for g in graphs if args.run_id in g]
     if args.since:
         if os.path.exists(args.since):
-            cutoff = os.path.getmtime(args.since)
+            # A directory's own mtime tracks its *last* write, so anchoring on
+            # it would match only the final run of a sweep. Anchor on the
+            # oldest entry instead -- that is when the sweep started.
+            if os.path.isdir(args.since):
+                entries = [os.path.join(args.since, e) for e in os.listdir(args.since)]
+                cutoff = min((os.path.getmtime(e) for e in entries),
+                             default=os.path.getmtime(args.since))
+            else:
+                cutoff = os.path.getmtime(args.since)
             graphs = [g for g in graphs if os.path.getmtime(g) >= cutoff]
         else:
             graphs = [g for g in graphs if args.since in g]

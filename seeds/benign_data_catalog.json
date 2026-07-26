@@ -106,7 +106,7 @@
         },
         {
           "role": "create",
-          "prompt": "Profile the columns of every table in {wd}table_inventory_{dataset}_{cycle}.csv. Write the long-format table inline to {wd}column_profiles_{dataset}_{cycle}.csv with columns for table, column, data type, null share, distinct count, minimum, maximum and an example value, then read it back and confirm the row count.",
+          "prompt": "Profile the columns of every table in {wd}table_inventory_{dataset}_{cycle}.csv, covering the six most important columns of each. Write the long-format table inline to {wd}column_profiles_{dataset}_{cycle}.csv with columns for table, column, data type, null share, distinct count, minimum, maximum and an example value, then read it back and confirm the row count.",
           "produces": [
             "{wd}column_profiles_{dataset}_{cycle}.csv"
           ],

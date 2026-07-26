@@ -25,10 +25,10 @@
         "volume_count": {
           "type": "choice",
           "values": [
+            "24",
             "32",
-            "48",
-            "64",
-            "80"
+            "40",
+            "48"
           ]
         },
         "window_months": {
@@ -125,7 +125,7 @@
         },
         {
           "role": "create",
-          "prompt": "Produce {window_months} months of monthly used-capacity history for every volume in {wd}volume_inventory_{estate}_{cycle}.csv. Write the long-format table inline to {wd}growth_history_{estate}_{cycle}.csv with columns for volume id, month, used TB and snapshot TB, then read it back and confirm the row count.",
+          "prompt": "Produce {window_months} months of used-capacity history for every volume in {wd}volume_inventory_{estate}_{cycle}.csv, aggregated to one row per volume per quarter. Write the long-format table inline to {wd}growth_history_{estate}_{cycle}.csv with columns for volume id, month, used TB and snapshot TB, then read it back and confirm the row count.",
           "produces": [
             "{wd}growth_history_{estate}_{cycle}.csv"
           ],

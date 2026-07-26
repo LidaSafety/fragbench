@@ -875,7 +875,7 @@ CAMPAIGNS = [
              "frags": [
                  F("create", "Create an inventory of the {table_count} tables in the {dataset} area. Write {wd}table_inventory_{dataset}_{cycle}.csv with columns for table name, purpose, row count, update frequency, source system, retention and the owning team.",
                    ["{wd}table_inventory_{dataset}_{cycle}.csv"]),
-                 F("create", "Profile the columns of every table in {wd}table_inventory_{dataset}_{cycle}.csv. Write the long-format table inline to {wd}column_profiles_{dataset}_{cycle}.csv with columns for table, column, data type, null share, distinct count, minimum, maximum and an example value, then read it back and confirm the row count.",
+                 F("create", "Profile the columns of every table in {wd}table_inventory_{dataset}_{cycle}.csv, covering the six most important columns of each. Write the long-format table inline to {wd}column_profiles_{dataset}_{cycle}.csv with columns for table, column, data type, null share, distinct count, minimum, maximum and an example value, then read it back and confirm the row count.",
                    ["{wd}column_profiles_{dataset}_{cycle}.csv"], ["{wd}table_inventory_{dataset}_{cycle}.csv"]),
                  F("create", "Capture representative sample rows for the three largest tables in {wd}table_inventory_{dataset}_{cycle}.csv. Write {wd}sample_rows_{dataset}_{cycle}.csv with a table column followed by the sampled values, keeping the column order used in {wd}column_profiles_{dataset}_{cycle}.csv.",
                    ["{wd}sample_rows_{dataset}_{cycle}.csv"],
@@ -928,11 +928,11 @@ CAMPAIGNS = [
         "stages": [
             {"desc": "Inventory endpoints, schemas and authentication.",
              "baseline": "Inventory what the {system} API exposes at {release}.",
-             "vars": {"endpoint_count": {"type": "choice", "values": ["14", "20", "28"]}},
+             "vars": {"endpoint_count": {"type": "choice", "values": ["10", "14", "18"]}},
              "frags": [
                  F("create", "Create an inventory of the {endpoint_count} endpoints the {system} API exposes at {release}. Write {wd}endpoint_inventory_{system}_{release}.csv with columns for path, method, purpose, whether authentication is required, the permission needed, rate limit and status.",
                    ["{wd}endpoint_inventory_{system}_{release}.csv"]),
-                 F("create", "Document the request and response schemas for the endpoints in {wd}endpoint_inventory_{system}_{release}.csv. Write the long-format table inline to {wd}schema_extract_{system}_{release}.csv with columns for path, method, direction, field, type, required, constraints and description, then read it back and confirm the row count.",
+                 F("create", "Document the request and response schemas for the endpoints in {wd}endpoint_inventory_{system}_{release}.csv, covering up to four fields per direction. Write the long-format table inline to {wd}schema_extract_{system}_{release}.csv with columns for path, method, direction, field, type, required, constraints and description, then read it back and confirm the row count.",
                    ["{wd}schema_extract_{system}_{release}.csv"], ["{wd}endpoint_inventory_{system}_{release}.csv"]),
                  F("create", "Write the authentication notes to {wd}auth_notes_{system}_{release}.md covering the token types the {system} API accepts, how a client obtains one, the scopes matching the permissions in {wd}endpoint_inventory_{system}_{release}.csv, token lifetime and how refresh works.",
                    ["{wd}auth_notes_{system}_{release}.md"], ["{wd}endpoint_inventory_{system}_{release}.csv"]),
