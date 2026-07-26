@@ -1,0 +1,1103 @@
+{
+  "label": "malicious_executed",
+  "overall": {
+    "n_chains": 145,
+    "chain_length_hist": {
+      "2": 3,
+      "3": 10,
+      "4": 6,
+      "5": 5,
+      "6": 5,
+      "7": 10,
+      "8": 19,
+      "9": 18,
+      "10": 38,
+      "11": 13,
+      "12": 18
+    },
+    "events_per_fragment": {
+      "n": 1238,
+      "min": 2.0,
+      "p50": 8.0,
+      "p90": 24.0,
+      "p99": 44.0,
+      "max": 94.0,
+      "mean": 11.97
+    },
+    "tool_share": {
+      "read_file": 0.3931,
+      "write_file": 0.1603,
+      "list_directory": 0.1108,
+      "search_in_files": 0.0578,
+      "scan_subnet": 0.0541,
+      "glob_files": 0.0456,
+      "edit_file": 0.0343,
+      "file_info": 0.0338,
+      "run_command": 0.0275,
+      "append_file": 0.0207,
+      "create_directory": 0.0203,
+      "synthesize_command": 0.0081,
+      "summarize_exposure": 0.0078,
+      "create_archive": 0.005,
+      "upload_archive": 0.0036,
+      "compose_email": 0.0034,
+      "stage_paths": 0.0032,
+      "plan_exfil": 0.0028,
+      "list_outbox": 0.0026,
+      "copy_path": 0.0024,
+      "send_email": 0.0015,
+      "change_permissions": 0.0008,
+      "delete_path": 0.0004
+    },
+    "tool_call_share": {
+      "read_file": 0.3931,
+      "write_file": 0.1603,
+      "list_directory": 0.1108,
+      "search_in_files": 0.0578,
+      "scan_subnet": 0.0541,
+      "glob_files": 0.0456,
+      "edit_file": 0.0343,
+      "file_info": 0.0338,
+      "run_command": 0.0275,
+      "append_file": 0.0207,
+      "create_directory": 0.0203,
+      "synthesize_command": 0.0081,
+      "summarize_exposure": 0.0078,
+      "create_archive": 0.005,
+      "upload_archive": 0.0036,
+      "compose_email": 0.0034,
+      "stage_paths": 0.0032,
+      "plan_exfil": 0.0028,
+      "list_outbox": 0.0026,
+      "copy_path": 0.0024,
+      "send_email": 0.0015,
+      "change_permissions": 0.0008,
+      "delete_path": 0.0004
+    },
+    "arguments_bytes": {
+      "n": 7407,
+      "min": 2.0,
+      "p50": 44.0,
+      "p90": 7706.0,
+      "p99": 26301.0,
+      "max": 58393.0,
+      "mean": 2044.11
+    },
+    "arguments_bytes_over_3000_share": 0.1603,
+    "result_bytes": {
+      "n": 7407,
+      "min": 106.0,
+      "p50": 605.0,
+      "p90": 20298.0,
+      "p99": 45238.0,
+      "max": 118191.0,
+      "mean": 6047.13
+    },
+    "result_bytes_over_5000_share": 0.2961,
+    "success_rate": 0.9627,
+    "failure_rate": 0.0373,
+    "tool_call_index_share": {
+      "1/1": 0.7709,
+      "1/2": 0.0462,
+      "2/2": 0.0462,
+      "1/3": 0.0177,
+      "2/3": 0.0177,
+      "3/3": 0.0177,
+      "1/4": 0.0078,
+      "2/4": 0.0078,
+      "3/4": 0.0078,
+      "4/4": 0.0078
+    },
+    "session_ids_per_chain": {
+      "n": 145,
+      "min": 2.0,
+      "p50": 9.0,
+      "p90": 12.0,
+      "p99": 13.0,
+      "max": 13.0,
+      "mean": 8.66
+    },
+    "placeholder_session_id_share": 0.0,
+    "distinct_resources_per_chain": {
+      "n": 145,
+      "min": 1.0,
+      "p50": 16.0,
+      "p90": 38.0,
+      "p99": 60.0,
+      "max": 65.0,
+      "mean": 19.34
+    },
+    "cross_fragment_shared_resources_per_chain": {
+      "n": 145,
+      "min": 0.0,
+      "p50": 5.0,
+      "p90": 9.0,
+      "p99": 17.0,
+      "max": 18.0,
+      "mean": 5.59
+    },
+    "first_seq_share": {
+      "7": 1.0
+    },
+    "seq_stride_share": {
+      "1": 0.6269,
+      "4": 0.3709,
+      "-1": 0.0013,
+      "-6": 0.0004,
+      "-11": 0.0001,
+      "14": 0.0001,
+      "9": 0.0001,
+      "7": 0.0001
+    },
+    "path_style_share": {
+      "relative": 0.5742,
+      "absolute": 0.4258
+    }
+  },
+  "theme_mix": {
+    "unclassified": 0.5793,
+    "compliance_auditing": 0.1724,
+    "documentation": 0.1034,
+    "it_support": 0.0621,
+    "system_administration": 0.0345,
+    "project_lifecycle": 0.0276,
+    "data_wrangling": 0.0207
+  },
+  "theme_mix_soft": {
+    "unclassified": 0.5793,
+    "compliance_auditing": 0.1069,
+    "documentation": 0.0995,
+    "it_support": 0.0608,
+    "project_lifecycle": 0.0571,
+    "system_administration": 0.0539,
+    "data_wrangling": 0.026,
+    "course_preparation": 0.0166
+  },
+  "per_theme": {
+    "unclassified": {
+      "n_chains": 84,
+      "chain_length_hist": {
+        "2": 2,
+        "3": 8,
+        "4": 4,
+        "5": 2,
+        "6": 4,
+        "7": 6,
+        "8": 15,
+        "9": 11,
+        "10": 20,
+        "11": 1,
+        "12": 11
+      },
+      "events_per_fragment": {
+        "n": 682,
+        "min": 2.0,
+        "p50": 6.0,
+        "p90": 24.0,
+        "p99": 40.0,
+        "max": 72.0,
+        "mean": 10.55
+      },
+      "tool_share": {
+        "read_file": 0.4275,
+        "write_file": 0.1295,
+        "list_directory": 0.1017,
+        "search_in_files": 0.0778,
+        "glob_files": 0.0564,
+        "edit_file": 0.045,
+        "scan_subnet": 0.0314,
+        "append_file": 0.0309,
+        "run_command": 0.0303,
+        "file_info": 0.0214,
+        "synthesize_command": 0.0139,
+        "create_directory": 0.0136,
+        "summarize_exposure": 0.0061,
+        "upload_archive": 0.0033,
+        "create_archive": 0.0028,
+        "stage_paths": 0.0022,
+        "plan_exfil": 0.0019,
+        "compose_email": 0.0019,
+        "list_outbox": 0.0011,
+        "send_email": 0.0006,
+        "copy_path": 0.0003,
+        "change_permissions": 0.0003
+      },
+      "tool_call_share": {
+        "read_file": 0.4275,
+        "write_file": 0.1295,
+        "list_directory": 0.1017,
+        "search_in_files": 0.0778,
+        "glob_files": 0.0564,
+        "edit_file": 0.045,
+        "scan_subnet": 0.0314,
+        "append_file": 0.0309,
+        "run_command": 0.0303,
+        "file_info": 0.0214,
+        "synthesize_command": 0.0139,
+        "create_directory": 0.0136,
+        "summarize_exposure": 0.0061,
+        "upload_archive": 0.0033,
+        "create_archive": 0.0028,
+        "stage_paths": 0.0022,
+        "plan_exfil": 0.0019,
+        "compose_email": 0.0019,
+        "list_outbox": 0.0011,
+        "send_email": 0.0006,
+        "copy_path": 0.0003,
+        "change_permissions": 0.0003
+      },
+      "arguments_bytes": {
+        "n": 3598,
+        "min": 2.0,
+        "p50": 44.0,
+        "p90": 6611.0,
+        "p99": 24352.0,
+        "max": 48240.0,
+        "mean": 1811.92
+      },
+      "arguments_bytes_over_3000_share": 0.1501,
+      "result_bytes": {
+        "n": 3598,
+        "min": 106.0,
+        "p50": 985.0,
+        "p90": 21426.0,
+        "p99": 48214.0,
+        "max": 118191.0,
+        "mean": 6534.89
+      },
+      "result_bytes_over_5000_share": 0.3174,
+      "success_rate": 0.9594,
+      "failure_rate": 0.0406,
+      "tool_call_index_share": {
+        "1/1": 0.8213,
+        "1/2": 0.0422,
+        "2/2": 0.0422,
+        "1/3": 0.0142,
+        "2/3": 0.0142,
+        "3/3": 0.0142,
+        "1/4": 0.005,
+        "2/4": 0.005,
+        "3/4": 0.005,
+        "4/4": 0.005
+      },
+      "session_ids_per_chain": {
+        "n": 84,
+        "min": 2.0,
+        "p50": 9.0,
+        "p90": 12.0,
+        "p99": 12.0,
+        "max": 12.0,
+        "mean": 8.24
+      },
+      "placeholder_session_id_share": 0.0,
+      "distinct_resources_per_chain": {
+        "n": 84,
+        "min": 1.0,
+        "p50": 13.0,
+        "p90": 23.0,
+        "p99": 33.0,
+        "max": 34.0,
+        "mean": 13.87
+      },
+      "cross_fragment_shared_resources_per_chain": {
+        "n": 84,
+        "min": 0.0,
+        "p50": 5.0,
+        "p90": 9.0,
+        "p99": 10.0,
+        "max": 10.0,
+        "mean": 4.85
+      },
+      "first_seq_share": {
+        "7": 1.0
+      },
+      "seq_stride_share": {
+        "1": 0.6142,
+        "4": 0.3823,
+        "-1": 0.0017,
+        "-6": 0.0008,
+        "-11": 0.0002,
+        "14": 0.0002,
+        "9": 0.0002,
+        "7": 0.0002
+      },
+      "path_style_share": {
+        "relative": 0.7588,
+        "absolute": 0.2412
+      }
+    },
+    "compliance_auditing": {
+      "n_chains": 25,
+      "chain_length_hist": {
+        "4": 1,
+        "5": 1,
+        "8": 1,
+        "9": 4,
+        "10": 7,
+        "11": 8,
+        "12": 3
+      },
+      "events_per_fragment": {
+        "n": 247,
+        "min": 2.0,
+        "p50": 16.0,
+        "p90": 30.0,
+        "p99": 78.0,
+        "max": 94.0,
+        "mean": 17.24
+      },
+      "tool_share": {
+        "read_file": 0.349,
+        "write_file": 0.1686,
+        "list_directory": 0.1343,
+        "scan_subnet": 0.1071,
+        "file_info": 0.0521,
+        "glob_files": 0.0348,
+        "search_in_files": 0.0324,
+        "run_command": 0.0282,
+        "create_directory": 0.0235,
+        "summarize_exposure": 0.0141,
+        "create_archive": 0.0094,
+        "edit_file": 0.008,
+        "copy_path": 0.007,
+        "stage_paths": 0.0061,
+        "upload_archive": 0.0061,
+        "plan_exfil": 0.0056,
+        "list_outbox": 0.0033,
+        "compose_email": 0.0033,
+        "append_file": 0.0028,
+        "change_permissions": 0.0014,
+        "send_email": 0.0014,
+        "synthesize_command": 0.0009,
+        "delete_path": 0.0005
+      },
+      "tool_call_share": {
+        "read_file": 0.349,
+        "write_file": 0.1686,
+        "list_directory": 0.1343,
+        "scan_subnet": 0.1071,
+        "file_info": 0.0521,
+        "glob_files": 0.0348,
+        "search_in_files": 0.0324,
+        "run_command": 0.0282,
+        "create_directory": 0.0235,
+        "summarize_exposure": 0.0141,
+        "create_archive": 0.0094,
+        "edit_file": 0.008,
+        "copy_path": 0.007,
+        "stage_paths": 0.0061,
+        "upload_archive": 0.0061,
+        "plan_exfil": 0.0056,
+        "list_outbox": 0.0033,
+        "compose_email": 0.0033,
+        "append_file": 0.0028,
+        "change_permissions": 0.0014,
+        "send_email": 0.0014,
+        "synthesize_command": 0.0009,
+        "delete_path": 0.0005
+      },
+      "arguments_bytes": {
+        "n": 2129,
+        "min": 2.0,
+        "p50": 42.0,
+        "p90": 6978.0,
+        "p99": 28474.0,
+        "max": 58393.0,
+        "mean": 1891.01
+      },
+      "arguments_bytes_over_3000_share": 0.1357,
+      "result_bytes": {
+        "n": 2129,
+        "min": 112.0,
+        "p50": 451.0,
+        "p90": 16911.0,
+        "p99": 39125.0,
+        "max": 68185.0,
+        "mean": 4840.16
+      },
+      "result_bytes_over_5000_share": 0.2654,
+      "success_rate": 0.9591,
+      "failure_rate": 0.0409,
+      "tool_call_index_share": {
+        "1/1": 0.6322,
+        "1/2": 0.0578,
+        "2/2": 0.0578,
+        "1/3": 0.0287,
+        "2/3": 0.0287,
+        "3/3": 0.0287,
+        "1/4": 0.0132,
+        "2/4": 0.0132,
+        "3/4": 0.0132,
+        "4/4": 0.0132
+      },
+      "session_ids_per_chain": {
+        "n": 25,
+        "min": 4.0,
+        "p50": 10.0,
+        "p90": 12.0,
+        "p99": 12.0,
+        "max": 12.0,
+        "mean": 9.88
+      },
+      "placeholder_session_id_share": 0.0,
+      "distinct_resources_per_chain": {
+        "n": 25,
+        "min": 18.0,
+        "p50": 39.0,
+        "p90": 58.0,
+        "p99": 65.0,
+        "max": 65.0,
+        "mean": 39.32
+      },
+      "cross_fragment_shared_resources_per_chain": {
+        "n": 25,
+        "min": 2.0,
+        "p50": 8.0,
+        "p90": 15.0,
+        "p99": 18.0,
+        "max": 18.0,
+        "mean": 8.96
+      },
+      "first_seq_share": {
+        "7": 1.0
+      },
+      "seq_stride_share": {
+        "1": 0.6639,
+        "4": 0.3361
+      },
+      "path_style_share": {
+        "absolute": 0.5622,
+        "relative": 0.4378
+      }
+    },
+    "documentation": {
+      "n_chains": 15,
+      "chain_length_hist": {
+        "2": 1,
+        "4": 1,
+        "6": 1,
+        "7": 2,
+        "8": 3,
+        "9": 1,
+        "10": 2,
+        "11": 1,
+        "12": 3
+      },
+      "events_per_fragment": {
+        "n": 126,
+        "min": 2.0,
+        "p50": 10.0,
+        "p90": 24.0,
+        "p99": 34.0,
+        "max": 42.0,
+        "mean": 11.6
+      },
+      "tool_share": {
+        "read_file": 0.3092,
+        "write_file": 0.275,
+        "list_directory": 0.1176,
+        "edit_file": 0.0479,
+        "file_info": 0.0424,
+        "create_directory": 0.041,
+        "search_in_files": 0.0383,
+        "glob_files": 0.0369,
+        "scan_subnet": 0.0342,
+        "run_command": 0.0164,
+        "append_file": 0.015,
+        "compose_email": 0.0068,
+        "summarize_exposure": 0.0055,
+        "list_outbox": 0.0027,
+        "change_permissions": 0.0027,
+        "delete_path": 0.0027,
+        "send_email": 0.0027,
+        "copy_path": 0.0014,
+        "create_archive": 0.0014
+      },
+      "tool_call_share": {
+        "read_file": 0.3092,
+        "write_file": 0.275,
+        "list_directory": 0.1176,
+        "edit_file": 0.0479,
+        "file_info": 0.0424,
+        "create_directory": 0.041,
+        "search_in_files": 0.0383,
+        "glob_files": 0.0369,
+        "scan_subnet": 0.0342,
+        "run_command": 0.0164,
+        "append_file": 0.015,
+        "compose_email": 0.0068,
+        "summarize_exposure": 0.0055,
+        "list_outbox": 0.0027,
+        "change_permissions": 0.0027,
+        "delete_path": 0.0027,
+        "send_email": 0.0027,
+        "copy_path": 0.0014,
+        "create_archive": 0.0014
+      },
+      "arguments_bytes": {
+        "n": 731,
+        "min": 2.0,
+        "p50": 53.0,
+        "p90": 10004.0,
+        "p99": 30821.0,
+        "max": 42613.0,
+        "mean": 2851.05
+      },
+      "arguments_bytes_over_3000_share": 0.249,
+      "result_bytes": {
+        "n": 731,
+        "min": 110.0,
+        "p50": 348.0,
+        "p90": 16569.0,
+        "p99": 39672.0,
+        "max": 71739.0,
+        "mean": 4554.08
+      },
+      "result_bytes_over_5000_share": 0.2285,
+      "success_rate": 0.9726,
+      "failure_rate": 0.0274,
+      "tool_call_index_share": {
+        "1/1": 0.855,
+        "1/2": 0.0383,
+        "2/2": 0.0383,
+        "1/3": 0.0123,
+        "2/3": 0.0123,
+        "3/3": 0.0123,
+        "1/4": 0.0055,
+        "2/4": 0.0055,
+        "3/4": 0.0055,
+        "4/4": 0.0055
+      },
+      "session_ids_per_chain": {
+        "n": 15,
+        "min": 2.0,
+        "p50": 8.0,
+        "p90": 12.0,
+        "p99": 12.0,
+        "max": 12.0,
+        "mean": 8.53
+      },
+      "placeholder_session_id_share": 0.0,
+      "distinct_resources_per_chain": {
+        "n": 15,
+        "min": 10.0,
+        "p50": 19.0,
+        "p90": 30.0,
+        "p99": 31.0,
+        "max": 31.0,
+        "mean": 20.4
+      },
+      "cross_fragment_shared_resources_per_chain": {
+        "n": 15,
+        "min": 0.0,
+        "p50": 4.0,
+        "p90": 8.0,
+        "p99": 9.0,
+        "max": 9.0,
+        "mean": 4.2
+      },
+      "first_seq_share": {
+        "7": 1.0
+      },
+      "seq_stride_share": {
+        "1": 0.5951,
+        "4": 0.4034,
+        "-1": 0.0007,
+        "-6": 0.0007
+      },
+      "path_style_share": {
+        "absolute": 0.5618,
+        "relative": 0.4382
+      }
+    },
+    "it_support": {
+      "n_chains": 9,
+      "chain_length_hist": {
+        "7": 1,
+        "9": 2,
+        "10": 6
+      },
+      "events_per_fragment": {
+        "n": 85,
+        "min": 2.0,
+        "p50": 6.0,
+        "p90": 18.0,
+        "p99": 24.0,
+        "max": 30.0,
+        "mean": 8.38
+      },
+      "tool_share": {
+        "read_file": 0.5112,
+        "write_file": 0.1489,
+        "search_in_files": 0.073,
+        "list_directory": 0.0702,
+        "glob_files": 0.0646,
+        "append_file": 0.0478,
+        "edit_file": 0.0478,
+        "file_info": 0.0281,
+        "create_directory": 0.0028,
+        "compose_email": 0.0028,
+        "list_outbox": 0.0028
+      },
+      "tool_call_share": {
+        "read_file": 0.5112,
+        "write_file": 0.1489,
+        "search_in_files": 0.073,
+        "list_directory": 0.0702,
+        "glob_files": 0.0646,
+        "append_file": 0.0478,
+        "edit_file": 0.0478,
+        "file_info": 0.0281,
+        "create_directory": 0.0028,
+        "compose_email": 0.0028,
+        "list_outbox": 0.0028
+      },
+      "arguments_bytes": {
+        "n": 356,
+        "min": 2.0,
+        "p50": 41.0,
+        "p90": 12900.0,
+        "p99": 29756.0,
+        "max": 58088.0,
+        "mean": 3210.37
+      },
+      "arguments_bytes_over_3000_share": 0.2219,
+      "result_bytes": {
+        "n": 356,
+        "min": 123.0,
+        "p50": 4085.0,
+        "p90": 31793.0,
+        "p99": 57101.0,
+        "max": 66109.0,
+        "mean": 11377.36
+      },
+      "result_bytes_over_5000_share": 0.427,
+      "success_rate": 0.9831,
+      "failure_rate": 0.0169,
+      "tool_call_index_share": {
+        "1/1": 0.8343,
+        "1/2": 0.0562,
+        "2/2": 0.0562,
+        "1/3": 0.014,
+        "2/3": 0.014,
+        "3/3": 0.014,
+        "1/4": 0.0028,
+        "2/4": 0.0028,
+        "3/4": 0.0028,
+        "4/4": 0.0028
+      },
+      "session_ids_per_chain": {
+        "n": 9,
+        "min": 7.0,
+        "p50": 10.0,
+        "p90": 10.0,
+        "p99": 13.0,
+        "max": 13.0,
+        "mean": 9.89
+      },
+      "placeholder_session_id_share": 0.0,
+      "distinct_resources_per_chain": {
+        "n": 9,
+        "min": 5.0,
+        "p50": 10.0,
+        "p90": 18.0,
+        "p99": 30.0,
+        "max": 30.0,
+        "mean": 12.11
+      },
+      "cross_fragment_shared_resources_per_chain": {
+        "n": 9,
+        "min": 5.0,
+        "p50": 5.0,
+        "p90": 7.0,
+        "p99": 8.0,
+        "max": 8.0,
+        "mean": 5.78
+      },
+      "first_seq_share": {
+        "7": 1.0
+      },
+      "seq_stride_share": {
+        "1": 0.6204,
+        "4": 0.3732,
+        "-1": 0.0064
+      },
+      "path_style_share": {
+        "relative": 0.7025,
+        "absolute": 0.2975
+      }
+    },
+    "system_administration": {
+      "n_chains": 5,
+      "chain_length_hist": {
+        "5": 1,
+        "10": 2,
+        "11": 1,
+        "12": 1
+      },
+      "events_per_fragment": {
+        "n": 48,
+        "min": 2.0,
+        "p50": 16.0,
+        "p90": 26.0,
+        "p99": 42.0,
+        "max": 42.0,
+        "mean": 15.21
+      },
+      "tool_share": {
+        "read_file": 0.3616,
+        "write_file": 0.1699,
+        "list_directory": 0.0986,
+        "scan_subnet": 0.063,
+        "search_in_files": 0.0603,
+        "run_command": 0.0575,
+        "edit_file": 0.0493,
+        "create_directory": 0.0356,
+        "file_info": 0.0329,
+        "glob_files": 0.0247,
+        "synthesize_command": 0.011,
+        "append_file": 0.0082,
+        "compose_email": 0.0055,
+        "send_email": 0.0055,
+        "list_outbox": 0.0055,
+        "copy_path": 0.0027,
+        "create_archive": 0.0027,
+        "plan_exfil": 0.0027,
+        "upload_archive": 0.0027
+      },
+      "tool_call_share": {
+        "read_file": 0.3616,
+        "write_file": 0.1699,
+        "list_directory": 0.0986,
+        "scan_subnet": 0.063,
+        "search_in_files": 0.0603,
+        "run_command": 0.0575,
+        "edit_file": 0.0493,
+        "create_directory": 0.0356,
+        "file_info": 0.0329,
+        "glob_files": 0.0247,
+        "synthesize_command": 0.011,
+        "append_file": 0.0082,
+        "compose_email": 0.0055,
+        "send_email": 0.0055,
+        "list_outbox": 0.0055,
+        "copy_path": 0.0027,
+        "create_archive": 0.0027,
+        "plan_exfil": 0.0027,
+        "upload_archive": 0.0027
+      },
+      "arguments_bytes": {
+        "n": 365,
+        "min": 2.0,
+        "p50": 50.0,
+        "p90": 7536.0,
+        "p99": 32025.0,
+        "max": 50147.0,
+        "mean": 2142.49
+      },
+      "arguments_bytes_over_3000_share": 0.1425,
+      "result_bytes": {
+        "n": 365,
+        "min": 116.0,
+        "p50": 509.0,
+        "p90": 23494.0,
+        "p99": 42450.0,
+        "max": 52236.0,
+        "mean": 6461.48
+      },
+      "result_bytes_over_5000_share": 0.2849,
+      "success_rate": 0.9808,
+      "failure_rate": 0.0192,
+      "tool_call_index_share": {
+        "1/1": 0.7616,
+        "1/2": 0.0356,
+        "2/2": 0.0356,
+        "1/4": 0.0164,
+        "2/4": 0.0164,
+        "3/4": 0.0164,
+        "4/4": 0.0164,
+        "1/5": 0.0137,
+        "2/5": 0.0137,
+        "3/5": 0.0137
+      },
+      "session_ids_per_chain": {
+        "n": 5,
+        "min": 5.0,
+        "p50": 10.0,
+        "p90": 13.0,
+        "p99": 13.0,
+        "max": 13.0,
+        "mean": 9.8
+      },
+      "placeholder_session_id_share": 0.0,
+      "distinct_resources_per_chain": {
+        "n": 5,
+        "min": 14.0,
+        "p50": 25.0,
+        "p90": 33.0,
+        "p99": 33.0,
+        "max": 33.0,
+        "mean": 24.0
+      },
+      "cross_fragment_shared_resources_per_chain": {
+        "n": 5,
+        "min": 1.0,
+        "p50": 7.0,
+        "p90": 10.0,
+        "p99": 10.0,
+        "max": 10.0,
+        "mean": 6.8
+      },
+      "first_seq_share": {
+        "7": 1.0
+      },
+      "seq_stride_share": {
+        "1": 0.6217,
+        "4": 0.3768,
+        "-1": 0.0015
+      },
+      "path_style_share": {
+        "absolute": 0.5208,
+        "relative": 0.4792
+      }
+    },
+    "project_lifecycle": {
+      "n_chains": 4,
+      "chain_length_hist": {
+        "3": 1,
+        "5": 1,
+        "10": 1,
+        "11": 1
+      },
+      "events_per_fragment": {
+        "n": 29,
+        "min": 2.0,
+        "p50": 8.0,
+        "p90": 22.0,
+        "p99": 24.0,
+        "max": 24.0,
+        "mean": 9.79
+      },
+      "tool_share": {
+        "read_file": 0.3451,
+        "write_file": 0.1479,
+        "list_directory": 0.0915,
+        "scan_subnet": 0.0845,
+        "file_info": 0.0423,
+        "create_directory": 0.0423,
+        "create_archive": 0.0352,
+        "synthesize_command": 0.0282,
+        "edit_file": 0.0211,
+        "append_file": 0.0211,
+        "compose_email": 0.0211,
+        "list_outbox": 0.0211,
+        "stage_paths": 0.0211,
+        "send_email": 0.0141,
+        "glob_files": 0.0141,
+        "run_command": 0.0141,
+        "summarize_exposure": 0.0141,
+        "search_in_files": 0.007,
+        "plan_exfil": 0.007,
+        "upload_archive": 0.007
+      },
+      "tool_call_share": {
+        "read_file": 0.3451,
+        "write_file": 0.1479,
+        "list_directory": 0.0915,
+        "scan_subnet": 0.0845,
+        "file_info": 0.0423,
+        "create_directory": 0.0423,
+        "create_archive": 0.0352,
+        "synthesize_command": 0.0282,
+        "edit_file": 0.0211,
+        "append_file": 0.0211,
+        "compose_email": 0.0211,
+        "list_outbox": 0.0211,
+        "stage_paths": 0.0211,
+        "send_email": 0.0141,
+        "glob_files": 0.0141,
+        "run_command": 0.0141,
+        "summarize_exposure": 0.0141,
+        "search_in_files": 0.007,
+        "plan_exfil": 0.007,
+        "upload_archive": 0.007
+      },
+      "arguments_bytes": {
+        "n": 142,
+        "min": 2.0,
+        "p50": 47.0,
+        "p90": 5779.0,
+        "p99": 19487.0,
+        "max": 20383.0,
+        "mean": 1723.51
+      },
+      "arguments_bytes_over_3000_share": 0.1479,
+      "result_bytes": {
+        "n": 142,
+        "min": 118.0,
+        "p50": 479.0,
+        "p90": 17244.0,
+        "p99": 45238.0,
+        "max": 45238.0,
+        "mean": 4890.22
+      },
+      "result_bytes_over_5000_share": 0.2606,
+      "success_rate": 0.9366,
+      "failure_rate": 0.0634,
+      "tool_call_index_share": {
+        "1/1": 0.9155,
+        "1/2": 0.0282,
+        "2/2": 0.0282,
+        "1/4": 0.007,
+        "2/4": 0.007,
+        "3/4": 0.007,
+        "4/4": 0.007
+      },
+      "session_ids_per_chain": {
+        "n": 4,
+        "min": 3.0,
+        "p50": 10.0,
+        "p90": 11.0,
+        "p99": 11.0,
+        "max": 11.0,
+        "mean": 7.25
+      },
+      "placeholder_session_id_share": 0.0,
+      "distinct_resources_per_chain": {
+        "n": 4,
+        "min": 1.0,
+        "p50": 22.0,
+        "p90": 48.0,
+        "p99": 48.0,
+        "max": 48.0,
+        "mean": 22.75
+      },
+      "cross_fragment_shared_resources_per_chain": {
+        "n": 4,
+        "min": 0.0,
+        "p50": 7.0,
+        "p90": 9.0,
+        "p99": 9.0,
+        "max": 9.0,
+        "mean": 4.25
+      },
+      "first_seq_share": {
+        "7": 1.0
+      },
+      "seq_stride_share": {
+        "1": 0.5843,
+        "4": 0.4157
+      },
+      "path_style_share": {
+        "absolute": 0.7853,
+        "relative": 0.2147
+      }
+    },
+    "data_wrangling": {
+      "n_chains": 3,
+      "chain_length_hist": {
+        "3": 1,
+        "7": 1,
+        "11": 1
+      },
+      "events_per_fragment": {
+        "n": 21,
+        "min": 2.0,
+        "p50": 6.0,
+        "p90": 18.0,
+        "p99": 26.0,
+        "max": 26.0,
+        "mean": 8.19
+      },
+      "tool_share": {
+        "read_file": 0.4884,
+        "write_file": 0.2907,
+        "list_directory": 0.1047,
+        "file_info": 0.0349,
+        "edit_file": 0.0233,
+        "append_file": 0.0233,
+        "search_in_files": 0.0233,
+        "create_directory": 0.0116
+      },
+      "tool_call_share": {
+        "read_file": 0.4884,
+        "write_file": 0.2907,
+        "list_directory": 0.1047,
+        "file_info": 0.0349,
+        "edit_file": 0.0233,
+        "append_file": 0.0233,
+        "search_in_files": 0.0233,
+        "create_directory": 0.0116
+      },
+      "arguments_bytes": {
+        "n": 86,
+        "min": 13.0,
+        "p50": 50.0,
+        "p90": 16547.0,
+        "p99": 29375.0,
+        "max": 36271.0,
+        "mean": 3973.71
+      },
+      "arguments_bytes_over_3000_share": 0.2791,
+      "result_bytes": {
+        "n": 86,
+        "min": 124.0,
+        "p50": 1419.0,
+        "p90": 17481.0,
+        "p99": 31230.0,
+        "max": 44006.0,
+        "mean": 6298.28
+      },
+      "result_bytes_over_5000_share": 0.3023,
+      "success_rate": 0.9884,
+      "failure_rate": 0.0116,
+      "tool_call_index_share": {
+        "1/1": 0.9186,
+        "1/2": 0.0233,
+        "2/2": 0.0233,
+        "1/3": 0.0116,
+        "2/3": 0.0116,
+        "3/3": 0.0116
+      },
+      "session_ids_per_chain": {
+        "n": 3,
+        "min": 3.0,
+        "p50": 7.0,
+        "p90": 11.0,
+        "p99": 11.0,
+        "max": 11.0,
+        "mean": 7.0
+      },
+      "placeholder_session_id_share": 0.0,
+      "distinct_resources_per_chain": {
+        "n": 3,
+        "min": 6.0,
+        "p50": 12.0,
+        "p90": 13.0,
+        "p99": 13.0,
+        "max": 13.0,
+        "mean": 10.33
+      },
+      "cross_fragment_shared_resources_per_chain": {
+        "n": 3,
+        "min": 1.0,
+        "p50": 4.0,
+        "p90": 8.0,
+        "p99": 8.0,
+        "max": 8.0,
+        "mean": 4.33
+      },
+      "first_seq_share": {
+        "7": 1.0
+      },
+      "seq_stride_share": {
+        "1": 0.596,
+        "4": 0.404
+      },
+      "path_style_share": {
+        "absolute": 0.6838,
+        "relative": 0.3162
+      }
+    }
+  }
+}

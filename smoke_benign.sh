@@ -58,7 +58,7 @@ time for input in "${INPUTS[@]}"; do
         SEEDS=0 \
         MCP_MODEL_BACKEND=openrouter \
         MCP_MODEL=qwen/qwen3.5-122b-a10b \
-        JUDGE=1 \
+        JUDGE=0 \
         MAX_PARALLEL_VARIATIONS=4 \
         MAX_PARALLEL_FRAGMENTS=2 \
         2>&1 | tee "$LOG_DIR/$name.log"
