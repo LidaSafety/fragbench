@@ -39,6 +39,17 @@ STATE_DIR=run_state
 LOG_DIR="run_logs/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$STATE_DIR" "$LOG_DIR"
 
+# Sharding across machines: split by CAMPAIGN, never by style. Each shard must
+# run all six styles of its campaigns into one accumulating filesystem, because
+# that is how the malicious corpus was produced -- 24 variations x 6 styles into
+# a /app layer that is never reset. Sharding by style instead would give each
+# machine one sixth of the cross-run residue and reopen the self-containment gap
+# that comparison already showed to be an artifact of exposure.
+#
+#   CAMPAIGNS="benign_sysadmin_capacity benign_sysadmin_backup ..." ./run_benign_full.sh
+if [ -n "${CAMPAIGNS:-}" ]; then
+    read -r -a CAMPAIGNS <<< "$CAMPAIGNS"
+else
 CAMPAIGNS=(
     benign_sysadmin_capacity   benign_sysadmin_backup     benign_sysadmin_patching
     benign_sysadmin_certs      benign_sysadmin_storage    benign_it_onboarding
@@ -49,6 +60,7 @@ CAMPAIGNS=(
     benign_personal_inbox      benign_personal_relocation benign_data_survey
     benign_data_catalog        benign_docs_api            benign_docs_handbook
 )
+fi
 
 n_styles=$(set -- $STYLES; echo $#)
 echo "grid: ${#CAMPAIGNS[@]} campaigns x $n_styles styles, seeds=$SEEDS, par=$PAR"
