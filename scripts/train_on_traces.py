@@ -108,17 +108,24 @@ def parse_ts(ts) -> float:
 
 
 def load(path: str, label: int, sample: int | None, seed: int):
-    """Return list of samples; each sample is a flat list of its events."""
+    """Return [(events, label, campaign)]; one entry per outer sample."""
     with open(path) as f:
         d = json.load(f)
-    samples = [[e for frag in var for e in frag] for var in d["sessions"]]
-    samples = [s for s in samples if s]
-    if sample and sample < len(samples):
-        random.Random(seed).shuffle(samples)
-        samples = samples[:sample]
+    src = d.get("malicious_source") or d.get("benign_source") or []
+    camps = [str((s or {}).get("campaign") or "UNKNOWN").lower() for s in src]
+    rows = []
+    for i, var in enumerate(d["sessions"]):
+        events = [e for frag in var for e in frag]
+        if events:
+            rows.append((events, label,
+                         camps[i] if i < len(camps) else ("benign" if not label else "unknown")))
+    if sample and sample < len(rows):
+        random.Random(seed).shuffle(rows)
+        rows = rows[:sample]
     print(f"  {os.path.basename(path):<28} label={label}  "
-          f"samples={len(samples):>5}  events={sum(len(s) for s in samples):>7}")
-    return [(s, label) for s in samples]
+          f"samples={len(rows):>5}  events={sum(len(r[0]) for r in rows):>7}  "
+          f"campaigns={len({r[2] for r in rows})}")
+    return rows
 
 
 def build_graph(corpus):
@@ -128,9 +135,10 @@ def build_graph(corpus):
     meta: dict[int, dict] = {}
     labels: list[int] = []
     sample_of: list[int] = []
+    campaign_of: list[str] = []
 
     nid = 0
-    for s_idx, (events, label) in enumerate(corpus):
+    for s_idx, (events, label, campaign) in enumerate(corpus):
         by_session: dict[str, list[int]] = defaultdict(list)
         pending_call: dict[tuple[str, int], int] = {}
         resources: dict[str, list[int]] = defaultdict(list)
@@ -160,6 +168,7 @@ def build_graph(corpus):
             }
             labels.append(label)
             sample_of.append(s_idx)
+            campaign_of.append(campaign)
 
             # 1 temporal: consecutive events within a session
             if by_session[sid]:
@@ -192,7 +201,8 @@ def build_graph(corpus):
 
     for n in range(nid):
         adj.setdefault(n, [])
-    return dict(adj), meta, edge_types, np.array(labels), np.array(sample_of)
+    return (dict(adj), meta, edge_types, np.array(labels),
+            np.array(sample_of), np.array(campaign_of))
 
 
 def sample_disjoint_split(sample_of, labels, test_size, seed):
@@ -207,6 +217,41 @@ def sample_disjoint_split(sample_of, labels, test_size, seed):
         test_samples.update(ss[:max(1, int(round(len(ss) * test_size)))])
     mask = np.array([s in test_samples for s in sample_of])
     return ~mask, mask
+
+
+def capture_probs(module):
+    """Record the (y_true, y_prob) each training call scores.
+
+    train_single_arch and train_ml_methods compute probabilities internally but
+    return only metrics. Rather than fork them -- which would make the training
+    loop ours and therefore a candidate artifact -- we shim the first metric
+    function they call on the finished predictions and keep a copy.
+    """
+    captured: list[tuple] = []
+    original = module.roc_auc_score
+
+    def shim(y_true, y_score, *a, **kw):
+        captured.append((np.asarray(y_true), np.asarray(y_score)))
+        return original(y_true, y_score, *a, **kw)
+
+    module.roc_auc_score = shim
+    return captured, (lambda: setattr(module, "roc_auc_score", original))
+
+
+def per_campaign_table(y, prob, campaign_of, models_probs):
+    """Table 3 protocol: each campaign's positive events + ALL benign test events."""
+    from sklearn.metrics import f1_score, accuracy_score
+    benign = y == 0
+    rows = []
+    for camp in sorted({c for c, lab in zip(campaign_of, y) if lab == 1}):
+        sel = benign | ((y == 1) & (campaign_of == camp))
+        row = {"campaign": camp, "n_pos": int(((y == 1) & (campaign_of == camp)).sum())}
+        for name, p in models_probs.items():
+            pred = (p[sel] >= 0.5).astype(int)
+            row[f"{name}_f1"] = f1_score(y[sel], pred, zero_division=0)
+            row[f"{name}_ac"] = accuracy_score(y[sel], pred)
+        rows.append(row)
+    return rows
 
 
 def evaluate(name, y, prob, sample_of, out):
@@ -248,7 +293,9 @@ def main() -> int:
                     help="match the benign sample count across arms")
     ap.add_argument("--test-size", type=float, default=0.3)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--quick", action="store_true", help="GBT + logistic only")
+    ap.add_argument("--no-gnn", action="store_true",
+                    help="classical baselines only (skips torch entirely)")
+    ap.add_argument("--epochs", type=int, default=30, help="GNN epochs (compare_gnns uses 30)")
     ap.add_argument("--json-out", help="write the results table here")
     args = ap.parse_args()
 
@@ -261,7 +308,7 @@ def main() -> int:
 
     print("\n[2/5] Building the fragment graph")
     t0 = time.perf_counter()
-    adj, meta, etypes, labels, sample_of = build_graph(corpus)
+    adj, meta, etypes, labels, sample_of, campaign_of = build_graph(corpus)
     et_counts = Counter(etypes.values())
     print(f"  nodes={len(labels):,}  edges={len(etypes):,}  "
           f"({time.perf_counter()-t0:.1f}s)")
@@ -275,64 +322,94 @@ def main() -> int:
     X, node_ids = FragmentFeatureEngine().compute_all_features(adj, meta, etypes)
     y = labels[np.array(node_ids)]
     s_of = sample_of[np.array(node_ids)]
+    camp_of = campaign_of[np.array(node_ids)]
     print(f"  X={X.shape}  ({time.perf_counter()-t0:.1f}s)")
 
-    print("\n[4/5] Chain-disjoint split")
-    tr, te = sample_disjoint_split(s_of, y, args.test_size, args.seed)
-    print(f"  train events={tr.sum():,} ({y[tr].sum():,} malicious)")
-    print(f"  test  events={te.sum():,} ({y[te].sum():,} malicious)")
-    print(f"  train chains={len(set(s_of[tr]))}  test chains={len(set(s_of[te]))}")
+    print("\n[4/5] Outer-sample split (reusing campaign_disjoint_split)")
+    import compare_gnns as CG
+    from train_gnn import NeighborSampler, build_node_features, campaign_disjoint_split
 
-    print("\n[5/5] Training")
-    from sklearn.ensemble import (RandomForestClassifier, AdaBoostClassifier,
-                                  HistGradientBoostingClassifier)
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.neural_network import MLPClassifier
-    from sklearn.neighbors import KNeighborsClassifier
-    from sklearn.svm import SVC
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler
+    # Their splitter holds out whole "campaign instances" and splits the benign
+    # remainder independently -- exactly the 70/30 outer-sample stratified split
+    # Table 3 describes. One malicious sample = one instance.
+    nid_arr = np.array(node_ids)
+    campaign_info = []
+    for s_id in sorted(set(s_of[y == 1].tolist())):
+        campaign_info.append({"nodes": nid_arr[(s_of == s_id) & (y == 1)].tolist()})
 
-    models = {"GBT": HistGradientBoostingClassifier(max_iter=300, random_state=args.seed),
-              "LogisticRegression": make_pipeline(StandardScaler(),
-                                                  LogisticRegression(max_iter=2000))}
-    if not args.quick:
-        models.update({
-            "RandomForest": RandomForestClassifier(n_estimators=300, n_jobs=-1,
-                                                   random_state=args.seed),
-            "AdaBoost": AdaBoostClassifier(random_state=args.seed),
-            "MLP": make_pipeline(StandardScaler(),
-                                 MLPClassifier(hidden_layer_sizes=(128, 64),
-                                               max_iter=400, random_state=args.seed)),
-            "KNN": make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=15)),
-            "SVM_RBF": make_pipeline(StandardScaler(),
-                                     SVC(probability=True, random_state=args.seed)),
-        })
+    train_ids, test_ids, y_train, y_test = campaign_disjoint_split(
+        list(range(len(y))), y, campaign_info,
+        test_size=args.test_size, random_state=args.seed)
+    print(f"  train events={len(train_ids):,} ({y_train.sum():,} malicious)")
+    print(f"  test  events={len(test_ids):,} ({y_test.sum():,} malicious)")
+    print(f"  held-out instances={len(campaign_info)} total malicious samples")
 
+    print("\n[5/5] Training the Table 3 panel (compare_gnns functions, unmodified)")
     rows: list[dict] = []
-    for name, model in models.items():
-        t0 = time.perf_counter()
-        model.fit(X[tr], y[tr])
-        prob = model.predict_proba(X[te])[:, 1]
-        r = evaluate(name, y[te], prob, s_of[te], rows)
-        print(f"  {name:<20} F1={r['f1']:.4f}  AUC={r['auc']:.4f}  "
-              f"AP={r['ap']:.4f}  chainF1={r['chain_f1']:.4f}  "
-              f"({time.perf_counter()-t0:.1f}s)")
+    probs: dict[str, np.ndarray] = {}
+    captured, restore = capture_probs(CG)
+
+    try:
+        if not args.no_gnn:
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            feats = build_node_features(meta, list(range(len(y))),
+                                        np.random.default_rng(args.seed))
+            sampler = NeighborSampler(adj, etypes, feats, K1=10, K2=5, seed=args.seed)
+            for arch in ("gcn", "sage", "gat", "gin"):
+                name = CG.ARCH_DISPLAY[arch]
+                before = len(captured)
+                m = CG.train_single_arch(
+                    arch=arch, sampler=sampler,
+                    train_ids=train_ids, y_train=y_train,
+                    test_ids=test_ids, y_test=y_test,
+                    epochs=args.epochs, batch_size=256, lr=1e-3, device=device)
+                probs[name] = captured[-1][1]
+                rows.append({"model": name, "f1": m["f1"], "acc": m["accuracy"],
+                             "prec": m["precision"], "rec": m["recall"],
+                             "auc": m["roc_auc"], "ap": m["avg_precision"]})
+                print(f"  {name:<12} F1={m['f1']:.4f}  Ac={m['accuracy']:.4f}  "
+                      f"AUC={m['roc_auc']:.4f}  ({m['train_time_s']:.0f}s)")
+
+        ml = CG.train_ml_methods(adj, meta, etypes,
+                                 train_ids, y_train, test_ids, y_test)
+        ml_probs = [c[1] for c in captured[len(probs):]]
+        for i, m in enumerate(ml):
+            name = m.get("display_name") or m.get("arch")
+            if i < len(ml_probs):
+                probs[name] = ml_probs[i]
+            rows.append({"model": name, "f1": m["f1"], "acc": m["accuracy"],
+                         "prec": m["precision"], "rec": m["recall"],
+                         "auc": m["roc_auc"], "ap": m["avg_precision"]})
+    finally:
+        restore()
+
+    for r in rows:
+        r.setdefault("chain_f1", float("nan"))
+
+    camp_rows = per_campaign_table(y_test, None, camp_of[test_ids], probs)
+    print("\n  per-campaign F1 (Table 3: campaign positives + all benign test events)")
+    hdr = "  " + f"{'campaign':<32}" + "".join(f"{n:>11}" for n in probs)
+    print(hdr + "\n  " + "-" * (len(hdr) - 2))
+    for cr in camp_rows:
+        print(f"  {cr['campaign']:<32}" +
+              "".join(f"{cr[f'{n}_f1']:>11.3f}" for n in probs))
 
     rows.sort(key=lambda r: -r["f1"])
     print("\n" + "=" * 78)
     print(f"  {'model':<20} {'acc':>7} {'prec':>7} {'rec':>7} {'F1':>7} "
-          f"{'AUC':>7} {'AP':>7} {'chainF1':>8}")
+          f"{'AUC':>7} {'AP':>7}")
     print("-" * 78)
     for r in rows:
         print(f"  {r['model']:<20} {r['acc']:>7.4f} {r['prec']:>7.4f} "
               f"{r['rec']:>7.4f} {r['f1']:>7.4f} {r['auc']:>7.4f} "
-              f"{r['ap']:>7.4f} {r['chain_f1']:>8.4f}")
+              f"{r['ap']:>7.4f}")
 
     if args.json_out:
         with open(args.json_out, "w") as f:
             json.dump({"malicious": args.malicious, "benign": args.benign,
-                       "n_events": int(len(y)), "results": rows}, f, indent=2)
+                       "n_events": int(len(y)), "results": rows,
+                       "per_campaign": camp_rows}, f, indent=2)
         print(f"\nwrote {args.json_out}")
     return 0
 
