@@ -247,7 +247,7 @@ def per_campaign_table(y, prob, campaign_of, models_probs):
         sel = benign | ((y == 1) & (campaign_of == camp))
         row = {"campaign": camp, "n_pos": int(((y == 1) & (campaign_of == camp)).sum())}
         for name, p in models_probs.items():
-            pred = (p[sel] >= 0.5).astype(int)
+            pred = (p[sel] > 0.5).astype(int)
             row[f"{name}_f1"] = f1_score(y[sel], pred, zero_division=0)
             row[f"{name}_ac"] = accuracy_score(y[sel], pred)
         rows.append(row)
@@ -257,7 +257,7 @@ def per_campaign_table(y, prob, campaign_of, models_probs):
 def evaluate(name, y, prob, sample_of, out):
     from sklearn.metrics import (accuracy_score, precision_score, recall_score,
                                  f1_score, roc_auc_score, average_precision_score)
-    pred = (prob >= 0.5).astype(int)
+    pred = (prob > 0.5).astype(int)
     row = dict(model=name,
                acc=accuracy_score(y, pred),
                prec=precision_score(y, pred, zero_division=0),

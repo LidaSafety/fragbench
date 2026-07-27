@@ -28,3 +28,4 @@ results_harness_*.json
 ablation_*.json
 per_campaign_test*.csv
 results_percampaign_*.json
+*_per_campaign.csv

@@ -52,11 +52,17 @@ class TraceDatasetGenerator:
         return TraceDatasetGenerator.graph
 
 
+CAMPAIGN_OF = None   # node id -> campaign name, for the per-campaign table
+LABELS = None
+
+
 def prepare(malicious: str, benign: str, mal_sample, ben_sample, seed: int):
     """Build the trace graph in the 5-tuple shape gen.generate() returns."""
+    global CAMPAIGN_OF, LABELS
     print("building the fragment graph from traces")
     corpus = load(malicious, 1, mal_sample, seed) + load(benign, 0, ben_sample, seed)
-    adj, meta, etypes, labels, sample_of, _camp = build_graph(corpus)
+    adj, meta, etypes, labels, sample_of, camp = build_graph(corpus)
+    CAMPAIGN_OF, LABELS = camp, labels
 
     # campaign_info: one entry per malicious outer sample, which is what
     # campaign_disjoint_split holds out wholesale.
@@ -107,19 +113,72 @@ def main() -> int:
 
     import importlib
     mod = importlib.import_module(args.script)
+
+    # ── observation only: nothing below changes a computation ────────────
+    # main() returns aggregate metrics, but Table 3 is per campaign, which needs
+    # a probability per held-out event. Rather than reimplement the pipeline to
+    # get them, wrap the three functions main() calls and keep what they already
+    # produce. Each wrapper delegates to the original and returns its result
+    # untouched.
+    seen: dict[str, object] = {}
+    captured: list = []
+    if hasattr(mod, "roc_auc_score"):
+        _auc = mod.roc_auc_score
+
+        def _auc_shim(y_true, y_score, *a, **kw):
+            captured.append((np.asarray(y_true), np.asarray(y_score)))
+            return _auc(y_true, y_score, *a, **kw)
+
+        mod.roc_auc_score = _auc_shim
+
+    if hasattr(mod, "train_single_arch"):
+        _tsa = mod.train_single_arch
+
+        def _tsa_shim(*a, **kw):
+            # train_single_arch also scores mid-training for checkpoint
+            # selection, so bound this call and take only its final scoring.
+            mark = len(captured)
+            out = _tsa(*a, **kw)
+            if len(captured) > mark:
+                seen[mod.ARCH_DISPLAY[kw.get("arch", a[0] if a else "?")]] = captured[-1][1]
+            return out
+
+        mod.train_single_arch = _tsa_shim
+
+    if hasattr(mod, "train_ml_methods"):
+        _tml = mod.train_ml_methods
+
+        def _tml_shim(*a, **kw):
+            mark = len(captured)
+            out = _tml(*a, **kw)
+            got = [c[1] for c in captured[mark:]]
+            if len(got) == len(out):
+                for r, pr in zip(out, got):
+                    seen[r.get("arch")] = pr
+            else:
+                print(f"  WARNING: {len(got)} probability vectors for {len(out)} "
+                      f"classical models -- per-campaign columns omitted",
+                      file=sys.stderr)
+            return out
+
+        mod.train_ml_methods = _tml_shim
+
+    test_ids_holder: list = []
     mod.CampaignDatasetGenerator = TraceDatasetGenerator   # the only substitution
 
     # compare_gnns.py:614 and train_gnn.py:311 both hardcode test_size=0.2, but
     # Table 3 reports a 70/30 outer-sample split. main() takes no test_size
     # argument, so force the ratio by wrapping the splitter in the module's
     # namespace. Pass --test-size 0.2 to reproduce the harness default instead.
-    if args.test_size is not None:
+    if True:
         inner = mod.campaign_disjoint_split
 
         def split(all_node_ids, labels, campaign_info, test_size=0.2,
                   random_state=42, _inner=inner, _ts=args.test_size):
-            return _inner(all_node_ids, labels, campaign_info,
-                          test_size=_ts, random_state=random_state)
+            out = _inner(all_node_ids, labels, campaign_info,
+                         test_size=_ts, random_state=random_state)
+            test_ids_holder.append(out[1])   # remember which events are held out
+            return out
 
         mod.campaign_disjoint_split = split
         print(f"split: test_size={args.test_size} "
@@ -132,9 +191,75 @@ def main() -> int:
     else:
         mod.train(epochs=args.epochs, batch_size=args.batch_size)
 
+    PER_CAMPAIGN: list = []
+    # ── per-campaign table (Table 3 protocol) ────────────────────────────
+    if test_ids_holder and seen and CAMPAIGN_OF is not None:
+        from sklearn.metrics import f1_score, accuracy_score
+        test_ids = np.asarray(test_ids_holder[-1])
+        y = LABELS[test_ids]
+        camp = CAMPAIGN_OF[test_ids]
+        order = ["GCN", "GraphSAGE", "GAT", "GIN", "svm", "mlp_sk", "gbt"]
+        label = {"svm": "SVM", "mlp_sk": "MLP", "gbt": "GBT"}
+        cols = [m for m in order if m in seen
+                and len(np.asarray(seen[m])) == len(test_ids)]
+
+        print("\n" + "=" * 78)
+        print("  PER-CAMPAIGN, HELD-OUT TEST EVENTS")
+        print("  (each campaign's positive test events + all benign test events)")
+        print("=" * 78)
+        hdr = f"  {'campaign':<30}" + "".join(f"{label.get(m, m):>16}" for m in cols)
+        print(hdr)
+        print(f"  {'':<30}" + "".join(f"{'F1':>8}{'Ac':>8}" for _ in cols))
+        print("  " + "-" * (len(hdr) - 2))
+
+        rows_csv = []
+        benign = y == 0
+        for c in sorted({x for x, l in zip(camp, y) if l == 1}):
+            sel = benign | ((y == 1) & (camp == c))
+            cells = []
+            for m in cols:
+                pred = (np.asarray(seen[m])[sel] > 0.5).astype(int)
+                cells.append((f1_score(y[sel], pred, zero_division=0),
+                              accuracy_score(y[sel], pred)))
+            print(f"  {c:<30}" + "".join(f"{f:>8.3f}{a:>8.3f}" for f, a in cells))
+            rows_csv.append([c, int(((y == 1) & (camp == c)).sum())]
+                            + [round(v, 4) for fa in cells for v in fa])
+
+        agg = []
+        for m in cols:
+            pred = (np.asarray(seen[m]) > 0.5).astype(int)
+            agg.append((f1_score(y, pred, zero_division=0), accuracy_score(y, pred)))
+        print("  " + "-" * (len(hdr) - 2))
+        print(f"  {'AGGREGATE':<30}" + "".join(f"{f:>8.3f}{a:>8.3f}" for f, a in agg))
+        rows_csv.append(["AGGREGATE", int(y.sum())]
+                        + [round(v, 4) for fa in agg for v in fa])
+
+        PER_CAMPAIGN.extend(
+            dict(zip(["campaign", "n_pos"]
+                     + [f"{label.get(m, m)}_{k}" for m in cols for k in ("F1", "Ac")], r))
+            for r in rows_csv)
+        csv_path = out.with_name(out.stem + "_per_campaign.csv")
+        import csv as _csv
+        with open(csv_path, "w", newline="") as fh:
+            w = _csv.writer(fh)
+            w.writerow(["campaign", "n_pos"]
+                       + [f"{label.get(m, m)}_{k}" for m in cols for k in ("F1", "Ac")])
+            w.writerows(rows_csv)
+        print(f"\n  per-campaign table -> {csv_path}")
+    elif seen:
+        print("\n  (per-campaign table skipped: no held-out ids observed)",
+              file=sys.stderr)
+
     if checkpoint.exists():
-        checkpoint.rename(out)
-        print(f"\nresults moved to {out}")
+        import json as _json
+        aggregate = _json.load(open(checkpoint))
+        with open(out, "w") as fh:
+            _json.dump({"malicious": args.malicious, "benign": args.benign,
+                        "test_size": args.test_size, "epochs": args.epochs,
+                        "aggregate": aggregate,
+                        "per_campaign": PER_CAMPAIGN}, fh, indent=2)
+        checkpoint.unlink()
+        print(f"\naggregate + per-campaign results -> {out}")
         print("  (the harness writes one fixed filename, so each arm is "
               "claimed here rather than left to be overwritten)")
     else:
