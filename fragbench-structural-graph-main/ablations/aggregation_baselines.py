@@ -34,6 +34,7 @@ Run:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -63,7 +64,11 @@ def event_features(tool: str, args: str) -> np.ndarray:
     v[12] = min(len(args) / 200.0, 30.0) / 30.0
     v[13] = min(len(args.split()) / 100.0, 1.0)
     if tool:
-        v[14 + (hash(tool) % 10)] = 1.0
+        # blake2b, not builtin hash(): str hashing is randomized per process,
+        # so hash(tool) would file the same tool into a different feature
+        # column on every run and make these baselines unreproducible.
+        v[14 + (int.from_bytes(hashlib.blake2b(tool.encode(), digest_size=8)
+                               .digest(), "big") % 10)] = 1.0
     return v
 
 

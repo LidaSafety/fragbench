@@ -76,52 +76,20 @@ def prepare(malicious: str, benign: str, mal_sample, ben_sample, seed: int):
     TraceDatasetGenerator.graph = (adj, meta, etypes, labels, campaign_info)
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--malicious", default="dataset/combined/malicious.json")
-    ap.add_argument("--benign", default="dataset/combined/benign.json")
-    ap.add_argument("--malicious-sample", type=int)
-    ap.add_argument("--benign-sample", type=int)
-    ap.add_argument("--script", choices=("compare_gnns", "train_gnn"),
-                    default="compare_gnns")
-    ap.add_argument("--epochs", type=int, default=30)
-    ap.add_argument("--batch-size", type=int, default=256)
-    ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--test-size", type=float, default=0.2,
-                    help="outer-sample holdout fraction. Defaults to 0.2, which "
-                         "is what compare_gnns.py:614 and train_gnn.py:311 pass "
-                         "and therefore what the published run used, despite "
-                         "Table 3's caption saying 70/30.")
-    ap.add_argument("--out", help="where to move the harness' results file "
-                                  "(default: results_harness_<benign stem>.json)")
-    args = ap.parse_args()
+def install_capture(mod) -> dict:
+    """Keep the held-out probabilities the harness already computes.
 
-    # compare_gnns.py writes checkpoints/gnn_comparison.json, a fixed path with
-    # no parameter, so a second arm would silently overwrite the first. Claim a
-    # distinct destination up front and check the run is not already racing one.
-    checkpoint = (REPO / "fragbench-structural-graph-main" / "checkpoints"
-                  / ("gnn_comparison.json" if args.script == "compare_gnns"
-                     else "fragguard_gnn.pt"))
-    out = Path(args.out) if args.out else REPO / (
-        f"results_harness_{Path(args.benign).stem}.json")
-    if out.exists():
-        print(f"refusing to overwrite {out} -- move it or pass --out", file=sys.stderr)
-        return 2
+    main() returns aggregate metrics, but a per-campaign table needs a
+    probability per held-out event. Rather than reimplement the pipeline to get
+    them, wrap the three functions main() calls and keep what they produce.
+    Every wrapper delegates to the original and returns its result untouched --
+    nothing here changes a computation.
 
-    prepare(args.malicious, args.benign,
-            args.malicious_sample, args.benign_sample, args.seed)
-
-    import importlib
-    mod = importlib.import_module(args.script)
-
-    # ── observation only: nothing below changes a computation ────────────
-    # main() returns aggregate metrics, but Table 3 is per campaign, which needs
-    # a probability per held-out event. Rather than reimplement the pipeline to
-    # get them, wrap the three functions main() calls and keep what they already
-    # produce. Each wrapper delegates to the original and returns its result
-    # untouched.
+    Returns a dict that fills in as the run proceeds: model key -> probabilities.
+    """
     seen: dict[str, object] = {}
     captured: list = []
+
     if hasattr(mod, "roc_auc_score"):
         _auc = mod.roc_auc_score
 
@@ -162,6 +130,50 @@ def main() -> int:
             return out
 
         mod.train_ml_methods = _tml_shim
+
+    return seen
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--malicious", default="dataset/combined/malicious.json")
+    ap.add_argument("--benign", default="dataset/combined/benign.json")
+    ap.add_argument("--malicious-sample", type=int)
+    ap.add_argument("--benign-sample", type=int)
+    ap.add_argument("--script", choices=("compare_gnns", "train_gnn"),
+                    default="compare_gnns")
+    ap.add_argument("--epochs", type=int, default=30)
+    ap.add_argument("--batch-size", type=int, default=256)
+    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--test-size", type=float, default=0.2,
+                    help="outer-sample holdout fraction. Defaults to 0.2, which "
+                         "is what compare_gnns.py:614 and train_gnn.py:311 pass "
+                         "and therefore what the published run used, despite "
+                         "Table 3's caption saying 70/30.")
+    ap.add_argument("--out", help="where to move the harness' results file "
+                                  "(default: results_harness_<benign stem>.json)")
+    args = ap.parse_args()
+
+    # compare_gnns.py writes checkpoints/gnn_comparison.json, a fixed path with
+    # no parameter, so a second arm would silently overwrite the first. Claim a
+    # distinct destination up front and check the run is not already racing one.
+    checkpoint = (REPO / "fragbench-structural-graph-main" / "checkpoints"
+                  / ("gnn_comparison.json" if args.script == "compare_gnns"
+                     else "fragguard_gnn.pt"))
+    out = Path(args.out) if args.out else REPO / (
+        f"results_harness_{Path(args.benign).stem}.json")
+    if out.exists():
+        print(f"refusing to overwrite {out} -- move it or pass --out", file=sys.stderr)
+        return 2
+
+    prepare(args.malicious, args.benign,
+            args.malicious_sample, args.benign_sample, args.seed)
+
+    import importlib
+    mod = importlib.import_module(args.script)
+
+    # ── observation only: nothing below changes a computation ────────────
+    seen = install_capture(mod)
 
     test_ids_holder: list = []
     mod.CampaignDatasetGenerator = TraceDatasetGenerator   # the only substitution

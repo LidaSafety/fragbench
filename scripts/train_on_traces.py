@@ -31,6 +31,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -48,6 +49,18 @@ TRAINING = REPO / "fragbench-structural-graph-main" / "training"
 sys.path.insert(0, str(TRAINING))
 
 from fragguard_gbt import FragmentFeatureEngine  # noqa: E402
+
+
+def stable_hash(text: str) -> int:
+    """Process-stable substitute for builtin hash() on strings.
+
+    PYTHONHASHSEED randomizes str hashing per process, so anything derived from
+    hash() -- bucket assignment, iteration order, metadata ids -- silently
+    changes between runs. That turns into run-to-run drift in the reported
+    metrics, which is indistinguishable from a real effect.
+    """
+    return int.from_bytes(hashlib.blake2b(text.encode(), digest_size=8).digest(),
+                          "big")
 
 # ── tool -> capability ─────────────────────────────────────────────────────
 # Substring rules over MCP tool names, mapped onto the capability vocabulary
@@ -149,7 +162,10 @@ def build_graph(corpus):
             sid = str(ev.get("session_id") or f"s{s_idx}")
 
             meta[nid] = {
-                "session_id": hash(sid) & 0x7FFFFFFF,
+                # stable across processes; the feature engine only ever tests
+                # session_id for equality (fragguard_gbt.py:459), but builtin
+                # hash() would still make the metadata unreproducible
+                "session_id": stable_hash(sid) & 0x7FFFFFFF,
                 "user_id": s_idx,
                 "timestamp": parse_ts(ev.get("ts")),
                 "api_calls": {ev.get("tool") or "unknown"},
@@ -189,7 +205,11 @@ def build_graph(corpus):
                     edge_types[(src, nid)] = 0
 
             # 2 shared_resource: same path / url / host in arguments
-            for res in set(RESOURCE_RE.findall(args_txt[:2000])):
+            # sorted(), not set(): set iteration order over strings is
+            # randomized per process, which reorders adj[] and therefore
+            # changes which neighbours NeighborSampler's K1=10 draw picks up.
+            # Same edges either way, but ~0.002 of run-to-run F1 drift.
+            for res in sorted(set(RESOURCE_RE.findall(args_txt[:2000]))):
                 bucket = resources[res]
                 for other in bucket[-MAX_RESOURCE_FANOUT:]:
                     adj[other].append(nid)
