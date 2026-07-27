@@ -81,9 +81,11 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=30)
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--test-size", type=float, default=0.3,
-                    help="outer-sample holdout fraction; Table 3 reports 70/30 "
-                         "but the harness hardcodes 0.2 (default: 0.3)")
+    ap.add_argument("--test-size", type=float, default=0.2,
+                    help="outer-sample holdout fraction. Defaults to 0.2, which "
+                         "is what compare_gnns.py:614 and train_gnn.py:311 pass "
+                         "and therefore what the published run used, despite "
+                         "Table 3's caption saying 70/30.")
     ap.add_argument("--out", help="where to move the harness' results file "
                                   "(default: results_harness_<benign stem>.json)")
     args = ap.parse_args()
