@@ -10,10 +10,19 @@
     "cr": "http://mlcommons.org/croissant/",
     "rai": "http://mlcommons.org/croissant/RAI/",
     "prov": "http://www.w3.org/ns/prov#",
-    "data": {"@id": "cr:data", "@type": "@json"},
-    "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
     "dct": "http://purl.org/dc/terms/",
-    "examples": {"@id": "cr:examples", "@type": "@json"},
+    "examples": {
+      "@id": "cr:examples",
+      "@type": "@json"
+    },
     "extract": "cr:extract",
     "field": "cr:field",
     "fileProperty": "cr:fileProperty",
@@ -41,7 +50,10 @@
   "@type": "sc:Dataset",
   "conformsTo": "http://mlcommons.org/croissant/1.1",
   "name": "fragbench",
-  "alternateName": ["anon-fragbench-neurips/fragbench", "FragBench"],
+  "alternateName": [
+    "anon-fragbench-neurips/fragbench",
+    "FragBench"
+  ],
   "description": "FragBench is a benchmark for evaluating cross-session, fragmented attacks on LLM agents that use tools via the Model Context Protocol (MCP). Each malicious campaign is decomposed into many small fragments distributed across sessions; a defender must reconstruct the compositional intent from a typed event graph. The public tier contains seed campaigns drawn from public cyber-incident reports, RL-generated stylised fragment variants, and synthetic benign tool-use traces. A gated companion dataset (anon-fragbench-neurips/fragbench-restricted) contains the more sensitive reinforcement-learning system prompts and judge-rubric configurations.",
   "url": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench",
   "version": "1.0.0",
@@ -65,7 +77,6 @@
     "benchmark"
   ],
   "citeAs": "@inproceedings{fragbench2026, title={FragBench: A Benchmark for Detecting Fragmented Multi-Session Jailbreak Attacks on LLM Agents}, author={Anonymous}, booktitle={NeurIPS Evaluations and Datasets Track (under review)}, year={2026}}",
-
   "prov:wasDerivedFrom": "https://anonymous.4open.science/r/fragbench-FE86/seeds/",
   "isBasedOn": [
     {
@@ -105,9 +116,11 @@
       "description": "Each fragment assembly executed end-to-end in a sandboxed Docker Compose environment with 24 MCP tool servers and qwen/qwen3.5-122b-a10b as the actor model. Assemblies accepted only if the full kill chain executed successfully."
     }
   ],
-
   "rai:dataCollection": "Seed campaigns were transcribed from publicly disclosed cyber-incident reports published by frontier AI vendors and security researchers (e.g. operator-published threat reports about misuse of LLM agents). Each seed defines a high-level malicious objective and a small set of parent tactics. Seeds were rewritten through a bootstrap then learned then creative reinforcement-learning loop using a frontier LLM to produce stylised fragment sequences. A single-token classifier-mode LLM judge selected variants that increased pass rate against target models while preserving the original objective.",
-  "rai:dataCollectionType": ["Synthetic", "Other"],
+  "rai:dataCollectionType": [
+    "Synthetic",
+    "Other"
+  ],
   "rai:dataCollectionTypeOthers": "RL-generated variants from publicly disclosed incident seeds; benign traces are synthetic tool-use transcripts.",
   "rai:dataCollectionTimeframe": {
     "@type": "sc:DateTime",
@@ -130,7 +143,6 @@
   "rai:annotationsPerItem": "1 (single judge call per fragment).",
   "rai:annotatorDemographics": "Not applicable; annotation is fully machine-generated.",
   "rai:machineAnnotationTools": "Claude Haiku 4.5 (claude-haiku-4-5-20251001) used as a single-token classifier-mode judge.",
-
   "rai:dataUseCases": [
     "Cross-session jailbreak detection: classify whether a session graph reconstructs a malicious campaign.",
     "Multi-turn red-team evaluation: measure judge-pass rate of fragmented attacks on target LLM agents.",
@@ -155,7 +167,6 @@
   "rai:dataSocialImpact": "FragBench is dual-use. Its intended impact is to enable academic research on detecting cross-session, fragmented jailbreak attacks against LLM agents, and to support development of defensive classifiers and guardrails. The same fragment sequences can in principle be reused as offensive prompts. To mitigate this, the most sensitive components (RL system prompts, judge-rubric configurations, and high-yield variant traces) are placed behind a manual access-review gate in a companion dataset; only the lower-yield public tier is openly accessible. We follow the standard practice for security benchmarks (HarmBench, JailbreakBench) of tiered release.",
   "rai:personalSensitiveInformation": "None. All prompts, identities, and tool arguments are synthetic. Recipient profiles, account names, file paths, and any apparent personal identifiers in fragment prompts are fabricated for the benchmark and do not correspond to real individuals or organisations. No private user data was collected.",
   "rai:dataReleaseMaintenancePlan": "Versioned via the HuggingFace dataset (v1.0.0 as of 2026-05-07). Errata, additional campaigns, and judge-rubric updates will be released as new minor versions on the same dataset URL. The sensitive RL system prompts and judge-rubric configurations are released separately under request-access at the gated companion dataset: https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted. Maintainer contact will be restored at camera-ready; for the double-blind review period, please open an issue on the HuggingFace dataset page.",
-
   "distribution": [
     {
       "@type": "cr:FileObject",
@@ -169,14 +180,18 @@
     {
       "@type": "cr:FileSet",
       "@id": "parquet-files-for-config-attack_meta",
-      "containedIn": {"@id": "repo"},
+      "containedIn": {
+        "@id": "repo"
+      },
       "encodingFormat": "application/x-parquet",
       "includes": "attack_meta/*/*.parquet"
     },
     {
       "@type": "cr:FileSet",
       "@id": "parquet-files-for-config-campaign_fragments",
-      "containedIn": {"@id": "repo"},
+      "containedIn": {
+        "@id": "repo"
+      },
       "encodingFormat": "application/x-parquet",
       "includes": "campaign_fragments/*/*.parquet"
     },
@@ -203,72 +218,452 @@
     {
       "@type": "cr:RecordSet",
       "dataType": "cr:Split",
-      "key": {"@id": "attack_meta_splits/split_name"},
+      "key": {
+        "@id": "attack_meta_splits/split_name"
+      },
       "@id": "attack_meta_splits",
       "name": "attack_meta_splits",
       "description": "Splits for the attack_meta config.",
       "field": [
-        {"@type": "cr:Field", "@id": "attack_meta_splits/split_name", "dataType": "sc:Text"}
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta_splits/split_name",
+          "dataType": "sc:Text"
+        }
       ],
-      "data": [{"attack_meta_splits/split_name": "train"}]
+      "data": [
+        {
+          "attack_meta_splits/split_name": "train"
+        }
+      ]
     },
     {
       "@type": "cr:RecordSet",
       "@id": "attack_meta",
       "description": "anon-fragbench-neurips/fragbench - 'attack_meta' subset. One row per attack pipeline run; describes which campaign, style, target model, and judge model were used.",
       "field": [
-        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text",
-         "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}},
-         "references": {"field": {"@id": "attack_meta_splits/split_name"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "source_file"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/run_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "run_id"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "campaign"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/style", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "style"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/fragments_path", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "fragments_path"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/seeds", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "seeds"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/started_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "started_at"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/target_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_model"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/target_backend", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_backend"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/llm_product", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "llm_product"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/judge_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "judge_model"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/status", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "status"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/ended_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "ended_at"}}},
-        {"@type": "cr:Field", "@id": "attack_meta/num_passed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "num_passed"}}}
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/split",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "fileProperty": "fullpath"
+            },
+            "transform": {
+              "regex": "attack_meta/(?:partial-)?(train)/.+parquet$"
+            }
+          },
+          "references": {
+            "field": {
+              "@id": "attack_meta_splits/split_name"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/source_file",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "source_file"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/run_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "run_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/campaign",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "campaign"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/style",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "style"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/fragments_path",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "fragments_path"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/seeds",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "seeds"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/started_at",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "started_at"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/target_model",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "target_model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/target_backend",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "target_backend"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/llm_product",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "llm_product"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/judge_model",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "judge_model"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/status",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "status"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/ended_at",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "ended_at"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "attack_meta/num_passed",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-attack_meta"
+            },
+            "extract": {
+              "column": "num_passed"
+            }
+          }
+        }
       ]
     },
     {
       "@type": "cr:RecordSet",
       "dataType": "cr:Split",
-      "key": {"@id": "campaign_fragments_splits/split_name"},
+      "key": {
+        "@id": "campaign_fragments_splits/split_name"
+      },
       "@id": "campaign_fragments_splits",
       "name": "campaign_fragments_splits",
       "description": "Splits for the campaign_fragments config.",
       "field": [
-        {"@type": "cr:Field", "@id": "campaign_fragments_splits/split_name", "dataType": "sc:Text"}
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments_splits/split_name",
+          "dataType": "sc:Text"
+        }
       ],
-      "data": [{"campaign_fragments_splits/split_name": "train"}]
+      "data": [
+        {
+          "campaign_fragments_splits/split_name": "train"
+        }
+      ]
     },
     {
       "@type": "cr:RecordSet",
       "@id": "campaign_fragments",
       "description": "anon-fragbench-neurips/fragbench - 'campaign_fragments' subset. One row per fragment within a campaign variation. Includes the parent tactic, parent prompt, produced and consumed artefacts (JSON-encoded), and stylised variations.",
       "field": [
-        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text",
-         "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}},
-         "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "source_file"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/variant", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variant"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/campaign_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign_id"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/seed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "seed"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/total_fragments", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "total_fragments"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/fragment_index", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "fragment_index"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/role", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "role"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/parent_tactic", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_tactic"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/parent_prompt", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_prompt"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/produces", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "produces"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/consumes", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "consumes"}}},
-        {"@type": "cr:Field", "@id": "campaign_fragments/variations", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variations"}}}
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/split",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "fileProperty": "fullpath"
+            },
+            "transform": {
+              "regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"
+            }
+          },
+          "references": {
+            "field": {
+              "@id": "campaign_fragments_splits/split_name"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/source_file",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "source_file"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/campaign",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "campaign"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/variant",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "variant"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/campaign_id",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "campaign_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/seed",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/total_fragments",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "total_fragments"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/fragment_index",
+          "dataType": "cr:Int64",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "fragment_index"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/role",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "role"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/parent_tactic",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "parent_tactic"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/parent_prompt",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "parent_prompt"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/produces",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "produces"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/consumes",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "consumes"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "campaign_fragments/variations",
+          "dataType": "sc:Text",
+          "source": {
+            "fileSet": {
+              "@id": "parquet-files-for-config-campaign_fragments"
+            },
+            "extract": {
+              "column": "variations"
+            }
+          }
+        }
       ]
     }
   ]
