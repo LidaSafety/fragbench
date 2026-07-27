@@ -60,12 +60,20 @@
   "url": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench",
   "version": "1.1.0",
   "datePublished": "2026-07-27",
+  "dateCreated": "2026-05-07",
+  "dateModified": "2026-07-27",
   "license": "https://creativecommons.org/licenses/by/4.0/",
   "creator": {
     "@type": "Organization",
     "name": "Anonymous (NeurIPS 2026 Evaluations and Datasets Track submission)",
     "url": "https://huggingface.co/anon-fragbench-neurips"
   },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Anonymous (NeurIPS 2026 Evaluations and Datasets Track submission)",
+    "url": "https://huggingface.co/anon-fragbench-neurips"
+  },
+  "inLanguage": "en",
   "keywords": [
     "text-classification",
     "text-generation",
@@ -79,7 +87,20 @@
     "benchmark"
   ],
   "citeAs": "@inproceedings{fragbench2026, title={FragBench: A Benchmark for Detecting Fragmented Multi-Session Jailbreak Attacks on LLM Agents}, author={Anonymous}, booktitle={NeurIPS Evaluations and Datasets Track (under review)}, year={2026}}",
-  "prov:wasDerivedFrom": "https://anonymous.4open.science/r/fragbench-FE86/seeds/",
+  "isLiveDataset": false,
+  "prov:wasDerivedFrom": [
+    {
+      "@type": "sc:Dataset",
+      "name": "FragBench campaign seed files",
+      "description": "The 24 campaign seed files the corpus is expanded from, together with the 35 published cyber-incident reports they were distilled from. The incident reports are third-party publications by security vendors and researchers; they are cited in Appendix F of the paper and none of their text is redistributed here, so no upstream licence propagates into this dataset.",
+      "url": "https://anonymous.4open.science/r/fragbench-FE86/seeds/",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Anonymous (NeurIPS 2026 submission)"
+      },
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
   "isBasedOn": [
     {
       "@type": "sc:Dataset",
@@ -97,7 +118,7 @@
       "@type": "prov:Activity",
       "@id": "activity-seed-authoring",
       "name": "Incident-report-derived campaign seeds (author-written, LLM-assisted)",
-      "description": "The authors distilled 35 published cyber-incident reports, catalogued in Appendix F of the paper, into 24 campaign seeds. Domain experts were consulted on the threat scenarios and an LLM (Claude Opus) was used to scale the drafting, with each seed checked back against its source report. The same approach produced the benign seeds, so both halves of the corpus were written the same way. Only 24 of the 35 incidents could be expressed as a complete, executable multi-stage sequence, which is why the counts differ. A seed lays out an ordered sequence of adversary steps, what security practitioners call a kill chain. Seeds are abstractions rather than copies, and no incident-report text is redistributed.",
+      "description": "The authors distilled 35 published cyber-incident reports, catalogued in Appendix F of the paper, into 24 campaign seeds. Domain experts were consulted on the threat scenarios and an LLM (Claude Opus) was used to scale the drafting, prompted per incident with the report summary and the seed schema, with each seed checked back against its source report. The same approach produced the benign seeds, so both halves of the corpus were written the same way. Only 24 of the 35 incidents could be expressed as a complete, executable multi-stage sequence, which is why the counts differ. A seed lays out an ordered sequence of adversary steps, what security practitioners call a kill chain. Seeds are abstractions rather than copies, and no incident-report text is redistributed.",
       "prov:used": "https://anonymous.4open.science/r/fragbench-FE86/seeds/"
     },
     {
@@ -122,7 +143,7 @@
       "@type": "prov:Activity",
       "@id": "activity-benign-execution",
       "name": "Executed benign control sessions (sandboxed execution)",
-      "description": "The authors wrote 24 benign campaigns covering ordinary IT and office work, using the same seed schema and authoring approach as the malicious ones. The same generator expanded them along the same two axes, 6 styles by 9 seeds, for 1,296 objectives, and every one was executed rather than simulated: one fragment per session, same actor, same 24 servers, same sandbox, same tracer. The safety judge was switched off, since it scores completion of a malicious objective and never touches the tool trace. Chains with empty sessions were dropped, leaving a campaign-stratified sample of 514 chains and 77,176 events against 55,274 malicious. The point is that the two halves now differ only in the objective."
+      "description": "The authors wrote 24 benign campaigns covering ordinary IT and office work, using the same seed schema and authoring approach as the malicious ones. The same generator expanded them along the same two axes, 6 styles by 9 seeds, for 1,296 objectives, and every one was executed rather than simulated: one fragment per session, same actor, same 24 servers, same sandbox, same tracer. The safety judge was switched off, since it scores completion of a malicious objective and never touches the tool trace. Chains with empty sessions were dropped, leaving a campaign-stratified sample of 514 chains and 77,176 events against 55,274 malicious. The point is that the two halves now differ only in the objective. Resemblance between the two corpora was measured rather than assumed: tool-frequency divergence, chain length, argument length, inter-call timing, resource reuse and tool success rate are compared in the paper, along with a chain-level classifier trained on those statistics as an adversarial check. rai:dataLimitations records where the two still differ."
     }
   ],
   "rai:dataCollection": "Seed campaigns were transcribed from publicly disclosed cyber-incident reports published by frontier AI vendors and security researchers (e.g. operator-published threat reports about misuse of LLM agents). Each seed defines a high-level malicious objective and a small set of parent tactics. Seeds were rewritten through a bootstrap, then learned, then creative iterative adversarial rewriting loop using a frontier LLM to produce stylised fragment sequences. This loop is a search over prompt text: no policy is learned and no model parameters are updated. A single-token classifier-mode LLM judge selected variants that increased pass rate against target models while preserving the original objective.",
@@ -156,7 +177,8 @@
     "Cross-session jailbreak detection: classify whether a session graph reconstructs a malicious campaign.",
     "Multi-turn red-team evaluation: measure judge-pass rate of fragmented attacks on target LLM agents.",
     "Compositional safety research: study aggregation features over typed session-event graphs.",
-    "Benchmarking detectors and guardrails on compositional jailbreaks."
+    "Benchmarking detectors and guardrails on compositional jailbreaks.",
+    "Validity evidence: the detection task is supported by benchmark results across seven model families (four graph neural networks and three classical classifiers) reported in the paper, together with edge-type ablations, graph-free aggregation baselines and a leave-one-campaign-family-out evaluation. Not validated: transfer to actor or judge families other than those evaluated, to non-cyber misuse domains, or to deployment at realistic malicious-user prevalence."
   ],
   "rai:dataLimitations": [
     "Sandbox-only: all execution traces come from a sandboxed harness; no real third-party systems were targeted, and the dataset does not capture network-side artefacts that real defenders may observe.",
@@ -194,6 +216,15 @@
       "name": "repo-main",
       "description": "The Hugging Face git repository on the main branch, which holds the JSONL corpora. Distinct from the 'repo' entry above, which points at the auto-generated parquet conversion branch.",
       "contentUrl": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench/tree/main",
+      "encodingFormat": "git+https",
+      "sha256": "https://github.com/mlcommons/croissant/issues/80"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "repo-restricted",
+      "name": "repo-restricted",
+      "description": "The gated companion repository. Access is granted by manual review, so this URL returns 401 to anonymous clients by design.",
+      "contentUrl": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted/tree/main",
       "encodingFormat": "git+https",
       "sha256": "https://github.com/mlcommons/croissant/issues/80"
     },
@@ -255,12 +286,12 @@
       "@id": "rl-outputs-manual",
       "name": "rl-outputs-manual",
       "description": "Adversarially rewritten fragment prompts from the iterative prompt-space rewriting phase (gated), Produced by the adversarial rewriting loop. Fully LLM-generated. Available at the companion restricted repository. The @id retains the historical 'rl-' prefix because it must match the published repository path; the procedure involves no reinforcement learning.",
-      "contentUrl": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted/resolve/main/rl-outputs-manual/",
       "encodingFormat": "application/json",
-      "includes": "**/*.json",
+      "includes": "rl-outputs-manual/**/*.json",
       "prov:wasGeneratedBy": {
         "@id": "activity-adversarial-rewriting"
-      }
+      },
+      "containedIn": {"@id": "repo-restricted"}
     }
   ],
   "recordSet": [
@@ -325,7 +356,7 @@
       "name": "attack_meta_splits",
       "description": "Splits for the attack_meta config.",
       "field": [
-        {"@type": "cr:Field", "@id": "attack_meta_splits/split_name", "dataType": "sc:Text", "description": ""}
+        {"@type": "cr:Field", "@id": "attack_meta_splits/split_name", "dataType": "sc:Text"}
       ],
       "data": [
         {"attack_meta_splits/split_name": "train"}
@@ -336,21 +367,21 @@
       "@id": "attack_meta",
       "description": "anon-fragbench-neurips/fragbench - 'attack_meta' subset. One row per attack pipeline run; describes which campaign, style, target model, and judge model were used.",
       "field": [
-        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "attack_meta_splits/split_name"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "source_file"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/run_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "run_id"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "campaign"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/style", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "style"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/fragments_path", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "fragments_path"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/seeds", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "seeds"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/started_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "started_at"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/target_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_model"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/target_backend", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_backend"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/llm_product", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "llm_product"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/judge_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "judge_model"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/status", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "status"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/ended_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "ended_at"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "attack_meta/num_passed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "num_passed"}}, "description": ""}
+        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "attack_meta_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "source_file"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/run_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "run_id"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "campaign"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/style", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "style"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/fragments_path", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "fragments_path"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/seeds", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "seeds"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/started_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "started_at"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/target_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_model"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/target_backend", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_backend"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/llm_product", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "llm_product"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/judge_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "judge_model"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/status", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "status"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/ended_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "ended_at"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/num_passed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "num_passed"}}}
       ]
     },
     {
@@ -361,7 +392,7 @@
       "name": "campaign_fragments_splits",
       "description": "Splits for the campaign_fragments config.",
       "field": [
-        {"@type": "cr:Field", "@id": "campaign_fragments_splits/split_name", "dataType": "sc:Text", "description": ""}
+        {"@type": "cr:Field", "@id": "campaign_fragments_splits/split_name", "dataType": "sc:Text"}
       ],
       "data": [
         {"campaign_fragments_splits/split_name": "train"}
@@ -372,21 +403,22 @@
       "@id": "campaign_fragments",
       "description": "anon-fragbench-neurips/fragbench - 'campaign_fragments' subset. One row per fragment within a campaign variation. Includes the parent tactic, parent prompt, produced and consumed artefacts (JSON-encoded), and stylised variations.",
       "field": [
-        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "source_file"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/variant", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variant"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/campaign_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign_id"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/seed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "seed"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/total_fragments", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "total_fragments"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/fragment_index", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "fragment_index"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/role", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "role"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/parent_tactic", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_tactic"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/parent_prompt", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_prompt"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/produces", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "produces"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/consumes", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "consumes"}}, "description": ""},
-        {"@type": "cr:Field", "@id": "campaign_fragments/variations", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variations"}}, "description": ""}
+        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "source_file"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/variant", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variant"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/campaign_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign_id"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/seed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "seed"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/total_fragments", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "total_fragments"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/fragment_index", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "fragment_index"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/role", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "role"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/parent_tactic", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_tactic"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/parent_prompt", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_prompt"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/produces", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "produces"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/consumes", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "consumes"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/variations", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variations"}}}
       ]
     }
-  ]
+  ],
+  "rai:hasSyntheticData": true
 }
