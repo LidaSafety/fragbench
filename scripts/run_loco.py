@@ -112,7 +112,7 @@ def parse_folds(spec: str | None, n: int) -> list[int]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--malicious", default="dataset/combined/malicious.json")
-    ap.add_argument("--benign", default="dataset/combined/benign.json")
+    ap.add_argument("--benign", default="benign_executed.json")
     ap.add_argument("--malicious-sample", type=int)
     ap.add_argument("--benign-sample", type=int)
     ap.add_argument("--conditions", default="full,within_session_only",

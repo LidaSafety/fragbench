@@ -136,7 +136,7 @@ def panel(seed):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--malicious", default="dataset/combined/malicious.json")
-    ap.add_argument("--benign", default="dataset/combined/benign.json")
+    ap.add_argument("--benign", default="benign_executed.json")
     ap.add_argument("--test-size", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--json-out", default="ablation_aggregation_baselines.json")

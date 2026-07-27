@@ -25,6 +25,7 @@ import glob
 import json
 import os
 import random
+from collections import defaultdict
 import re
 import shutil
 import sys
@@ -116,6 +117,12 @@ def main() -> int:
     ap.add_argument("--keep-dead", action="store_true",
                     help="keep chains containing zero-tool-call sessions "
                          "(API-limit casualties); excluded by default")
+    ap.add_argument("--keep-duplicates", action="store_true",
+                    help="keep every chain for an objective that was run more "
+                         "than once; one per (campaign, style, seed) by default")
+    ap.add_argument("--stratify", action="store_true",
+                    help="draw --sample evenly across campaigns instead of "
+                         "uniformly at random over chains")
     args = ap.parse_args()
 
     sys.path.insert(0, str(NORMALIZER))
@@ -153,10 +160,60 @@ def main() -> int:
         print(f"  dropped {dropped} chains containing zero-tool-call sessions "
               f"-> {len(graphs)} usable")
 
+    # (campaign, style, seed) identifies an objective; the run id does not.
+    triple: dict[str, tuple] = {}
+    for g in graphs:
+        try:
+            v = json.load(open(g))["variation"]
+        except Exception:
+            continue
+        triple[g] = (v.get("campaign"), v.get("style"), v.get("seed"))
+
+    if not args.keep_duplicates:
+        # Re-running a block after the API-limit window produced a second chain
+        # for objectives that already had a good one. Two runs of the same
+        # objective are redundancy, not data -- and they inflate whichever
+        # campaign happened to need re-running. Newest run id wins.
+        best: dict[tuple, str] = {}
+        for g in graphs:
+            k = triple.get(g)
+            if k and (k not in best or g > best[k]):
+                best[k] = g
+        dropped = len(graphs) - len(best)
+        graphs = sorted(best.values())
+        print(f"  dropped {dropped} repeat chains -> {len(graphs)} distinct objectives")
+
     if args.sample and args.sample < len(graphs):
-        random.Random(args.seed).shuffle(graphs)
-        graphs = sorted(graphs[:args.sample])
-        print(f"  sampled down to {len(graphs)} chains (seed {args.seed})")
+        rng = random.Random(args.seed)
+        if args.stratify:
+            # Round-robin across campaigns. A flat draw leaves campaign counts
+            # anywhere from 11 to 32 by luck, while the malicious side is
+            # uniform at ~24 per campaign; an imbalanced control set is an
+            # easy thing for a reviewer to object to.
+            by_campaign: dict[str, list[str]] = defaultdict(list)
+            for g in graphs:
+                by_campaign[triple[g][0]].append(g)
+            for v in by_campaign.values():
+                rng.shuffle(v)
+            names = sorted(by_campaign)
+            picked: list[str] = []
+            depth = 0
+            while len(picked) < args.sample:
+                progressed = False
+                for c in names:
+                    if depth < len(by_campaign[c]) and len(picked) < args.sample:
+                        picked.append(by_campaign[c][depth])
+                        progressed = True
+                if not progressed:
+                    break
+                depth += 1
+            graphs = sorted(picked)
+            print(f"  stratified sample: {len(graphs)} chains across "
+                  f"{len(names)} campaigns (seed {args.seed})")
+        else:
+            rng.shuffle(graphs)
+            graphs = sorted(graphs[:args.sample])
+            print(f"  sampled down to {len(graphs)} chains (seed {args.seed})")
 
     if not graphs:
         print("nothing to build", file=sys.stderr)

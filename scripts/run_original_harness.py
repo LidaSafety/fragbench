@@ -13,8 +13,10 @@ from the real MCP traces. Everything downstream -- the split, node features,
 neighbour sampling, all four GNNs, all seven classical baselines, the reporting --
 is the original code path, executed line for line.
 
-    python scripts/run_original_harness.py --benign dataset/combined/benign.json
-    python scripts/run_original_harness.py --benign benign_executed.json
+Both corpora are executed MCP traces: dataset/combined/malicious.json and
+benign_executed.json. The synthetic benign control is not used.
+
+    python scripts/run_original_harness.py
     python scripts/run_original_harness.py --script train_gnn --epochs 30
 """
 
@@ -137,7 +139,7 @@ def install_capture(mod) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--malicious", default="dataset/combined/malicious.json")
-    ap.add_argument("--benign", default="dataset/combined/benign.json")
+    ap.add_argument("--benign", default="benign_executed.json")
     ap.add_argument("--malicious-sample", type=int)
     ap.add_argument("--benign-sample", type=int)
     ap.add_argument("--script", choices=("compare_gnns", "train_gnn"),
