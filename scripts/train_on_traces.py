@@ -297,6 +297,8 @@ def main() -> int:
                     help="classical baselines only (skips torch entirely)")
     ap.add_argument("--epochs", type=int, default=30, help="GNN epochs (compare_gnns uses 30)")
     ap.add_argument("--json-out", help="write the results table here")
+    ap.add_argument("--csv-out", default="per_campaign_test.csv",
+                    help="per-campaign table as CSV (Table 3 layout)")
     args = ap.parse_args()
 
     print("=" * 78)
@@ -358,22 +360,33 @@ def main() -> int:
             sampler = NeighborSampler(adj, etypes, feats, K1=10, K2=5, seed=args.seed)
             for arch in ("gcn", "sage", "gat", "gin"):
                 name = CG.ARCH_DISPLAY[arch]
-                before = len(captured)
+                mark = len(captured)
                 m = CG.train_single_arch(
                     arch=arch, sampler=sampler,
                     train_ids=train_ids, y_train=y_train,
                     test_ids=test_ids, y_test=y_test,
                     epochs=args.epochs, batch_size=256, lr=1e-3, device=device)
-                probs[name] = captured[-1][1]
+                # the final capture of this call is the held-out scoring
+                probs[name] = captured[-1][1] if len(captured) > mark else None
                 rows.append({"model": name, "f1": m["f1"], "acc": m["accuracy"],
                              "prec": m["precision"], "rec": m["recall"],
                              "auc": m["roc_auc"], "ap": m["avg_precision"]})
                 print(f"  {name:<12} F1={m['f1']:.4f}  Ac={m['accuracy']:.4f}  "
                       f"AUC={m['roc_auc']:.4f}  ({m['train_time_s']:.0f}s)")
 
+        # train_single_arch also scores mid-training for checkpoint selection, so
+        # `captured` holds several entries per GNN. Mark the position before the
+        # classical panel and take only what that call appends -- one per model,
+        # in the order train_ml_methods trains them.
+        mark = len(captured)
         ml = CG.train_ml_methods(adj, meta, etypes,
                                  train_ids, y_train, test_ids, y_test)
-        ml_probs = [c[1] for c in captured[len(probs):]]
+        ml_probs = [c[1] for c in captured[mark:]]
+        if len(ml_probs) != len(ml):
+            print(f"  WARNING: captured {len(ml_probs)} probability vectors for "
+                  f"{len(ml)} classical models; per-campaign columns would be "
+                  f"misaligned, so they are omitted.")
+            ml_probs = []
         for i, m in enumerate(ml):
             name = m.get("display_name") or m.get("arch")
             if i < len(ml_probs):
@@ -387,13 +400,42 @@ def main() -> int:
     for r in rows:
         r.setdefault("chain_f1", float("nan"))
 
+    # Table 3 reports exactly seven detectors; train_ml_methods returns eleven.
+    TABLE3 = ["GCN", "GraphSAGE", "GAT", "GIN", "svm", "mlp_sk", "gbt"]
+    LABEL = {"svm": "SVM", "mlp_sk": "MLP", "gbt": "GBT"}
+    cols = [m for m in TABLE3 if m in probs]
+
     camp_rows = per_campaign_table(y_test, None, camp_of[test_ids], probs)
-    print("\n  per-campaign F1 (Table 3: campaign positives + all benign test events)")
-    hdr = "  " + f"{'campaign':<32}" + "".join(f"{n:>11}" for n in probs)
-    print(hdr + "\n  " + "-" * (len(hdr) - 2))
+    print("\n" + "=" * 78)
+    print("  PER-CAMPAIGN, HELD-OUT TEST EVENTS")
+    print("  (each campaign's positive test events + all benign test events)")
+    print("=" * 78)
+    hdr = f"  {'campaign':<30}" + "".join(f"{LABEL.get(m, m):>16}" for m in cols)
+    sub = f"  {'':<30}" + "".join(f"{'F1':>8}{'Ac':>8}" for _ in cols)
+    print(hdr + "\n" + sub + "\n  " + "-" * (len(hdr) - 2))
     for cr in camp_rows:
-        print(f"  {cr['campaign']:<32}" +
-              "".join(f"{cr[f'{n}_f1']:>11.3f}" for n in probs))
+        print(f"  {cr['campaign']:<30}" +
+              "".join(f"{cr[f'{m}_f1']:>8.3f}{cr[f'{m}_ac']:>8.3f}" for m in cols))
+
+    agg = {r["model"]: r for r in rows}
+    print("  " + "-" * (len(hdr) - 2))
+    print(f"  {'AGGREGATE':<30}" +
+          "".join(f"{agg[m]['f1']:>8.3f}{agg[m]['acc']:>8.3f}"
+                  if m in agg else f"{'':>16}" for m in cols))
+
+    if args.csv_out:
+        import csv
+        with open(args.csv_out, "w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(["campaign", "n_pos"] +
+                       [f"{LABEL.get(m, m)}_{k}" for m in cols for k in ("F1", "Ac")])
+            for cr in camp_rows:
+                w.writerow([cr["campaign"], cr["n_pos"]] +
+                           [round(cr[f"{m}_{k}"], 4) for m in cols for k in ("f1", "ac")])
+            w.writerow(["AGGREGATE", int(y_test.sum())] +
+                       [round(agg[m][k], 4) if m in agg else ""
+                        for m in cols for k in ("f1", "acc")])
+        print(f"\n  wrote {args.csv_out}")
 
     rows.sort(key=lambda r: -r["f1"])
     print("\n" + "=" * 78)
