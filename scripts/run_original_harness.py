@@ -81,6 +81,9 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=30)
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--test-size", type=float, default=0.3,
+                    help="outer-sample holdout fraction; Table 3 reports 70/30 "
+                         "but the harness hardcodes 0.2 (default: 0.3)")
     ap.add_argument("--out", help="where to move the harness' results file "
                                   "(default: results_harness_<benign stem>.json)")
     args = ap.parse_args()
@@ -103,6 +106,22 @@ def main() -> int:
     import importlib
     mod = importlib.import_module(args.script)
     mod.CampaignDatasetGenerator = TraceDatasetGenerator   # the only substitution
+
+    # compare_gnns.py:614 and train_gnn.py:311 both hardcode test_size=0.2, but
+    # Table 3 reports a 70/30 outer-sample split. main() takes no test_size
+    # argument, so force the ratio by wrapping the splitter in the module's
+    # namespace. Pass --test-size 0.2 to reproduce the harness default instead.
+    if args.test_size is not None:
+        inner = mod.campaign_disjoint_split
+
+        def split(all_node_ids, labels, campaign_info, test_size=0.2,
+                  random_state=42, _inner=inner, _ts=args.test_size):
+            return _inner(all_node_ids, labels, campaign_info,
+                          test_size=_ts, random_state=random_state)
+
+        mod.campaign_disjoint_split = split
+        print(f"split: test_size={args.test_size} "
+              f"({100*(1-args.test_size):.0f}/{100*args.test_size:.0f} outer-sample)")
 
     print(f"\nrunning {args.script}.{'main' if args.script == 'compare_gnns' else 'train'}() "
           f"unmodified on the trace graph\n")
