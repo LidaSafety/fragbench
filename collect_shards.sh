@@ -33,7 +33,9 @@ for host in "$@"; do
     echo "########## $host"
     for sub in logs results/runs; do
         echo "  <- $sub"
-        rsync -az --info=progress2 --partial \
+        # --progress, not --info=progress2: macOS ships openrsync (rsync
+        # 2.6.9-compatible), which does not have the newer --info flag.
+        rsync -az --progress --partial \
             -e "ssh -i $KEY -o StrictHostKeyChecking=accept-new" \
             "$USER@$host:$REMOTE_DIR/$sub/" "./$sub/"
         [ $? -ne 0 ] && echo "  WARNING: $sub failed for $host"

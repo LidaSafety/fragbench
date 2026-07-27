@@ -37,6 +37,25 @@ def paths_of(arg) -> list[str]:
     return [s] if s else []
 
 
+_LOG_INDEX: dict[str, str] | None = None
+
+
+def _log_index() -> dict[str, str]:
+    """Map session-log basename -> path, searching logs/ recursively.
+
+    The harness files sessions under logs/<run_id>/ and older runs sit in
+    logs/old/, so a flat logs/<basename> lookup silently finds nothing and
+    every tool-result rate reads zero while the verdict counts still work.
+    """
+    global _LOG_INDEX
+    if _LOG_INDEX is None:
+        _LOG_INDEX = {
+            os.path.basename(p): p
+            for p in glob.glob("logs/**/session_*.jsonl", recursive=True)
+        }
+    return _LOG_INDEX
+
+
 def session_events(fragment: dict):
     """Yield (tool, paths, ok) once per resolved tool call in a fragment.
 
@@ -47,8 +66,8 @@ def session_events(fragment: dict):
     sp = fragment.get("session_path")
     if not sp:
         return
-    p = os.path.join("logs", os.path.basename(sp))
-    if not os.path.exists(p):
+    p = _log_index().get(os.path.basename(sp))
+    if not p:
         return
     pending: tuple[str, list[str]] | None = None
     with open(p) as fh:
