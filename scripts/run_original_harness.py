@@ -81,7 +81,21 @@ def main() -> int:
     ap.add_argument("--epochs", type=int, default=30)
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--out", help="where to move the harness' results file "
+                                  "(default: results_harness_<benign stem>.json)")
     args = ap.parse_args()
+
+    # compare_gnns.py writes checkpoints/gnn_comparison.json, a fixed path with
+    # no parameter, so a second arm would silently overwrite the first. Claim a
+    # distinct destination up front and check the run is not already racing one.
+    checkpoint = (REPO / "fragbench-structural-graph-main" / "checkpoints"
+                  / ("gnn_comparison.json" if args.script == "compare_gnns"
+                     else "fragguard_gnn.pt"))
+    out = Path(args.out) if args.out else REPO / (
+        f"results_harness_{Path(args.benign).stem}.json")
+    if out.exists():
+        print(f"refusing to overwrite {out} -- move it or pass --out", file=sys.stderr)
+        return 2
 
     prepare(args.malicious, args.benign,
             args.malicious_sample, args.benign_sample, args.seed)
@@ -96,6 +110,15 @@ def main() -> int:
         mod.main(epochs=args.epochs, batch_size=args.batch_size)
     else:
         mod.train(epochs=args.epochs, batch_size=args.batch_size)
+
+    if checkpoint.exists():
+        checkpoint.rename(out)
+        print(f"\nresults moved to {out}")
+        print("  (the harness writes one fixed filename, so each arm is "
+              "claimed here rather than left to be overwritten)")
+    else:
+        print(f"\nwarning: expected {checkpoint} but it was not written",
+              file=sys.stderr)
     return 0
 
 

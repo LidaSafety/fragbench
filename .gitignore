@@ -24,3 +24,4 @@ dataset/dataset_staging/
 benign_executed*.json
 .venv-graph/
 results_arm_*.json
+results_harness_*.json
