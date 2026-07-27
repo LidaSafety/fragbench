@@ -7,13 +7,23 @@
     "column": "cr:column",
     "conformsTo": "dct:conformsTo",
     "containedIn": "cr:containedIn",
+    "equivalentProperty": "cr:equivalentProperty",
     "cr": "http://mlcommons.org/croissant/",
     "rai": "http://mlcommons.org/croissant/RAI/",
     "prov": "http://www.w3.org/ns/prov#",
-    "data": {"@id": "cr:data", "@type": "@json"},
-    "dataType": {"@id": "cr:dataType", "@type": "@vocab"},
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
     "dct": "http://purl.org/dc/terms/",
-    "examples": {"@id": "cr:examples", "@type": "@json"},
+    "examples": {
+      "@id": "cr:examples",
+      "@type": "@json"
+    },
     "extract": "cr:extract",
     "field": "cr:field",
     "fileProperty": "cr:fileProperty",
@@ -32,6 +42,7 @@
     "regex": "cr:regex",
     "repeated": "cr:repeated",
     "replace": "cr:replace",
+    "samplingRate": "cr:samplingRate",
     "sc": "https://schema.org/",
     "separator": "cr:separator",
     "source": "cr:source",
@@ -39,19 +50,33 @@
     "transform": "cr:transform"
   },
   "@type": "sc:Dataset",
-  "conformsTo": "http://mlcommons.org/croissant/1.1",
+  "conformsTo": [
+    "http://mlcommons.org/croissant/1.1",
+    "http://mlcommons.org/croissant/RAI/1.0"
+  ],
   "name": "fragbench",
-  "alternateName": ["anon-fragbench-neurips/fragbench", "FragBench"],
-  "description": "FragBench is a benchmark for evaluating cross-session, fragmented attacks on LLM agents that use tools via the Model Context Protocol (MCP). Each malicious campaign is decomposed into many small fragments distributed across sessions; a defender must reconstruct the compositional intent from a typed event graph. The public tier contains seed campaigns drawn from public cyber-incident reports, RL-generated stylised fragment variants, and synthetic benign tool-use traces. A gated companion dataset (anon-fragbench-neurips/fragbench-restricted) contains the more sensitive reinforcement-learning system prompts and judge-rubric configurations.",
+  "alternateName": [
+    "anon-fragbench-neurips/fragbench",
+    "FragBench"
+  ],
+  "description": "FragBench is a benchmark for evaluating cross-session, fragmented attacks on LLM agents that use tools through the Model Context Protocol (MCP). A malicious campaign is broken into small fragments spread across separate sessions, and a defender has to reconstruct the intent from a typed event graph.\n\nMuch of the dataset is synthetic and none of it is captured from real user activity. The campaign seeds were written by the authors from published incident reports, with domain experts consulted and an LLM used to scale the drafting. Campaign variants come from deterministic template expansion of those seeds, and the adversarially rewritten fragments are LLM output. The tool-call traces are genuine execution logs, but the actor ran against mock MCP servers in a sandbox, never against real systems. Both the malicious and the benign sessions were executed the same way, so the two halves differ only in the objective. See rai:dataLimitations.\n\nA gated companion dataset (anon-fragbench-neurips/fragbench-restricted) holds the rewriter system prompts and judge rubrics.",
   "url": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench",
-  "version": "1.0.0",
-  "datePublished": "2026-05-07",
+  "version": "1.1.0",
+  "datePublished": "2026-07-27",
+  "dateCreated": "2026-05-07",
+  "dateModified": "2026-07-27",
   "license": "https://creativecommons.org/licenses/by/4.0/",
   "creator": {
     "@type": "Organization",
     "name": "Anonymous (NeurIPS 2026 Evaluations and Datasets Track submission)",
     "url": "https://huggingface.co/anon-fragbench-neurips"
   },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Anonymous (NeurIPS 2026 Evaluations and Datasets Track submission)",
+    "url": "https://huggingface.co/anon-fragbench-neurips"
+  },
+  "inLanguage": "en",
   "keywords": [
     "text-classification",
     "text-generation",
@@ -65,8 +90,20 @@
     "benchmark"
   ],
   "citeAs": "@inproceedings{fragbench2026, title={FragBench: A Benchmark for Detecting Fragmented Multi-Session Jailbreak Attacks on LLM Agents}, author={Anonymous}, booktitle={NeurIPS Evaluations and Datasets Track (under review)}, year={2026}}",
-
-  "prov:wasDerivedFrom": "https://anonymous.4open.science/r/fragbench-FE86/seeds/",
+  "isLiveDataset": false,
+  "prov:wasDerivedFrom": [
+    {
+      "@type": "sc:Dataset",
+      "name": "FragBench campaign seed files",
+      "description": "The 24 campaign seed files the corpus is expanded from, together with the 35 published cyber-incident reports they were distilled from. The incident reports are third-party publications by security vendors and researchers; they are cited in Appendix F of the paper and none of their text is redistributed here, so no upstream licence propagates into this dataset.",
+      "url": "https://anonymous.4open.science/r/fragbench-FE86/seeds/",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Anonymous (NeurIPS 2026 submission)"
+      },
+      "license": "https://creativecommons.org/licenses/by/4.0/"
+    }
+  ],
   "isBasedOn": [
     {
       "@type": "sc:Dataset",
@@ -75,7 +112,7 @@
     },
     {
       "@type": "sc:Dataset",
-      "name": "FragBench RL Outputs (Gated)",
+      "name": "FragBench Adversarial Rewriting Outputs (Gated)",
       "url": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted"
     }
   ],
@@ -83,39 +120,48 @@
     {
       "@type": "prov:Activity",
       "@id": "activity-seed-authoring",
-      "name": "Campaign Seed Authoring",
-      "description": "Kill-chain seed files authored by domain experts from 24 publicly reported cyber-incident campaigns, with inter-author quality review against source threat-intelligence reports."
+      "name": "Incident-report-derived campaign seeds (author-written, LLM-assisted)",
+      "description": "The authors distilled 35 published cyber-incident reports, catalogued in Appendix F of the paper, into 24 campaign seeds. Domain experts were consulted on the threat scenarios and an LLM (Claude Opus) was used to scale the drafting, prompted per incident with the report summary and the seed schema, with each seed checked back against its source report. The same approach produced the benign seeds, so both halves of the corpus were written the same way. Only 24 of the 35 incidents could be expressed as a complete, executable multi-stage sequence, which is why the counts differ. A seed lays out an ordered sequence of adversary steps, what security practitioners call a kill chain. Seeds are abstractions rather than copies, and no incident-report text is redistributed. Human agents: the seeds were written and reviewed by the paper's authors with consulted domain experts in security operations. Affiliations, locations and team composition are withheld for double-blind review and will be stated at camera-ready. No crowdsourced labour was used at any stage of this dataset.",
+      "prov:used": "https://anonymous.4open.science/r/fragbench-FE86/seeds/"
     },
     {
       "@type": "prov:Activity",
       "@id": "activity-synthetic-generation",
-      "name": "Synthetic Fragment Generation",
-      "description": "Fragment legitimization and style rephrasing performed by Claude Haiku 4.5. Benign cover sessions synthetically generated by Claude Sonnet 4.5 using few-shot schema examples."
+      "name": "Generated campaign variants (machine-generated)",
+      "description": "Each seed expands into many fragment sequences by deterministic template substitution (run.py --generate). No model is called on this path, so any variant is reproducible from its seed file and seed integer. Individual fragments are optionally restyled by Claude Haiku 4.5."
     },
     {
       "@type": "prov:Activity",
       "@id": "activity-adversarial-rewriting",
-      "name": "Adversarial Rewriting",
-      "description": "RL-style rewriter loop using Claude Sonnet 4.6, Claude Opus 4.7, and DeepSeek V4 Flash as rewriters against LLM safety judges (gpt-oss:20b, Claude Sonnet 4.6, Claude Opus 4.7, Llama-Guard-4-12B, GPT-4.1-mini) to optimize fragments against single-turn-prompt safety classifiers."
+      "name": "Adversarially rewritten fragments (LLM-generated)",
+      "description": "A rewriter model proposes a reworded fragment, a safety judge scores it, and the loop repeats for a bounded number of rounds. This is a search over prompt text: nothing is learned and no parameters change, so earlier descriptions of it as reinforcement learning were inaccurate. Rewriters were Claude Sonnet 4.6, Claude Opus 4.7 and DeepSeek V4 Flash; judges were gpt-oss:20b, Claude Sonnet 4.6, Claude Opus 4.7, Llama-Guard-4-12B and GPT-4.1-mini."
     },
     {
       "@type": "prov:Activity",
       "@id": "activity-mcp-validation",
-      "name": "MCP Sandbox Execution Validation",
-      "description": "Each fragment assembly executed end-to-end in a sandboxed Docker Compose environment with 24 MCP tool servers and qwen/qwen3.5-122b-a10b as the actor model. Assemblies accepted only if the full kill chain executed successfully."
+      "name": "Executed malicious tool-call traces (sandboxed execution)",
+      "description": "Malicious fragment assemblies were run end to end in a Docker Compose sandbox of 24 MCP tool servers, with qwen/qwen3.5-122b-a10b via OpenRouter as the actor. These are not observations of real systems: every server is a mock and nothing external was contacted. Outcomes are recorded as they happened rather than filtered down to successes."
+    },
+    {
+      "@type": "prov:Activity",
+      "@id": "activity-benign-execution",
+      "name": "Executed benign control sessions (sandboxed execution)",
+      "description": "The authors wrote 24 benign campaigns covering ordinary IT and office work, using the same seed schema and authoring approach as the malicious ones. The same generator expanded them along the same two axes, 6 styles by 9 seeds, for 1,296 objectives, and every one was executed rather than simulated: one fragment per session, same actor, same 24 servers, same sandbox, same tracer. The safety judge was switched off, since it scores completion of a malicious objective and never touches the tool trace. Chains with empty sessions were dropped, leaving a campaign-stratified sample of 514 chains and 77,176 events against 55,274 malicious. The point is that the two halves now differ only in the objective. Resemblance between the two corpora was measured rather than assumed: tool-frequency divergence, chain length, argument length, inter-call timing, resource reuse and tool success rate are compared in the paper, along with a chain-level classifier trained on those statistics as an adversarial check. rai:dataLimitations records where the two still differ. Utility. Detector performance on this corpus was measured against a model-fabricated alternative, with training code, split and hyperparameters held fixed. Event-level F1 is lower on the executed corpus for every architecture, by between 0.047 and 0.208, which quantifies how much of the separability in the fabricated comparison came from generation process rather than from the objective. The relative ordering of model families is unchanged across the two, so architecture comparisons hold on both."
     }
   ],
-
-  "rai:dataCollection": "Seed campaigns were transcribed from publicly disclosed cyber-incident reports published by frontier AI vendors and security researchers (e.g. operator-published threat reports about misuse of LLM agents). Each seed defines a high-level malicious objective and a small set of parent tactics. Seeds were rewritten through a bootstrap then learned then creative reinforcement-learning loop using a frontier LLM to produce stylised fragment sequences. A single-token classifier-mode LLM judge selected variants that increased pass rate against target models while preserving the original objective.",
-  "rai:dataCollectionType": ["Synthetic", "Other"],
-  "rai:dataCollectionTypeOthers": "RL-generated variants from publicly disclosed incident seeds; benign traces are synthetic tool-use transcripts.",
+  "rai:dataCollection": "Seed campaigns were transcribed from publicly disclosed cyber-incident reports published by frontier AI vendors and security researchers (e.g. operator-published threat reports about misuse of LLM agents). Each seed defines a high-level malicious objective and a small set of parent tactics. Seeds were rewritten through a bootstrap, then learned, then creative iterative adversarial rewriting loop using a frontier LLM to produce stylised fragment sequences. This loop is a search over prompt text: no policy is learned and no model parameters are updated. A single-token classifier-mode LLM judge selected variants that increased pass rate against target models while preserving the original objective.",
+  "rai:dataCollectionType": [
+    "Synthetic",
+    "Other"
+  ],
+  "rai:dataCollectionTypeOthers": "Mostly synthetic, from several sources that prov:wasGeneratedBy lists separately. The campaign seeds are the authors' own writing, distilled from published incident reports with domain-expert input and LLM assistance for scale. Campaign variants and rewritten fragments are entirely machine-generated. The tool-call traces are real execution logs, though the servers behind them are mocks.",
   "rai:dataCollectionTimeframe": {
     "@type": "sc:DateTime",
     "startDate": "2026-02-01",
-    "endDate": "2026-05-01"
+    "endDate": "2026-07-27"
   },
   "rai:dataCollectionRawData": "Public cyber-incident reports describing real-world misuse of LLM agents. The benchmark stores rewritten fragment sequences and per-fragment LLM-judge verdicts; raw incident-report text is not redistributed.",
-  "rai:dataCollectionMissingData": "No human subject data is collected; missingness is not applicable. Some campaigns have fewer variants than others where the RL generator could not produce judge-passing variants without violating fidelity to the seed objective.",
+  "rai:dataCollectionMissingData": "No human subject data is collected; missingness is not applicable. Some campaigns have fewer variants than others where the rewriting loop could not produce judge-passing variants without violating fidelity to the seed objective.",
   "rai:dataPreprocessingProtocol": [
     "Bootstrap: seed campaigns are decomposed into ordered fragments (parent_tactic, parent_prompt, produces, consumes).",
     "Style rewriting: each fragment is rewritten in multiple stylised variants by a frontier LLM under attack system prompts.",
@@ -130,32 +176,33 @@
   "rai:annotationsPerItem": "1 (single judge call per fragment).",
   "rai:annotatorDemographics": "Not applicable; annotation is fully machine-generated.",
   "rai:machineAnnotationTools": "Claude Haiku 4.5 (claude-haiku-4-5-20251001) used as a single-token classifier-mode judge.",
-
   "rai:dataUseCases": [
     "Cross-session jailbreak detection: classify whether a session graph reconstructs a malicious campaign.",
     "Multi-turn red-team evaluation: measure judge-pass rate of fragmented attacks on target LLM agents.",
     "Compositional safety research: study aggregation features over typed session-event graphs.",
-    "Benchmarking detectors and guardrails on compositional jailbreaks."
+    "Benchmarking detectors and guardrails on compositional jailbreaks.",
+    "Validity evidence. Detection is measured by event-level F1, accuracy and ROC-AUC, reported in the paper across seven model families: four graph neural networks and three classical classifiers. It is supported by edge-type ablations isolating within-session from cross-session structure, graph-free aggregation baselines at fragment, session and user level, and a leave-one-campaign-family-out evaluation testing generalisation to campaign families absent from training.\n\nThis is an evaluation benchmark, not a training corpus. Reported figures are established for the actors, judges and cyber-incident domain evaluated, at the class balance of the released corpus. Not validated: transfer to other actor or judge families, non-cyber misuse domains, deployment at realistic malicious-user prevalence, or robustness to an attacker optimising against the detector, since the rewriting pipeline never receives the detector's score."
   ],
   "rai:dataLimitations": [
     "Sandbox-only: all execution traces come from a sandboxed harness; no real third-party systems were targeted, and the dataset does not capture network-side artefacts that real defenders may observe.",
     "English-only: all fragment prompts, model responses, and judge rubrics are in English.",
     "Coverage skew: campaigns over-represent LLM-confirmed incidents disclosed by frontier-API vendors; coverage of non-frontier attacker ecosystems and lower-resource languages is limited.",
     "Judge dependence: per-fragment verdicts are produced by a single LLM judge (Claude Haiku 4.5) and inherit its blind spots. Detectors trained against this judge may transfer imperfectly to systems using different judges or human reviewers.",
-    "Static snapshot: the public tier is a frozen v1.0.0 snapshot. Attacker tactics and defender capabilities will continue to evolve.",
+    "Volume differences remain between the two corpora. Benign objectives make more tool calls across more sessions and reuse files within a chain more often, while malicious arguments have a longer tail; completing a legitimate task takes more steps than abandoning an illegitimate one. These are behavioural differences rather than artifacts of provenance, since both corpora come off one pipeline, but they are large enough that a classifier over simple summary statistics separates the corpora at chain level. Do not treat the corpora as fully distribution-matched; effect sizes and the matched-subsample controls are reported in the paper.",
+    "Benign cross-chain resource sharing is a design choice rather than a measurement. Some artifact names in the benign seeds are shared across chains on purpose, while each chain's main deliverables carry per-variation discriminators. Giving every name a discriminator had pushed cross-chain sharing to zero, which would itself have separated the classes on the detector's shared_resource edge.",
+    "Static snapshot: the public tier is a frozen v1.1.0 snapshot. Attacker tactics and defender capabilities will continue to evolve.",
     "Not for direct deployment as offensive tooling; not for targeting individuals, organisations, or infrastructure without authorisation."
   ],
   "rai:dataBiases": [
     "Source bias: seed campaigns are biased toward incidents that frontier-API providers chose to disclose publicly, which may over-represent high-visibility threat actors and under-represent lower-profile attackers.",
-    "Stylistic bias: all RL-generated variants are rewritten by a single frontier LLM family, so stylistic diversity is bounded by that model's prior.",
+    "Stylistic bias: all adversarially rewritten variants are produced by a single frontier LLM family, so stylistic diversity is bounded by that model's prior.",
     "Judge bias: the single-token classifier judge inherits the safety preferences and refusal patterns of its underlying LLM (Claude Haiku 4.5).",
     "Language bias: English-only.",
     "Domain bias: campaigns concentrate on financial fraud, credential theft, deepfake-enabled identity fraud, and malware-development assistance; other harm categories are under-represented."
   ],
-  "rai:dataSocialImpact": "FragBench is dual-use. Its intended impact is to enable academic research on detecting cross-session, fragmented jailbreak attacks against LLM agents, and to support development of defensive classifiers and guardrails. The same fragment sequences can in principle be reused as offensive prompts. To mitigate this, the most sensitive components (RL system prompts, judge-rubric configurations, and high-yield variant traces) are placed behind a manual access-review gate in a companion dataset; only the lower-yield public tier is openly accessible. We follow the standard practice for security benchmarks (HarmBench, JailbreakBench) of tiered release.",
-  "rai:personalSensitiveInformation": "None. All prompts, identities, and tool arguments are synthetic. Recipient profiles, account names, file paths, and any apparent personal identifiers in fragment prompts are fabricated for the benchmark and do not correspond to real individuals or organisations. No private user data was collected.",
-  "rai:dataReleaseMaintenancePlan": "Versioned via the HuggingFace dataset (v1.0.0 as of 2026-05-07). Errata, additional campaigns, and judge-rubric updates will be released as new minor versions on the same dataset URL. The sensitive RL system prompts and judge-rubric configurations are released separately under request-access at the gated companion dataset: https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted. Maintainer contact will be restored at camera-ready; for the double-blind review period, please open an issue on the HuggingFace dataset page.",
-
+  "rai:dataSocialImpact": "FragBench is dual-use. Its intended impact is to enable academic research on detecting cross-session, fragmented jailbreak attacks against LLM agents, and to support development of defensive classifiers and guardrails. The same fragment sequences can in principle be reused as offensive prompts. To mitigate this, the most sensitive components (rewriter system prompts, judge-rubric configurations, and high-yield variant traces) are placed behind a manual access-review gate in a companion dataset; only the lower-yield public tier is openly accessible. We follow the standard practice for security benchmarks (HarmBench, JailbreakBench) of tiered release.",
+  "rai:personalSensitiveInformation": "None of the categories the guidance enumerates (gender, socio-economic status, geography, language, age, culture, seniority, health or medical data, political or religious belief) are present. All prompts, identities and tool arguments are synthetic: recipient profiles, account names, file paths and any apparent personal identifiers in fragment prompts were fabricated for the benchmark and do not correspond to real people or organisations. No human subjects were involved and no user data was collected, so no de-identification was applied and none was needed.\n\nResidual risk. Two remain and neither is a privacy risk to an individual. Fabricated identifiers can coincide with a real name or domain by chance, since they were generated rather than checked against a denylist. And the campaign seeds abstract publicly disclosed intrusions, so an informed reader may recognise the incident a seed derives from; those incidents are already public and are cited in the paper.\n\nEthics review. No institutional review board approval was sought or required: the work involves no human subjects, no personal data and no interaction with real systems, every execution being confined to a sandbox of mock servers. The relevant risk is dual use rather than privacy, and it is handled by tiered release, described in rai:dataSocialImpact.",
+  "rai:dataReleaseMaintenancePlan": "Versioned via the HuggingFace dataset (v1.1.0 as of 2026-07-27). Errata, additional campaigns, and judge-rubric updates will be released as new minor versions on the same dataset URL. The sensitive rewriter system prompts and judge-rubric configurations are released separately under request-access at the gated companion dataset: https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted. Maintainer contact will be restored at camera-ready; for the double-blind review period, please open an issue on the HuggingFace dataset page.",
   "distribution": [
     {
       "@type": "cr:FileObject",
@@ -167,39 +214,143 @@
       "sha256": "https://github.com/mlcommons/croissant/issues/80"
     },
     {
+      "@type": "cr:FileObject",
+      "@id": "repo-main",
+      "name": "repo-main",
+      "description": "The Hugging Face git repository on the main branch, which holds the JSONL corpora. Distinct from the 'repo' entry above, which points at the auto-generated parquet conversion branch.",
+      "contentUrl": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench/tree/main",
+      "encodingFormat": "git+https",
+      "sha256": "https://github.com/mlcommons/croissant/issues/80"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "repo-restricted",
+      "name": "repo-restricted",
+      "description": "The gated companion repository. Access is granted by manual review, so this URL returns 401 to anonymous clients by design.",
+      "contentUrl": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted/tree/main",
+      "encodingFormat": "git+https",
+      "sha256": "https://github.com/mlcommons/croissant/issues/80"
+    },
+    {
       "@type": "cr:FileSet",
       "@id": "parquet-files-for-config-attack_meta",
+      "name": "parquet-files-for-config-attack_meta",
+      "description": "Per-run metadata for executed attack pipelines. Generated by executing attack pipelines: one row per harness run, recording the campaign, style, actor model and judge model used.",
       "containedIn": {"@id": "repo"},
       "encodingFormat": "application/x-parquet",
-      "includes": "attack_meta/*/*.parquet"
+      "includes": "attack_meta/*/*.parquet",
+      "prov:wasGeneratedBy": {
+        "@id": "activity-mcp-validation"
+      }
     },
     {
       "@type": "cr:FileSet",
       "@id": "parquet-files-for-config-campaign_fragments",
+      "name": "parquet-files-for-config-campaign_fragments",
+      "description": "Fragment sequences per campaign variant. Machine-generated by deterministic expansion from the campaign seeds, with fragment text optionally rewritten by the adversarial rewriting loop. Fully synthetic.",
       "containedIn": {"@id": "repo"},
       "encodingFormat": "application/x-parquet",
-      "includes": "campaign_fragments/*/*.parquet"
+      "includes": "campaign_fragments/*/*.parquet",
+      "prov:wasGeneratedBy": [
+        {
+          "@id": "activity-synthetic-generation"
+        },
+        {
+          "@id": "activity-adversarial-rewriting"
+        }
+      ]
     },
     {
       "@type": "cr:FileSet",
       "@id": "sessions",
       "name": "sessions",
-      "description": "Redacted MCP session logs organized by campaign. One JSONL per dispatched fragment session. LLM response content is stripped; tool call structure, verdicts, and timing are retained.",
-      "contentUrl": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench/resolve/main/sessions/",
+      "description": "Redacted MCP session logs for the MALICIOUS class, organized by campaign. One JSONL per dispatched fragment session. LLM response content is stripped; tool call structure, verdicts, and timing are retained. Emitted by the actor model running against mock MCP servers in a sandbox, not captured from real systems.",
       "encodingFormat": "application/jsonlines",
-      "includes": "**/*.jsonl"
+      "includes": "sessions/**/*.jsonl",
+      "prov:wasGeneratedBy": {
+        "@id": "activity-mcp-validation"
+      },
+      "containedIn": {"@id": "repo-main"}
+    },
+    {
+      "@type": "cr:FileSet",
+      "@id": "benign-sessions",
+      "name": "benign-sessions",
+      "description": "Benign control sessions, one JSONL per fragment session. Benign objectives were run through the same MCP harness, actor, sandbox and tracer as the malicious side, so the two corpora differ only in the objective. 514 chains and 77,176 events, drawn campaign-stratified from 1,296 executed objectives after dropping chains with empty sessions.",
+      "encodingFormat": "application/jsonlines",
+      "includes": "benign_executed/*.jsonl",
+      "prov:wasGeneratedBy": {
+        "@id": "activity-benign-execution"
+      },
+      "containedIn": {"@id": "repo-main"}
     },
     {
       "@type": "cr:FileSet",
       "@id": "rl-outputs-manual",
       "name": "rl-outputs-manual",
-      "description": "Adversarially rewritten fragment prompts from the RL phase (gated). Available at the companion restricted repository.",
-      "contentUrl": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted/resolve/main/rl-outputs-manual/",
+      "description": "Adversarially rewritten fragment prompts from the iterative prompt-space rewriting phase (gated), Produced by the adversarial rewriting loop. Fully LLM-generated. Available at the companion restricted repository. The @id retains the historical 'rl-' prefix because it must match the published repository path; the procedure involves no reinforcement learning.",
       "encodingFormat": "application/json",
-      "includes": "**/*.json"
+      "includes": "rl-outputs-manual/**/*.json",
+      "prov:wasGeneratedBy": {
+        "@id": "activity-adversarial-rewriting"
+      },
+      "containedIn": {"@id": "repo-restricted"}
     }
   ],
   "recordSet": [
+    {
+      "@type": "cr:RecordSet",
+      "@id": "session_events",
+      "name": "session_events",
+      "description": "Tool-call event stream for the malicious class, one record per line of each session JSONL. The 'event' field gives the record kind; tool_call and tool_result carry the payload the detector consumes, and the rest are harness bookkeeping. The fields below are those on tool_call and tool_result records.",
+      "field": [
+        {"@type": "cr:Field", "@id": "session_events/seq", "name": "seq", "description": "Monotonic event index within the session.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "seq"}}},
+        {"@type": "cr:Field", "@id": "session_events/ts", "name": "ts", "description": "ISO-8601 event timestamp.", "dataType": "sc:DateTime", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "ts"}}},
+        {"@type": "cr:Field", "@id": "session_events/event", "name": "event", "description": "Record kind, e.g. tool_call, tool_result, session_start, verdict.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "event"}}},
+        {"@type": "cr:Field", "@id": "session_events/session_id", "name": "session_id", "description": "Identifier of the session this event belongs to; the unit across which fragmentation is measured.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "session_id"}}},
+        {"@type": "cr:Field", "@id": "session_events/iteration", "name": "iteration", "description": "Actor loop iteration that produced the event (budget 16 per fragment).", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "iteration"}}},
+        {"@type": "cr:Field", "@id": "session_events/tool", "name": "tool", "description": "MCP tool name invoked.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "tool"}}},
+        {"@type": "cr:Field", "@id": "session_events/arguments", "name": "arguments", "description": "Serialized tool-call arguments.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "arguments"}}},
+        {"@type": "cr:Field", "@id": "session_events/arguments_bytes", "name": "arguments_bytes", "description": "Byte length of the serialized arguments.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "arguments_bytes"}}},
+        {"@type": "cr:Field", "@id": "session_events/tool_call_index", "name": "tool_call_index", "description": "Position of this call within its iteration, formatted 'n/m'.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "tool_call_index"}}},
+        {"@type": "cr:Field", "@id": "session_events/success", "name": "success", "description": "Whether the tool result reported success. Present on tool_result records.", "dataType": "sc:Boolean", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "success"}}},
+        {"@type": "cr:Field", "@id": "session_events/result_preview", "name": "result_preview", "description": "Truncated tool result payload.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "result_preview"}}},
+        {"@type": "cr:Field", "@id": "session_events/result_bytes", "name": "result_bytes", "description": "Byte length of the full tool result before truncation.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "result_bytes"}}},
+        {"@type": "cr:Field", "@id": "session_events/tool_result_index", "name": "tool_result_index", "description": "Position of this result within its iteration, formatted 'n/m'.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "tool_result_index"}}}
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "benign_session_events",
+      "name": "benign_session_events",
+      "description": "Tool-call event stream for the benign control class, one record per line of each benign session JSONL. The harness writes this, so the schema matches session_events exactly.",
+      "field": [
+        {"@type": "cr:Field", "@id": "benign_session_events/seq", "name": "seq", "description": "Monotonic event index within the session.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "seq"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/ts", "name": "ts", "description": "ISO-8601 event timestamp, emitted by the harness at execution time.", "dataType": "sc:DateTime", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "ts"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/event", "name": "event", "description": "Record kind, e.g. tool_call, tool_result, session_start.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "event"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/session_id", "name": "session_id", "description": "Harness-assigned session identifier.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "session_id"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/iteration", "name": "iteration", "description": "Actor loop iteration that produced the event.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "iteration"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/tool", "name": "tool", "description": "MCP tool name invoked.065 bits.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "tool"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/arguments", "name": "arguments", "description": "Serialized tool-call arguments, JSON in both corpora.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "arguments"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/arguments_bytes", "name": "arguments_bytes", "description": "Byte length of the serialized arguments.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "arguments_bytes"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/tool_call_index", "name": "tool_call_index", "description": "Position of this call within its iteration, formatted 'n/m'.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "tool_call_index"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/success", "name": "success", "description": "Whether the tool result reported success.4 percent.", "dataType": "sc:Boolean", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "success"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/result_preview", "name": "result_preview", "description": "Truncated tool result payload.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "result_preview"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/result_bytes", "name": "result_bytes", "description": "Byte length of the full tool result before truncation.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "result_bytes"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/tool_result_index", "name": "tool_result_index", "description": "Position of this result within its iteration.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "tool_result_index"}}}
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "rewritten_fragments",
+      "name": "rewritten_fragments",
+      "description": "Adversarially rewritten fragment prompts (GATED, hosted in the companion restricted repository). Produced by iterative prompt-space rewriting against single-turn safety judges, with no policy learning or parameter updates. Fully LLM-generated text.",
+      "field": [
+        {"@type": "cr:Field", "@id": "rewritten_fragments/campaign", "name": "campaign", "description": "Campaign identifier the fragment belongs to.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "rl-outputs-manual"}, "extract": {"column": "campaign"}}},
+        {"@type": "cr:Field", "@id": "rewritten_fragments/prompt", "name": "prompt", "description": "Rewritten fragment prompt text.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "rl-outputs-manual"}, "extract": {"column": "prompt"}}},
+        {"@type": "cr:Field", "@id": "rewritten_fragments/style", "name": "style", "description": "Style label applied to the fragment.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "rl-outputs-manual"}, "extract": {"column": "style"}}}
+      ]
+    },
     {
       "@type": "cr:RecordSet",
       "dataType": "cr:Split",
@@ -210,16 +361,16 @@
       "field": [
         {"@type": "cr:Field", "@id": "attack_meta_splits/split_name", "dataType": "sc:Text"}
       ],
-      "data": [{"attack_meta_splits/split_name": "train"}]
+      "data": [
+        {"attack_meta_splits/split_name": "train"}
+      ]
     },
     {
       "@type": "cr:RecordSet",
       "@id": "attack_meta",
       "description": "anon-fragbench-neurips/fragbench - 'attack_meta' subset. One row per attack pipeline run; describes which campaign, style, target model, and judge model were used.",
       "field": [
-        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text",
-         "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}},
-         "references": {"field": {"@id": "attack_meta_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "attack_meta_splits/split_name"}}},
         {"@type": "cr:Field", "@id": "attack_meta/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "source_file"}}},
         {"@type": "cr:Field", "@id": "attack_meta/run_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "run_id"}}},
         {"@type": "cr:Field", "@id": "attack_meta/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "campaign"}}},
@@ -246,16 +397,16 @@
       "field": [
         {"@type": "cr:Field", "@id": "campaign_fragments_splits/split_name", "dataType": "sc:Text"}
       ],
-      "data": [{"campaign_fragments_splits/split_name": "train"}]
+      "data": [
+        {"campaign_fragments_splits/split_name": "train"}
+      ]
     },
     {
       "@type": "cr:RecordSet",
       "@id": "campaign_fragments",
       "description": "anon-fragbench-neurips/fragbench - 'campaign_fragments' subset. One row per fragment within a campaign variation. Includes the parent tactic, parent prompt, produced and consumed artefacts (JSON-encoded), and stylised variations.",
       "field": [
-        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text",
-         "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}},
-         "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}},
+        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}},
         {"@type": "cr:Field", "@id": "campaign_fragments/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "source_file"}}},
         {"@type": "cr:Field", "@id": "campaign_fragments/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign"}}},
         {"@type": "cr:Field", "@id": "campaign_fragments/variant", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variant"}}},
@@ -271,5 +422,6 @@
         {"@type": "cr:Field", "@id": "campaign_fragments/variations", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variations"}}}
       ]
     }
-  ]
+  ],
+  "rai:hasSyntheticData": true
 }
