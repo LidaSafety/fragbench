@@ -315,8 +315,18 @@ def _build_authored_fragment_groups(seed_data: dict, gen, seed: int):
         if authored:
             sub_fragments = [_safe_format(f["prompt"], resolved) for f in authored]
             roles = [f.get("role", "") for f in authored]
-            produces = [list(f.get("produces", [])) for f in authored]
-            consumes = [list(f.get("consumes", [])) for f in authored]
+            # Artifact names may themselves be templated (e.g. a per-variation
+            # filename discriminator), so they resolve through the same
+            # substitution as the prompts — otherwise attack_runner would try to
+            # match a literal placeholder when wiring produces -> consumes.
+            produces = [
+                [_safe_format(p, resolved) for p in f.get("produces", [])]
+                for f in authored
+            ]
+            consumes = [
+                [_safe_format(c, resolved) for c in f.get("consumes", [])]
+                for f in authored
+            ]
         else:
             sub_fragments = [parent_step]
             roles = []
@@ -496,6 +506,7 @@ async def run_generate(args) -> None:
     gen = VARIATION_REGISTRY[campaign_id](args.seed_file)
     api_key = args.claude_key if not args.dry_run else None
     base_seed = args.seed if args.seed is not None else _random.randint(0, 2**31)
+    is_benign = bool(seed_data["metadata"].get("benign", False))
 
     # Parse style filter
     styles = None
@@ -524,7 +535,8 @@ async def run_generate(args) -> None:
     use_templates = args.style_templates is not False
 
     print(f"Generating {args.num_variations} variation(s) "
-          f"[campaign={campaign_id.upper()}, base_seed={base_seed}]")
+          f"[campaign={campaign_id.upper()}, base_seed={base_seed}"
+          f"{', benign' if is_benign else ''}]")
     print(f"  Styles: {', '.join(styles or STYLES)}")
 
     final_frag_list: list[list] = []
@@ -572,6 +584,7 @@ async def run_generate(args) -> None:
                 styles=styles,
                 api_key=stylize_api_key,
                 semaphore=sem,
+                benign=is_benign,
             )
             for fragment_group in groups_to_stylize
         ])

@@ -690,7 +690,9 @@ frags=d.get("fragments") or []; \
 # =========================================================================
 
 DATASET_N ?= 10
-DATASET_BASE_SEED ?= 1000
+# Every released campaign numbers its variations from 0 upwards; keep the
+# default aligned so benign and malicious campaigns share one convention.
+DATASET_BASE_SEED ?= 0
 ATTACKS_DIR ?= attacks
 
 # Generator LLM settings (used by run.py --generate when --fragment/--legitimize)

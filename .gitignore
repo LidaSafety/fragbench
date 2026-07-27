@@ -19,3 +19,20 @@ logs/*.jsonl
 /fragbench-structural-graph/fragbench_dataset_generator/fragbench_pack/rl_checkpoints/disclosure/
 .env
 fragbench-structural-graph/runs/
+
+dataset/dataset_staging/
+benign_executed*.json
+.venv-graph/
+results_arm_*.json
+results_harness_*.json
+ablation_*.json
+per_campaign_test*.csv
+results_percampaign_*.json
+*_per_campaign.csv
+
+# corpora and derived artefacts: rsynced to the training hosts, never committed
+/dataset/
+/results/quarantine_dead/
+results_loco_*.json
+# ssh keys for the training hosts
+*.pem
