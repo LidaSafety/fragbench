@@ -20,4 +20,5 @@ logs/*.jsonl
 .env
 fragbench-structural-graph/runs/
 
-dataset/
+dataset/dataset_staging/
+benign_executed*.json
