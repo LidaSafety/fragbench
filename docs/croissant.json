@@ -56,7 +56,7 @@
     "anon-fragbench-neurips/fragbench",
     "FragBench"
   ],
-  "description": "FragBench is a benchmark for evaluating cross-session, fragmented attacks on LLM agents that use tools through the Model Context Protocol (MCP). A malicious campaign is broken into small fragments spread across separate sessions, and a defender has to reconstruct the intent from a typed event graph.\n\nMuch of the dataset is synthetic, and none of it is captured from real user activity. The campaign seeds were written by the authors from published cyber-incident reports, with domain experts consulted and an LLM used to scale the drafting. Campaign variants come from deterministic template expansion of those seeds. The adversarially rewritten fragments are LLM output. The tool-call traces are genuine execution logs, but the actor ran against mock MCP servers inside a sandbox, never against real systems.\n\nBenign objectives were written, expanded by the same generator, and run through the same harness, actor and sandbox as the malicious side, so the two halves differ only in what the objective was.\n\nA gated companion dataset (anon-fragbench-neurips/fragbench-restricted) holds the rewriter system prompts and judge rubrics.",
+  "description": "FragBench is a benchmark for evaluating cross-session, fragmented attacks on LLM agents that use tools through the Model Context Protocol (MCP). A malicious campaign is broken into small fragments spread across separate sessions, and a defender has to reconstruct the intent from a typed event graph.\n\nMuch of the dataset is synthetic and none of it is captured from real user activity. The campaign seeds were written by the authors from published incident reports, with domain experts consulted and an LLM used to scale the drafting. Campaign variants come from deterministic template expansion of those seeds, and the adversarially rewritten fragments are LLM output. The tool-call traces are genuine execution logs, but the actor ran against mock MCP servers in a sandbox, never against real systems. Both the malicious and the benign sessions were executed the same way, so the two halves differ only in the objective. See rai:dataLimitations.\n\nA gated companion dataset (anon-fragbench-neurips/fragbench-restricted) holds the rewriter system prompts and judge rubrics.",
   "url": "https://huggingface.co/datasets/anon-fragbench-neurips/fragbench",
   "version": "1.1.0",
   "datePublished": "2026-07-27",
@@ -97,38 +97,32 @@
       "@type": "prov:Activity",
       "@id": "activity-seed-authoring",
       "name": "Incident-report-derived campaign seeds (author-written, LLM-assisted)",
-      "description": "The authors distilled 35 published cyber-incident reports, catalogued in Appendix F of the paper, into 24 campaign seeds. Domain experts were consulted on the threat scenarios, and an LLM (Claude Opus) was used to scale the drafting; each seed was checked back against its source report. The same approach produced the benign campaign seeds later, so both halves of the corpus were written the same way. The counts differ because only 24 of the 35 incidents could be expressed as a complete, executable multi-stage sequence. A seed lays out an ordered sequence of adversary steps, what security practitioners call a kill chain: reconnaissance, then initial access, and so on through to the final objective. Seeds are abstractions rather than copies, and no incident-report text is redistributed.",
+      "description": "The authors distilled 35 published cyber-incident reports, catalogued in Appendix F of the paper, into 24 campaign seeds. Domain experts were consulted on the threat scenarios and an LLM (Claude Opus) was used to scale the drafting, with each seed checked back against its source report. The same approach produced the benign seeds, so both halves of the corpus were written the same way. Only 24 of the 35 incidents could be expressed as a complete, executable multi-stage sequence, which is why the counts differ. A seed lays out an ordered sequence of adversary steps, what security practitioners call a kill chain. Seeds are abstractions rather than copies, and no incident-report text is redistributed.",
       "prov:used": "https://anonymous.4open.science/r/fragbench-FE86/seeds/"
     },
     {
       "@type": "prov:Activity",
       "@id": "activity-synthetic-generation",
       "name": "Generated campaign variants (machine-generated)",
-      "description": "Each seed expands into many fragment sequences by deterministic template substitution over per-variation variables (run.py --generate). No model is called on this path, so any variant can be reproduced from its seed file and seed integer. Individual fragments are optionally restyled by Claude Haiku 4.5. Nothing here corresponds to observed activity."
+      "description": "Each seed expands into many fragment sequences by deterministic template substitution (run.py --generate). No model is called on this path, so any variant is reproducible from its seed file and seed integer. Individual fragments are optionally restyled by Claude Haiku 4.5."
     },
     {
       "@type": "prov:Activity",
       "@id": "activity-adversarial-rewriting",
       "name": "Adversarially rewritten fragments (LLM-generated)",
-      "description": "A rewriter model proposes a reworded fragment, a safety judge scores it, and the loop repeats for a bounded number of rounds. This is a search over prompt text: nothing is learned and no parameters change, so earlier descriptions of it as reinforcement learning were inaccurate. Rewriters were Claude Sonnet 4.6, Claude Opus 4.7 and DeepSeek V4 Flash; judges were gpt-oss:20b, Claude Sonnet 4.6, Claude Opus 4.7, Llama-Guard-4-12B and GPT-4.1-mini. The output is entirely model-written."
+      "description": "A rewriter model proposes a reworded fragment, a safety judge scores it, and the loop repeats for a bounded number of rounds. This is a search over prompt text: nothing is learned and no parameters change, so earlier descriptions of it as reinforcement learning were inaccurate. Rewriters were Claude Sonnet 4.6, Claude Opus 4.7 and DeepSeek V4 Flash; judges were gpt-oss:20b, Claude Sonnet 4.6, Claude Opus 4.7, Llama-Guard-4-12B and GPT-4.1-mini."
     },
     {
       "@type": "prov:Activity",
       "@id": "activity-mcp-validation",
       "name": "Executed malicious tool-call traces (sandboxed execution)",
-      "description": "Fragment assemblies were run end to end in a Docker Compose sandbox of 24 MCP tool servers, with qwen/qwen3.5-122b-a10b via OpenRouter as the actor. These are real tool-call sequences from a model, which is what separates them from the fabricated benign traces. They are not observations of real systems: every server is a mock, the filesystem is a sandbox, and nothing external was contacted. Outcomes are recorded as they happened rather than filtered down to successes. Assemblies that hit known harness failure modes were re-run or had their seed prompts fixed, and the failure rate that remains is reported in the paper."
+      "description": "Malicious fragment assemblies were run end to end in a Docker Compose sandbox of 24 MCP tool servers, with qwen/qwen3.5-122b-a10b via OpenRouter as the actor. These are not observations of real systems: every server is a mock and nothing external was contacted. Outcomes are recorded as they happened rather than filtered down to successes."
     },
     {
       "@type": "prov:Activity",
       "@id": "activity-benign-execution",
       "name": "Executed benign control sessions (sandboxed execution)",
-      "description": "The negative class as of v1.1.0. The authors wrote 24 benign campaigns covering ordinary IT and office work, such as onboarding a cohort, reconciling a storage inventory or preparing a compliance review, using the same seed schema and the same authoring approach as the malicious campaigns. Task mix was chosen to match what the earlier fabricated corpus covered. The same variation driver and prompt generator expanded them along the same two axes, 6 surface styles by 9 random seeds, for 1,296 objectives. Every one was executed rather than simulated: one fragment becomes one session, and the same actor (qwen/qwen3.5-122b-a10b via OpenRouter, temperature 1.0, max_tokens 6500) calls the same 24 MCP servers in the same sandbox, logged by the same tracer. The safety judge was switched off, since it scores completion of a malicious objective and means nothing here; it never touches the tool trace, which is all the detector reads. Chains with empty sessions were dropped, leaving a campaign-stratified sample of 514 chains and 77,176 events, against 55,274 for the malicious class. The point of the corpus is that benign and malicious data now differ only in the objective: generator, expansion path, styles, sandbox, actor and log schema are all held the same."
-    },
-    {
-      "@type": "prov:Activity",
-      "@id": "activity-benign-synthesis",
-      "name": "Superseded fabricated benign sessions (v1.0.0)",
-      "description": "Claude Opus generated these directly, prompted to produce a similar-looking data structure conditioned on the malicious side's tool mix, byte distributions and chain lengths. They were never run through the harness. They were the negative class behind the v1.0.0 results and are kept only so those numbers stay reproducible. They are not a like-for-like control, because they differ from the malicious class in how they were produced as well as in objective. Use the executed benign corpus instead."
+      "description": "The authors wrote 24 benign campaigns covering ordinary IT and office work, using the same seed schema and authoring approach as the malicious ones. The same generator expanded them along the same two axes, 6 styles by 9 seeds, for 1,296 objectives, and every one was executed rather than simulated: one fragment per session, same actor, same 24 servers, same sandbox, same tracer. The safety judge was switched off, since it scores completion of a malicious objective and never touches the tool trace. Chains with empty sessions were dropped, leaving a campaign-stratified sample of 514 chains and 77,176 events against 55,274 malicious. The point is that the two halves now differ only in the objective."
     }
   ],
   "rai:dataCollection": "Seed campaigns were transcribed from publicly disclosed cyber-incident reports published by frontier AI vendors and security researchers (e.g. operator-published threat reports about misuse of LLM agents). Each seed defines a high-level malicious objective and a small set of parent tactics. Seeds were rewritten through a bootstrap, then learned, then creative iterative adversarial rewriting loop using a frontier LLM to produce stylised fragment sequences. This loop is a search over prompt text: no policy is learned and no model parameters are updated. A single-token classifier-mode LLM judge selected variants that increased pass rate against target models while preserving the original objective.",
@@ -136,11 +130,11 @@
     "Synthetic",
     "Other"
   ],
-  "rai:dataCollectionTypeOthers": "Mostly synthetic, from several sources that prov:wasGeneratedBy lists separately. The campaign seeds are the authors' own writing, distilled from published incident reports with domain-expert input and LLM assistance for scale. Campaign variants and rewritten fragments are entirely machine-generated. The tool-call traces are real execution logs, though the servers behind them are mocks. One earlier benign corpus was fabricated outright by Claude Sonnet 4.5 and never executed.",
+  "rai:dataCollectionTypeOthers": "Mostly synthetic, from several sources that prov:wasGeneratedBy lists separately. The campaign seeds are the authors' own writing, distilled from published incident reports with domain-expert input and LLM assistance for scale. Campaign variants and rewritten fragments are entirely machine-generated. The tool-call traces are real execution logs, though the servers behind them are mocks.",
   "rai:dataCollectionTimeframe": {
     "@type": "sc:DateTime",
     "startDate": "2026-02-01",
-    "endDate": "2026-05-01"
+    "endDate": "2026-07-27"
   },
   "rai:dataCollectionRawData": "Public cyber-incident reports describing real-world misuse of LLM agents. The benchmark stores rewritten fragment sequences and per-fragment LLM-judge verdicts; raw incident-report text is not redistributed.",
   "rai:dataCollectionMissingData": "No human subject data is collected; missingness is not applicable. Some campaigns have fewer variants than others where the rewriting loop could not produce judge-passing variants without violating fidelity to the seed objective.",
@@ -169,24 +163,21 @@
     "English-only: all fragment prompts, model responses, and judge rubrics are in English.",
     "Coverage skew: campaigns over-represent LLM-confirmed incidents disclosed by frontier-API vendors; coverage of non-frontier attacker ecosystems and lower-resource languages is limited.",
     "Judge dependence: per-fragment verdicts are produced by a single LLM judge (Claude Haiku 4.5) and inherit its blind spots. Detectors trained against this judge may transfer imperfectly to systems using different judges or human reviewers.",
-    "The v1.0.0 benign controls were never executed. That negative class was written by an LLM in the shape of execution logs rather than run through the harness, so a detection score against it mixes together two questions: whether the model spots compositional harm, and whether it can tell two generation processes apart. This is why the executed benign corpus was added in v1.1.0, and the fabricated one is kept only for continuity with the published results. Retraining the same detectors against the executed corpus drops event-level F1 for every model, by between 0.047 and 0.208 depending on architecture, which is the size of the shortcut the old comparison carried.",
-    "Chain length is partly class-separating in the superseded corpus. Its benign chains take only the lengths 7, 8 and 10, and length 8 accounts for 262 of 514 chains, while malicious chains run from 2 to 12. The executed corpus fixes this: 10 fragments is the most common length on both sides, at 50.2 percent benign and 46.5 percent malicious.",
-    "Volume differences remain in the executed corpus. Even with the pipeline held identical, benign objectives make more tool calls per chain (75.1 against 48.7, Cohen's d -0.97) across more sessions (10.6 against 8.2, d -0.85) and reuse files within a chain more often (0.59 against 0.42, d -0.90), while malicious arguments have a longer tail (p90 6,944 against 3,216 characters, d +0.86). Completing a legitimate task simply takes more steps. These are behavioural differences rather than artifacts of provenance, since both corpora now come off one pipeline, but they are large: a gradient-boosted classifier over these summary statistics tells the two corpora apart at chain level with AUC 0.997, and matching on chain length and tool count barely dents it. Do not treat the executed corpus as fully distribution-matched. Length- and count-matched subsampling, and a run with count features masked, are the controls to use.",
-    "Benign cross-chain resource sharing is a design choice, not a measurement. Some artifact names in the benign seeds are shared across chains on purpose, while each chain's main deliverables carry per-variation discriminators. Giving every name a discriminator had pushed cross-chain sharing to zero, which would itself have separated the classes on the detector's shared_resource edge. The trade-off is that the benign sharing rate is something we set rather than something we observed.",
-    "Static snapshot: the public tier is a frozen v1.0.0 snapshot. Attacker tactics and defender capabilities will continue to evolve.",
+    "Volume differences remain between the two corpora. Benign objectives make more tool calls across more sessions and reuse files within a chain more often, while malicious arguments have a longer tail; completing a legitimate task takes more steps than abandoning an illegitimate one. These are behavioural differences rather than artifacts of provenance, since both corpora come off one pipeline, but they are large enough that a classifier over simple summary statistics separates the corpora at chain level. Do not treat the corpora as fully distribution-matched; effect sizes and the matched-subsample controls are reported in the paper.",
+    "Benign cross-chain resource sharing is a design choice rather than a measurement. Some artifact names in the benign seeds are shared across chains on purpose, while each chain's main deliverables carry per-variation discriminators. Giving every name a discriminator had pushed cross-chain sharing to zero, which would itself have separated the classes on the detector's shared_resource edge.",
+    "Static snapshot: the public tier is a frozen v1.1.0 snapshot. Attacker tactics and defender capabilities will continue to evolve.",
     "Not for direct deployment as offensive tooling; not for targeting individuals, organisations, or infrastructure without authorisation."
   ],
   "rai:dataBiases": [
     "Source bias: seed campaigns are biased toward incidents that frontier-API providers chose to disclose publicly, which may over-represent high-visibility threat actors and under-represent lower-profile attackers.",
     "Stylistic bias: all adversarially rewritten variants are produced by a single frontier LLM family, so stylistic diversity is bounded by that model's prior.",
-    "Class-provenance bias in the superseded corpus. Its malicious side is executed tool-call traces while its benign side is model-fabricated, so the two differ in how they were made. Placeholder session identifiers appear in 30.6 percent of benign events and none of the malicious ones; tool_call_index is '1/1' for 99.6 percent of benign calls against 77.1 percent; the tool-result failure rate is 0.5 percent against 3.7 percent; and 99.9 percent of benign paths are absolute against 42.6 percent. A classifier can pick up any of these without modelling composition at all. The executed benign corpus closes all four, which is why it should be preferred.",
     "Judge bias: the single-token classifier judge inherits the safety preferences and refusal patterns of its underlying LLM (Claude Haiku 4.5).",
     "Language bias: English-only.",
     "Domain bias: campaigns concentrate on financial fraud, credential theft, deepfake-enabled identity fraud, and malware-development assistance; other harm categories are under-represented."
   ],
   "rai:dataSocialImpact": "FragBench is dual-use. Its intended impact is to enable academic research on detecting cross-session, fragmented jailbreak attacks against LLM agents, and to support development of defensive classifiers and guardrails. The same fragment sequences can in principle be reused as offensive prompts. To mitigate this, the most sensitive components (rewriter system prompts, judge-rubric configurations, and high-yield variant traces) are placed behind a manual access-review gate in a companion dataset; only the lower-yield public tier is openly accessible. We follow the standard practice for security benchmarks (HarmBench, JailbreakBench) of tiered release.",
   "rai:personalSensitiveInformation": "None. All prompts, identities, and tool arguments are synthetic. Recipient profiles, account names, file paths, and any apparent personal identifiers in fragment prompts are fabricated for the benchmark and do not correspond to real individuals or organisations. No private user data was collected.",
-  "rai:dataReleaseMaintenancePlan": "Versioned via the HuggingFace dataset (v1.0.0 as of 2026-05-07). Errata, additional campaigns, and judge-rubric updates will be released as new minor versions on the same dataset URL. The sensitive rewriter system prompts and judge-rubric configurations are released separately under request-access at the gated companion dataset: https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted. Maintainer contact will be restored at camera-ready; for the double-blind review period, please open an issue on the HuggingFace dataset page.",
+  "rai:dataReleaseMaintenancePlan": "Versioned via the HuggingFace dataset (v1.1.0 as of 2026-07-27). Errata, additional campaigns, and judge-rubric updates will be released as new minor versions on the same dataset URL. The sensitive rewriter system prompts and judge-rubric configurations are released separately under request-access at the gated companion dataset: https://huggingface.co/datasets/anon-fragbench-neurips/fragbench-restricted. Maintainer contact will be restored at camera-ready; for the double-blind review period, please open an issue on the HuggingFace dataset page.",
   "distribution": [
     {
       "@type": "cr:FileObject",
@@ -211,9 +202,7 @@
       "@id": "parquet-files-for-config-attack_meta",
       "name": "parquet-files-for-config-attack_meta",
       "description": "Per-run metadata for executed attack pipelines. Generated by executing attack pipelines: one row per harness run, recording the campaign, style, actor model and judge model used.",
-      "containedIn": {
-        "@id": "repo"
-      },
+      "containedIn": {"@id": "repo"},
       "encodingFormat": "application/x-parquet",
       "includes": "attack_meta/*/*.parquet",
       "prov:wasGeneratedBy": {
@@ -225,9 +214,7 @@
       "@id": "parquet-files-for-config-campaign_fragments",
       "name": "parquet-files-for-config-campaign_fragments",
       "description": "Fragment sequences per campaign variant. Machine-generated by deterministic expansion from the campaign seeds, with fragment text optionally rewritten by the adversarial rewriting loop. Fully synthetic.",
-      "containedIn": {
-        "@id": "repo"
-      },
+      "containedIn": {"@id": "repo"},
       "encodingFormat": "application/x-parquet",
       "includes": "campaign_fragments/*/*.parquet",
       "prov:wasGeneratedBy": [
@@ -249,37 +236,19 @@
       "prov:wasGeneratedBy": {
         "@id": "activity-mcp-validation"
       },
-      "containedIn": {
-        "@id": "repo-main"
-      }
+      "containedIn": {"@id": "repo-main"}
     },
     {
       "@type": "cr:FileSet",
       "@id": "benign-sessions",
       "name": "benign-sessions",
-      "description": "Benign cover sessions forming the NEGATIVE class, one JSONL per chain (session_chain_<id>_s<n>.jsonl). Superseded and model-fabricated: generated directly by Claude Sonnet 4.5 in the shape of execution logs, conditioned on the malicious side's tool mix, byte distributions and chain lengths. They were never run through the harness, so they differ from the malicious class in generation process as well as in objective. See rai:dataLimitations before using them as a negative class.",
-      "encodingFormat": "application/jsonlines",
-      "includes": "benign/*.jsonl",
-      "prov:wasGeneratedBy": {
-        "@id": "activity-benign-synthesis"
-      },
-      "containedIn": {
-        "@id": "repo-main"
-      }
-    },
-    {
-      "@type": "cr:FileSet",
-      "@id": "executed-benign-sessions",
-      "name": "executed-benign-sessions",
-      "description": "Executed benign control sessions (v1.1.0), one JSONL per fragment session. Benign objectives run through the same MCP harness, actor model, sandbox and tracer as the malicious class, so the two corpora differ in objective alone. 514 chains, 77,176 events, campaign-stratified from 1,296 executed objectives after discarding chains containing empty sessions. This is the negative class to use for detector evaluation. The superseded fabricated corpus (@id benign-sessions) is retained for continuity with the v1.0.0 published results but is not a like-for-like control.",
+      "description": "Benign control sessions, one JSONL per fragment session. Benign objectives were run through the same MCP harness, actor, sandbox and tracer as the malicious side, so the two corpora differ only in the objective. 514 chains and 77,176 events, drawn campaign-stratified from 1,296 executed objectives after dropping chains with empty sessions.",
       "encodingFormat": "application/jsonlines",
       "includes": "benign_executed/*.jsonl",
       "prov:wasGeneratedBy": {
         "@id": "activity-benign-execution"
       },
-      "containedIn": {
-        "@id": "repo-main"
-      }
+      "containedIn": {"@id": "repo-main"}
     },
     {
       "@type": "cr:FileSet",
@@ -299,609 +268,42 @@
       "@type": "cr:RecordSet",
       "@id": "session_events",
       "name": "session_events",
-      "description": "Tool-call event stream for the MALICIOUS class, one record per line of each session JSONL. The 'event' field discriminates the record kind; tool_call and tool_result records carry the tool-use payload the detector consumes, and session_start / session_end / iteration_start / llm_response_received / user_query / assistant_response / query_complete / toolkits_connected / verdict records carry harness bookkeeping. Fields below are those present on tool_call and tool_result records.",
+      "description": "Tool-call event stream for the malicious class, one record per line of each session JSONL. The 'event' field gives the record kind; tool_call and tool_result carry the payload the detector consumes, and the rest are harness bookkeeping. The fields below are those on tool_call and tool_result records.",
       "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/seq",
-          "name": "seq",
-          "description": "Monotonic event index within the session.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "seq"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/ts",
-          "name": "ts",
-          "description": "ISO-8601 event timestamp.",
-          "dataType": "sc:DateTime",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "ts"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/event",
-          "name": "event",
-          "description": "Record kind, e.g. tool_call, tool_result, session_start, verdict.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "event"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/session_id",
-          "name": "session_id",
-          "description": "Identifier of the session this event belongs to; the unit across which fragmentation is measured.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "session_id"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/iteration",
-          "name": "iteration",
-          "description": "Actor loop iteration that produced the event (budget 16 per fragment).",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "iteration"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/tool",
-          "name": "tool",
-          "description": "MCP tool name invoked.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "tool"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/arguments",
-          "name": "arguments",
-          "description": "Serialized tool-call arguments. Cross-session shared_resource edges are derived from paths and URLs extracted from this field.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "arguments"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/arguments_bytes",
-          "name": "arguments_bytes",
-          "description": "Byte length of the serialized arguments.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "arguments_bytes"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/tool_call_index",
-          "name": "tool_call_index",
-          "description": "Position of this call within its iteration, formatted 'n/m'.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "tool_call_index"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/success",
-          "name": "success",
-          "description": "Whether the tool result reported success. Present on tool_result records.",
-          "dataType": "sc:Boolean",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "success"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/result_preview",
-          "name": "result_preview",
-          "description": "Truncated tool result payload.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "result_preview"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/result_bytes",
-          "name": "result_bytes",
-          "description": "Byte length of the full tool result before truncation.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "result_bytes"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "session_events/tool_result_index",
-          "name": "tool_result_index",
-          "description": "Position of this result within its iteration, formatted 'n/m'.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "sessions"
-            },
-            "extract": {
-              "column": "tool_result_index"
-            }
-          }
-        }
+        {"@type": "cr:Field", "@id": "session_events/seq", "name": "seq", "description": "Monotonic event index within the session.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "seq"}}},
+        {"@type": "cr:Field", "@id": "session_events/ts", "name": "ts", "description": "ISO-8601 event timestamp.", "dataType": "sc:DateTime", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "ts"}}},
+        {"@type": "cr:Field", "@id": "session_events/event", "name": "event", "description": "Record kind, e.g. tool_call, tool_result, session_start, verdict.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "event"}}},
+        {"@type": "cr:Field", "@id": "session_events/session_id", "name": "session_id", "description": "Identifier of the session this event belongs to; the unit across which fragmentation is measured.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "session_id"}}},
+        {"@type": "cr:Field", "@id": "session_events/iteration", "name": "iteration", "description": "Actor loop iteration that produced the event (budget 16 per fragment).", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "iteration"}}},
+        {"@type": "cr:Field", "@id": "session_events/tool", "name": "tool", "description": "MCP tool name invoked.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "tool"}}},
+        {"@type": "cr:Field", "@id": "session_events/arguments", "name": "arguments", "description": "Serialized tool-call arguments.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "arguments"}}},
+        {"@type": "cr:Field", "@id": "session_events/arguments_bytes", "name": "arguments_bytes", "description": "Byte length of the serialized arguments.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "arguments_bytes"}}},
+        {"@type": "cr:Field", "@id": "session_events/tool_call_index", "name": "tool_call_index", "description": "Position of this call within its iteration, formatted 'n/m'.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "tool_call_index"}}},
+        {"@type": "cr:Field", "@id": "session_events/success", "name": "success", "description": "Whether the tool result reported success. Present on tool_result records.", "dataType": "sc:Boolean", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "success"}}},
+        {"@type": "cr:Field", "@id": "session_events/result_preview", "name": "result_preview", "description": "Truncated tool result payload.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "result_preview"}}},
+        {"@type": "cr:Field", "@id": "session_events/result_bytes", "name": "result_bytes", "description": "Byte length of the full tool result before truncation.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "result_bytes"}}},
+        {"@type": "cr:Field", "@id": "session_events/tool_result_index", "name": "tool_result_index", "description": "Position of this result within its iteration, formatted 'n/m'.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "sessions"}, "extract": {"column": "tool_result_index"}}}
       ]
     },
     {
       "@type": "cr:RecordSet",
       "@id": "benign_session_events",
       "name": "benign_session_events",
-      "description": "Tool-call event stream for the SUPERSEDED fabricated benign class (v1.0.0), one record per line of each benign session JSONL. Schema is identical to session_events by construction, because the generator was prompted to emit the same structure. Superseded and model-fabricated: Claude Sonnet 4.5 wrote these records; nothing was executed to produce them, so they should not be read as execution logs. see rai:dataLimitations for the measured distributional differences from the executed malicious class.",
+      "description": "Tool-call event stream for the benign control class, one record per line of each benign session JSONL. The harness writes this, so the schema matches session_events exactly.",
       "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/seq",
-          "name": "seq",
-          "description": "Monotonic event index within the chain.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "seq"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/ts",
-          "name": "ts",
-          "description": "ISO-8601 event timestamp (fabricated).",
-          "dataType": "sc:DateTime",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "ts"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/event",
-          "name": "event",
-          "description": "Record kind, tool_call or tool_result.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "event"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/session_id",
-          "name": "session_id",
-          "description": "Session identifier. Note that 30.6 percent of benign events carry placeholder UUIDs of the form a1b2c3d4-..., an artifact of synthesis absent from the executed malicious class.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "session_id"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/iteration",
-          "name": "iteration",
-          "description": "Nominal actor loop iteration.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "iteration"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/tool",
-          "name": "tool",
-          "description": "MCP tool name.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "tool"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/arguments",
-          "name": "arguments",
-          "description": "Serialized tool-call arguments. 99.9 percent of paths here are absolute /workspace/... paths, against 42.6 percent in the executed malicious class.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "arguments"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/arguments_bytes",
-          "name": "arguments_bytes",
-          "description": "Byte length of the serialized arguments.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "arguments_bytes"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/tool_call_index",
-          "name": "tool_call_index",
-          "description": "Position within iteration. 99.6 percent are '1/1', against 77.1 percent in the executed malicious class.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "tool_call_index"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/success",
-          "name": "success",
-          "description": "Reported tool success. The benign failure rate is 0.5 percent against 3.7 percent for the executed malicious class.",
-          "dataType": "sc:Boolean",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "success"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/result_preview",
-          "name": "result_preview",
-          "description": "Truncated tool result payload.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "result_preview"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/result_bytes",
-          "name": "result_bytes",
-          "description": "Byte length of the full result before truncation.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "result_bytes"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "benign_session_events/tool_result_index",
-          "name": "tool_result_index",
-          "description": "Position of this result within its iteration.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "benign-sessions"
-            },
-            "extract": {
-              "column": "tool_result_index"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "@type": "cr:RecordSet",
-      "@id": "executed_benign_session_events",
-      "name": "executed_benign_session_events",
-      "description": "Tool-call event stream for the executed benign control class (v1.1.0). Schema is identical to session_events because the harness writes it, not a generator. Executing the benign side closes the four generation tells that separated the fabricated corpus from the malicious class (placeholder session identifiers, tool_call_index distribution, tool-result failure rate and absolute-path share) and removes the chain-length-8 artifact: the modal chain is 10 fragments in both corpora, at 50.2 percent benign and 46.5 percent malicious. Residual differences are behavioural rather than procedural and are documented in rai:dataLimitations.",
-      "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/seq",
-          "name": "seq",
-          "description": "Monotonic event index within the session.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "seq"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/ts",
-          "name": "ts",
-          "description": "ISO-8601 event timestamp, emitted by the harness at execution time.",
-          "dataType": "sc:DateTime",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "ts"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/event",
-          "name": "event",
-          "description": "Record kind, e.g. tool_call, tool_result, session_start.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "event"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/session_id",
-          "name": "session_id",
-          "description": "Harness-assigned session identifier. Unlike the superseded fabricated corpus, no placeholder identifiers appear.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "session_id"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/iteration",
-          "name": "iteration",
-          "description": "Actor loop iteration that produced the event.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "iteration"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/tool",
-          "name": "tool",
-          "description": "MCP tool name invoked. The two corpora share 23 of 26 tools, with a tool-frequency Jensen-Shannon divergence of 0.065 bits.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "tool"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/arguments",
-          "name": "arguments",
-          "description": "Serialized tool-call arguments, JSON in both corpora. Cross-session shared_resource edges are derived from paths and URLs extracted from this field.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "arguments"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/arguments_bytes",
-          "name": "arguments_bytes",
-          "description": "Byte length of the serialized arguments. Benign p90 is 3,216 characters against 6,944 for the malicious class.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "arguments_bytes"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/tool_call_index",
-          "name": "tool_call_index",
-          "description": "Position of this call within its iteration, formatted 'n/m'.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "tool_call_index"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/success",
-          "name": "success",
-          "description": "Whether the tool result reported success. Benign 96.7 percent against malicious 95.4 percent.",
-          "dataType": "sc:Boolean",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "success"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/result_preview",
-          "name": "result_preview",
-          "description": "Truncated tool result payload.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "result_preview"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/result_bytes",
-          "name": "result_bytes",
-          "description": "Byte length of the full tool result before truncation.",
-          "dataType": "sc:Integer",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "result_bytes"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "executed_benign_session_events/tool_result_index",
-          "name": "tool_result_index",
-          "description": "Position of this result within its iteration.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "executed-benign-sessions"
-            },
-            "extract": {
-              "column": "tool_result_index"
-            }
-          }
-        }
+        {"@type": "cr:Field", "@id": "benign_session_events/seq", "name": "seq", "description": "Monotonic event index within the session.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "seq"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/ts", "name": "ts", "description": "ISO-8601 event timestamp, emitted by the harness at execution time.", "dataType": "sc:DateTime", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "ts"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/event", "name": "event", "description": "Record kind, e.g. tool_call, tool_result, session_start.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "event"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/session_id", "name": "session_id", "description": "Harness-assigned session identifier.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "session_id"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/iteration", "name": "iteration", "description": "Actor loop iteration that produced the event.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "iteration"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/tool", "name": "tool", "description": "MCP tool name invoked.065 bits.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "tool"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/arguments", "name": "arguments", "description": "Serialized tool-call arguments, JSON in both corpora.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "arguments"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/arguments_bytes", "name": "arguments_bytes", "description": "Byte length of the serialized arguments.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "arguments_bytes"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/tool_call_index", "name": "tool_call_index", "description": "Position of this call within its iteration, formatted 'n/m'.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "tool_call_index"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/success", "name": "success", "description": "Whether the tool result reported success.4 percent.", "dataType": "sc:Boolean", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "success"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/result_preview", "name": "result_preview", "description": "Truncated tool result payload.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "result_preview"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/result_bytes", "name": "result_bytes", "description": "Byte length of the full tool result before truncation.", "dataType": "sc:Integer", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "result_bytes"}}},
+        {"@type": "cr:Field", "@id": "benign_session_events/tool_result_index", "name": "tool_result_index", "description": "Position of this result within its iteration.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "benign-sessions"}, "extract": {"column": "tool_result_index"}}}
       ]
     },
     {
@@ -910,74 +312,23 @@
       "name": "rewritten_fragments",
       "description": "Adversarially rewritten fragment prompts (GATED, hosted in the companion restricted repository). Produced by iterative prompt-space rewriting against single-turn safety judges, with no policy learning or parameter updates. Fully LLM-generated text.",
       "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "rewritten_fragments/campaign",
-          "name": "campaign",
-          "description": "Campaign identifier the fragment belongs to.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "rl-outputs-manual"
-            },
-            "extract": {
-              "column": "campaign"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "rewritten_fragments/prompt",
-          "name": "prompt",
-          "description": "Rewritten fragment prompt text.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "rl-outputs-manual"
-            },
-            "extract": {
-              "column": "prompt"
-            }
-          }
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "rewritten_fragments/style",
-          "name": "style",
-          "description": "Style label applied to the fragment.",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "rl-outputs-manual"
-            },
-            "extract": {
-              "column": "style"
-            }
-          }
-        }
+        {"@type": "cr:Field", "@id": "rewritten_fragments/campaign", "name": "campaign", "description": "Campaign identifier the fragment belongs to.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "rl-outputs-manual"}, "extract": {"column": "campaign"}}},
+        {"@type": "cr:Field", "@id": "rewritten_fragments/prompt", "name": "prompt", "description": "Rewritten fragment prompt text.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "rl-outputs-manual"}, "extract": {"column": "prompt"}}},
+        {"@type": "cr:Field", "@id": "rewritten_fragments/style", "name": "style", "description": "Style label applied to the fragment.", "dataType": "sc:Text", "source": {"fileSet": {"@id": "rl-outputs-manual"}, "extract": {"column": "style"}}}
       ]
     },
     {
       "@type": "cr:RecordSet",
       "dataType": "cr:Split",
-      "key": {
-        "@id": "attack_meta_splits/split_name"
-      },
+      "key": {"@id": "attack_meta_splits/split_name"},
       "@id": "attack_meta_splits",
       "name": "attack_meta_splits",
       "description": "Splits for the attack_meta config.",
       "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta_splits/split_name",
-          "dataType": "sc:Text",
-          "description": ""
-        }
+        {"@type": "cr:Field", "@id": "attack_meta_splits/split_name", "dataType": "sc:Text", "description": ""}
       ],
       "data": [
-        {
-          "attack_meta_splits/split_name": "train"
-        }
+        {"attack_meta_splits/split_name": "train"}
       ]
     },
     {
@@ -985,247 +336,35 @@
       "@id": "attack_meta",
       "description": "anon-fragbench-neurips/fragbench - 'attack_meta' subset. One row per attack pipeline run; describes which campaign, style, target model, and judge model were used.",
       "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/split",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "fileProperty": "fullpath"
-            },
-            "transform": {
-              "regex": "attack_meta/(?:partial-)?(train)/.+parquet$"
-            }
-          },
-          "references": {
-            "field": {
-              "@id": "attack_meta_splits/split_name"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/source_file",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "source_file"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/run_id",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "run_id"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/campaign",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "campaign"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/style",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "style"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/fragments_path",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "fragments_path"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/seeds",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "seeds"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/started_at",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "started_at"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/target_model",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "target_model"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/target_backend",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "target_backend"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/llm_product",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "llm_product"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/judge_model",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "judge_model"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/status",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "status"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/ended_at",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "ended_at"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "attack_meta/num_passed",
-          "dataType": "cr:Int64",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-attack_meta"
-            },
-            "extract": {
-              "column": "num_passed"
-            }
-          },
-          "description": ""
-        }
+        {"@type": "cr:Field", "@id": "attack_meta/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "attack_meta/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "attack_meta_splits/split_name"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "source_file"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/run_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "run_id"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "campaign"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/style", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "style"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/fragments_path", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "fragments_path"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/seeds", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "seeds"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/started_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "started_at"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/target_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_model"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/target_backend", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "target_backend"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/llm_product", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "llm_product"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/judge_model", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "judge_model"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/status", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "status"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/ended_at", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "ended_at"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "attack_meta/num_passed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-attack_meta"}, "extract": {"column": "num_passed"}}, "description": ""}
       ]
     },
     {
       "@type": "cr:RecordSet",
       "dataType": "cr:Split",
-      "key": {
-        "@id": "campaign_fragments_splits/split_name"
-      },
+      "key": {"@id": "campaign_fragments_splits/split_name"},
       "@id": "campaign_fragments_splits",
       "name": "campaign_fragments_splits",
       "description": "Splits for the campaign_fragments config.",
       "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments_splits/split_name",
-          "dataType": "sc:Text",
-          "description": ""
-        }
+        {"@type": "cr:Field", "@id": "campaign_fragments_splits/split_name", "dataType": "sc:Text", "description": ""}
       ],
       "data": [
-        {
-          "campaign_fragments_splits/split_name": "train"
-        }
+        {"campaign_fragments_splits/split_name": "train"}
       ]
     },
     {
@@ -1233,210 +372,20 @@
       "@id": "campaign_fragments",
       "description": "anon-fragbench-neurips/fragbench - 'campaign_fragments' subset. One row per fragment within a campaign variation. Includes the parent tactic, parent prompt, produced and consumed artefacts (JSON-encoded), and stylised variations.",
       "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/split",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "fileProperty": "fullpath"
-            },
-            "transform": {
-              "regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"
-            }
-          },
-          "references": {
-            "field": {
-              "@id": "campaign_fragments_splits/split_name"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/source_file",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "source_file"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/campaign",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "campaign"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/variant",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "variant"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/campaign_id",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "campaign_id"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/seed",
-          "dataType": "cr:Int64",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "seed"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/total_fragments",
-          "dataType": "cr:Int64",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "total_fragments"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/fragment_index",
-          "dataType": "cr:Int64",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "fragment_index"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/role",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "role"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/parent_tactic",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "parent_tactic"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/parent_prompt",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "parent_prompt"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/produces",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "produces"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/consumes",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "consumes"
-            }
-          },
-          "description": ""
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "campaign_fragments/variations",
-          "dataType": "sc:Text",
-          "source": {
-            "fileSet": {
-              "@id": "parquet-files-for-config-campaign_fragments"
-            },
-            "extract": {
-              "column": "variations"
-            }
-          },
-          "description": ""
-        }
+        {"@type": "cr:Field", "@id": "campaign_fragments/split", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"fileProperty": "fullpath"}, "transform": {"regex": "campaign_fragments/(?:partial-)?(train)/.+parquet$"}}, "references": {"field": {"@id": "campaign_fragments_splits/split_name"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/source_file", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "source_file"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/campaign", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/variant", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variant"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/campaign_id", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "campaign_id"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/seed", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "seed"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/total_fragments", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "total_fragments"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/fragment_index", "dataType": "cr:Int64", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "fragment_index"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/role", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "role"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/parent_tactic", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_tactic"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/parent_prompt", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "parent_prompt"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/produces", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "produces"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/consumes", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "consumes"}}, "description": ""},
+        {"@type": "cr:Field", "@id": "campaign_fragments/variations", "dataType": "sc:Text", "source": {"fileSet": {"@id": "parquet-files-for-config-campaign_fragments"}, "extract": {"column": "variations"}}, "description": ""}
       ]
     }
   ]
