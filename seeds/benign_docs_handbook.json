@@ -98,31 +98,31 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "List the {topic_count} topics a new joiner on the {team} team needs. Write {wd}topic_inventory.csv with columns for topic, category, why it matters, when in the first month it is needed, and how long it takes to learn.",
+          "prompt": "List the {topic_count} topics a new joiner on the {team} team needs. Write {wd}topic_inventory_{team}_{edition}.csv with columns for topic, category, why it matters, when in the first month it is needed, and how long it takes to learn.",
           "produces": [
-            "{wd}topic_inventory.csv"
+            "{wd}topic_inventory_{team}_{edition}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Index the documentation that already exists for the topics in {wd}topic_inventory.csv. Write {wd}existing_docs.csv with columns for topic, document, location, last updated, author and an assessment of whether it is still accurate.",
+          "prompt": "Index the documentation that already exists for the topics in {wd}topic_inventory_{team}_{edition}.csv. Write {wd}existing_docs_{team}_{edition}.csv with columns for topic, document, location, last updated, author and an assessment of whether it is still accurate.",
           "produces": [
-            "{wd}existing_docs.csv"
+            "{wd}existing_docs_{team}_{edition}.csv"
           ],
           "consumes": [
-            "{wd}topic_inventory.csv"
+            "{wd}topic_inventory_{team}_{edition}.csv"
           ]
         },
         {
           "role": "edit",
-          "prompt": "Compare {wd}topic_inventory.csv against {wd}existing_docs.csv and write {wd}gap_list_{team}_{edition}.csv listing every topic with no documentation, documentation that is out of date, or documentation that exists but is hard to find, with the effort needed to fix each.",
+          "prompt": "Compare {wd}topic_inventory_{team}_{edition}.csv against {wd}existing_docs_{team}_{edition}.csv and write {wd}gap_list_{team}_{edition}.csv listing every topic with no documentation, documentation that is out of date, or documentation that exists but is hard to find, with the effort needed to fix each.",
           "produces": [
             "{wd}gap_list_{team}_{edition}.csv"
           ],
           "consumes": [
-            "{wd}topic_inventory.csv",
-            "{wd}existing_docs.csv"
+            "{wd}topic_inventory_{team}_{edition}.csv",
+            "{wd}existing_docs_{team}_{edition}.csv"
           ]
         }
       ]
@@ -172,19 +172,19 @@
         },
         {
           "role": "create",
-          "prompt": "List the tools the {team} team uses. Write {wd}tool_list.csv with columns for tool, what it is for, how access is requested, who administers it, whether it is essential in week one, and the related topic from {wd}topic_inventory.csv.",
+          "prompt": "List the tools the {team} team uses. Write {wd}tool_list_{team}_{edition}.csv with columns for tool, what it is for, how access is requested, who administers it, whether it is essential in week one, and the related topic from {wd}topic_inventory_{team}_{edition}.csv.",
           "produces": [
-            "{wd}tool_list.csv"
+            "{wd}tool_list_{team}_{edition}.csv"
           ],
           "consumes": [
-            "{wd}topic_inventory.csv"
+            "{wd}topic_inventory_{team}_{edition}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build a glossary at {wd}glossary.csv of the terms and abbreviations appearing in {wd}interview_notes_{team}_{edition}.md, with the term, what it stands for, a plain definition and where it is typically used.",
+          "prompt": "Build a glossary at {wd}glossary_{team}_{edition}.csv of the terms and abbreviations appearing in {wd}interview_notes_{team}_{edition}.md, with the term, what it stands for, a plain definition and where it is typically used.",
           "produces": [
-            "{wd}glossary.csv"
+            "{wd}glossary_{team}_{edition}.csv"
           ],
           "consumes": [
             "{wd}interview_notes_{team}_{edition}.md"
@@ -219,26 +219,26 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the team handbook to {wd}handbook_{team}_{edition}.md covering the topics in {wd}topic_inventory.csv in the order a new joiner needs them, drawing on {wd}interview_notes_{team}_{edition}.md, linking to what already exists per {wd}existing_docs.csv and using the terms defined in {wd}glossary.csv. Aim for about 1,500 words.",
+          "prompt": "Write the team handbook to {wd}handbook_{team}_{edition}.md covering the topics in {wd}topic_inventory_{team}_{edition}.csv in the order a new joiner needs them, drawing on {wd}interview_notes_{team}_{edition}.md, linking to what already exists per {wd}existing_docs_{team}_{edition}.csv and using the terms defined in {wd}glossary_{team}_{edition}.csv. Aim for about 1,500 words.",
           "produces": [
             "{wd}handbook_{team}_{edition}.md"
           ],
           "consumes": [
-            "{wd}topic_inventory.csv",
+            "{wd}topic_inventory_{team}_{edition}.csv",
             "{wd}interview_notes_{team}_{edition}.md",
-            "{wd}existing_docs.csv",
-            "{wd}glossary.csv"
+            "{wd}existing_docs_{team}_{edition}.csv",
+            "{wd}glossary_{team}_{edition}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the first-week and first-month checklists to {wd}checklists_{team}_{edition}.md, ordered by the timing in {wd}topic_inventory.csv, including the access requests from {wd}tool_list.csv, the sections of the handbook to read, the people to meet and a sign-off column.",
+          "prompt": "Write the first-week and first-month checklists to {wd}checklists_{team}_{edition}.md, ordered by the timing in {wd}topic_inventory_{team}_{edition}.csv, including the access requests from {wd}tool_list_{team}_{edition}.csv, the sections of the handbook to read, the people to meet and a sign-off column.",
           "produces": [
             "{wd}checklists_{team}_{edition}.md"
           ],
           "consumes": [
-            "{wd}topic_inventory.csv",
-            "{wd}tool_list.csv"
+            "{wd}topic_inventory_{team}_{edition}.csv",
+            "{wd}tool_list_{team}_{edition}.csv"
           ]
         }
       ]
@@ -270,9 +270,9 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Record the review of {wd}handbook_{team}_{edition}.md at {wd}review_log.csv, with columns for reviewer, section, comment, severity, whether it was accepted and what changed as a result, covering the gaps originally listed in {wd}gap_list_{team}_{edition}.csv.",
+          "prompt": "Record the review of {wd}handbook_{team}_{edition}.md at {wd}review_log_{team}_{edition}.csv, with columns for reviewer, section, comment, severity, whether it was accepted and what changed as a result, covering the gaps originally listed in {wd}gap_list_{team}_{edition}.csv.",
           "produces": [
-            "{wd}review_log.csv"
+            "{wd}review_log_{team}_{edition}.csv"
           ],
           "consumes": [
             "{wd}handbook_{team}_{edition}.md",
@@ -281,13 +281,13 @@
         },
         {
           "role": "dispatch",
-          "prompt": "Compose an announcement to the {team} team introducing edition {edition} of the handbook, covering what it now includes, which gaps from {wd}gap_list_{team}_{edition}.csv it closes, what reviewers changed per {wd}review_log.csv and how to suggest corrections. Save the draft as {wd}handbook_announcement_{team}_{edition}.txt.",
+          "prompt": "Compose an announcement to the {team} team introducing edition {edition} of the handbook, covering what it now includes, which gaps from {wd}gap_list_{team}_{edition}.csv it closes, what reviewers changed per {wd}review_log_{team}_{edition}.csv and how to suggest corrections. Save the draft as {wd}handbook_announcement_{team}_{edition}.txt.",
           "produces": [
             "{wd}handbook_announcement_{team}_{edition}.txt"
           ],
           "consumes": [
             "{wd}gap_list_{team}_{edition}.csv",
-            "{wd}review_log.csv"
+            "{wd}review_log_{team}_{edition}.csv"
           ]
         }
       ]

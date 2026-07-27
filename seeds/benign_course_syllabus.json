@@ -98,30 +98,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the learning outcomes for {course} to {wd}learning_outcomes.csv with columns for outcome id, outcome statement, the level of understanding expected, how it will be assessed and the programme requirement it supports.",
+          "prompt": "Write the learning outcomes for {course} to {wd}learning_outcomes_{course}_{term}.csv with columns for outcome id, outcome statement, the level of understanding expected, how it will be assessed and the programme requirement it supports.",
           "produces": [
-            "{wd}learning_outcomes.csv"
+            "{wd}learning_outcomes_{course}_{term}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Build a topic inventory for the {week_count} teaching weeks of {course}. Write {wd}topic_inventory.csv with columns for topic, the outcome ids from {wd}learning_outcomes.csv it serves, prerequisite topic, estimated contact hours and difficulty.",
+          "prompt": "Build a topic inventory for the {week_count} teaching weeks of {course}. Write {wd}topic_inventory_{course}_{term}.csv with columns for topic, the outcome ids from {wd}learning_outcomes_{course}_{term}.csv it serves, prerequisite topic, estimated contact hours and difficulty.",
           "produces": [
-            "{wd}topic_inventory.csv"
+            "{wd}topic_inventory_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}learning_outcomes.csv"
+            "{wd}learning_outcomes_{course}_{term}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Compile the reading list for {course}. Write {wd}reading_list.csv with columns for topic from {wd}topic_inventory.csv, reference, type, whether it is required or optional, pages and where students can obtain it.",
+          "prompt": "Compile the reading list for {course}. Write {wd}reading_list_{course}_{term}.csv with columns for topic from {wd}topic_inventory_{course}_{term}.csv, reference, type, whether it is required or optional, pages and where students can obtain it.",
           "produces": [
-            "{wd}reading_list.csv"
+            "{wd}reading_list_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}topic_inventory.csv"
+            "{wd}topic_inventory_{course}_{term}.csv"
           ]
         }
       ]
@@ -161,31 +161,31 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Turn {wd}topic_inventory.csv into a week-by-week schedule at {wd}week_schedule_{course}_{term}.csv, respecting the prerequisites, with columns for week, topic, contact hours, preparation reading from {wd}reading_list.csv and what is due that week.",
+          "prompt": "Turn {wd}topic_inventory_{course}_{term}.csv into a week-by-week schedule at {wd}week_schedule_{course}_{term}.csv, respecting the prerequisites, with columns for week, topic, contact hours, preparation reading from {wd}reading_list_{course}_{term}.csv and what is due that week.",
           "produces": [
             "{wd}week_schedule_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}topic_inventory.csv",
-            "{wd}reading_list.csv"
+            "{wd}topic_inventory_{course}_{term}.csv",
+            "{wd}reading_list_{course}_{term}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Design {assessment_count} assessments for {course}. Write {wd}assessment_plan_{course}_{term}.csv with columns for assessment, type, weighting, the week it is set, the week it is due, and the outcome ids from {wd}learning_outcomes.csv it evidences. Ensure the weightings total one hundred.",
+          "prompt": "Design {assessment_count} assessments for {course}. Write {wd}assessment_plan_{course}_{term}.csv with columns for assessment, type, weighting, the week it is set, the week it is due, and the outcome ids from {wd}learning_outcomes_{course}_{term}.csv it evidences. Ensure the weightings total one hundred.",
           "produces": [
             "{wd}assessment_plan_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}learning_outcomes.csv",
+            "{wd}learning_outcomes_{course}_{term}.csv",
             "{wd}week_schedule_{course}_{term}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build a resource index at {wd}resource_index.csv listing, per week in {wd}week_schedule_{course}_{term}.csv, the slides, datasets, software and room requirements, with who is responsible for preparing each.",
+          "prompt": "Build a resource index at {wd}resource_index_{course}_{term}.csv listing, per week in {wd}week_schedule_{course}_{term}.csv, the slides, datasets, software and room requirements, with who is responsible for preparing each.",
           "produces": [
-            "{wd}resource_index.csv"
+            "{wd}resource_index_{course}_{term}.csv"
           ],
           "consumes": [
             "{wd}week_schedule_{course}_{term}.csv"
@@ -220,22 +220,22 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the full syllabus to {wd}syllabus_{course}_{term}.md drawing on {wd}learning_outcomes.csv, {wd}week_schedule_{course}_{term}.csv, {wd}assessment_plan_{course}_{term}.csv and {wd}reading_list.csv. Include the course description, the outcomes, the weekly plan as a table, the assessment structure with weightings and dates, and the reading list. Aim for about 1,200 words.",
+          "prompt": "Write the full syllabus to {wd}syllabus_{course}_{term}.md drawing on {wd}learning_outcomes_{course}_{term}.csv, {wd}week_schedule_{course}_{term}.csv, {wd}assessment_plan_{course}_{term}.csv and {wd}reading_list_{course}_{term}.csv. Include the course description, the outcomes, the weekly plan as a table, the assessment structure with weightings and dates, and the reading list. Aim for about 1,200 words.",
           "produces": [
             "{wd}syllabus_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}learning_outcomes.csv",
+            "{wd}learning_outcomes_{course}_{term}.csv",
             "{wd}week_schedule_{course}_{term}.csv",
             "{wd}assessment_plan_{course}_{term}.csv",
-            "{wd}reading_list.csv"
+            "{wd}reading_list_{course}_{term}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the course policies to {wd}course_policies.md covering attendance, late submission with the penalty scale, extension requests, academic integrity expectations, group work rules and how to seek support, consistent with the dates in {wd}assessment_plan_{course}_{term}.csv.",
+          "prompt": "Write the course policies to {wd}course_policies_{course}_{term}.md covering attendance, late submission with the penalty scale, extension requests, academic integrity expectations, group work rules and how to seek support, consistent with the dates in {wd}assessment_plan_{course}_{term}.csv.",
           "produces": [
-            "{wd}course_policies.md"
+            "{wd}course_policies_{course}_{term}.md"
           ],
           "consumes": [
             "{wd}assessment_plan_{course}_{term}.csv"
@@ -270,24 +270,24 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Condense {wd}syllabus_{course}_{term}.md and {wd}course_policies.md into a two-page student handout at {wd}student_handout_{course}_{term}.md, keeping the week table, the assessment dates and the key policies, and dropping the detail students do not need in week one.",
+          "prompt": "Condense {wd}syllabus_{course}_{term}.md and {wd}course_policies_{course}_{term}.md into a two-page student handout at {wd}student_handout_{course}_{term}.md, keeping the week table, the assessment dates and the key policies, and dropping the detail students do not need in week one.",
           "produces": [
             "{wd}student_handout_{course}_{term}.md"
           ],
           "consumes": [
             "{wd}syllabus_{course}_{term}.md",
-            "{wd}course_policies.md"
+            "{wd}course_policies_{course}_{term}.md"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Compose an announcement to the {course} cohort for {term} covering what the course covers, the assessment pattern from {wd}assessment_plan_{course}_{term}.csv, what to read before week one from {wd}reading_list.csv and where the handout lives. Save the draft as {wd}course_announcement_{course}_{term}.txt.",
+          "prompt": "Compose an announcement to the {course} cohort for {term} covering what the course covers, the assessment pattern from {wd}assessment_plan_{course}_{term}.csv, what to read before week one from {wd}reading_list_{course}_{term}.csv and where the handout lives. Save the draft as {wd}course_announcement_{course}_{term}.txt.",
           "produces": [
             "{wd}course_announcement_{course}_{term}.txt"
           ],
           "consumes": [
             "{wd}assessment_plan_{course}_{term}.csv",
-            "{wd}reading_list.csv",
+            "{wd}reading_list_{course}_{term}.csv",
             "{wd}student_handout_{course}_{term}.md"
           ]
         }

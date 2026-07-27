@@ -98,28 +98,28 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create an inventory of what is being moved to {city}, room by room across {room_count} rooms. Write {wd}move_inventory.csv with columns for room, item, quantity, estimated volume in cubic feet, fragile or not, and whether it is going, being sold or being discarded.",
+          "prompt": "Create an inventory of what is being moved to {city}, room by room across {room_count} rooms. Write {wd}move_inventory_{city}_{batch}.csv with columns for room, item, quantity, estimated volume in cubic feet, fragile or not, and whether it is going, being sold or being discarded.",
           "produces": [
-            "{wd}move_inventory.csv"
+            "{wd}move_inventory_{city}_{batch}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "List every organisation that needs the new {city} address. Write {wd}address_list.csv with columns for organisation, category, account reference, how the change is notified, the notice period needed and the deadline.",
+          "prompt": "List every organisation that needs the new {city} address. Write {wd}address_list_{city}_{batch}.csv with columns for organisation, category, account reference, how the change is notified, the notice period needed and the deadline.",
           "produces": [
-            "{wd}address_list.csv"
+            "{wd}address_list_{city}_{batch}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Build the move timeline at {wd}timeline_{city}_{batch}.csv working back from moving day, with columns for task, the week it falls in, who does it, the dependency and whether it blocks the move. Include the notification deadlines from {wd}address_list.csv.",
+          "prompt": "Build the move timeline at {wd}timeline_{city}_{batch}.csv working back from moving day, with columns for task, the week it falls in, who does it, the dependency and whether it blocks the move. Include the notification deadlines from {wd}address_list_{city}_{batch}.csv.",
           "produces": [
             "{wd}timeline_{city}_{batch}.csv"
           ],
           "consumes": [
-            "{wd}address_list.csv"
+            "{wd}address_list_{city}_{batch}.csv"
           ]
         }
       ]
@@ -159,19 +159,19 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Record {quote_count} removal quotes for the volume in {wd}move_inventory.csv. Write {wd}quotes_{city}_{batch}.csv with columns for company, quoted price, what is included, insurance cover, packing service offered, available dates and any exclusions.",
+          "prompt": "Record {quote_count} removal quotes for the volume in {wd}move_inventory_{city}_{batch}.csv. Write {wd}quotes_{city}_{batch}.csv with columns for company, quoted price, what is included, insurance cover, packing service offered, available dates and any exclusions.",
           "produces": [
             "{wd}quotes_{city}_{batch}.csv"
           ],
           "consumes": [
-            "{wd}move_inventory.csv"
+            "{wd}move_inventory_{city}_{batch}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build a moving checklist at {wd}move_checklist.csv from {wd}timeline_{city}_{batch}.csv, expanding each task into the concrete steps, with columns for task, step, when, who and a done column.",
+          "prompt": "Build a moving checklist at {wd}move_checklist_{city}_{batch}.csv from {wd}timeline_{city}_{batch}.csv, expanding each task into the concrete steps, with columns for task, step, when, who and a done column.",
           "produces": [
-            "{wd}move_checklist.csv"
+            "{wd}move_checklist_{city}_{batch}.csv"
           ],
           "consumes": [
             "{wd}timeline_{city}_{batch}.csv"
@@ -228,12 +228,12 @@
         },
         {
           "role": "create",
-          "prompt": "Write the packing list to {wd}packing_list.md, grouped by room from {wd}move_inventory.csv, giving the box count needed, the packing materials, what must be packed last and unpacked first, and the labelling scheme.",
+          "prompt": "Write the packing list to {wd}packing_list_{city}_{batch}.md, grouped by room from {wd}move_inventory_{city}_{batch}.csv, giving the box count needed, the packing materials, what must be packed last and unpacked first, and the labelling scheme.",
           "produces": [
-            "{wd}packing_list.md"
+            "{wd}packing_list_{city}_{batch}.md"
           ],
           "consumes": [
-            "{wd}move_inventory.csv"
+            "{wd}move_inventory_{city}_{batch}.csv"
           ]
         }
       ]
@@ -265,24 +265,24 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Draft the address change notifications at {wd}notification_letters_{city}_{batch}.md with one clearly headed section per organisation in {wd}address_list.csv, each giving the account reference, the old and new address, the effective date and what you are asking them to do.",
+          "prompt": "Draft the address change notifications at {wd}notification_letters_{city}_{batch}.md with one clearly headed section per organisation in {wd}address_list_{city}_{batch}.csv, each giving the account reference, the old and new address, the effective date and what you are asking them to do.",
           "produces": [
             "{wd}notification_letters_{city}_{batch}.md"
           ],
           "consumes": [
-            "{wd}address_list.csv"
+            "{wd}address_list_{city}_{batch}.csv"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Write a short summary to {wd}move_summary_{city}_{batch}.txt covering the moving date and company from {wd}moving_plan_{city}_{batch}.md, the budget position from {wd}budget_{city}_{batch}.csv, what remains outstanding on {wd}move_checklist.csv and the three things most likely to go wrong.",
+          "prompt": "Write a short summary to {wd}move_summary_{city}_{batch}.txt covering the moving date and company from {wd}moving_plan_{city}_{batch}.md, the budget position from {wd}budget_{city}_{batch}.csv, what remains outstanding on {wd}move_checklist_{city}_{batch}.csv and the three things most likely to go wrong.",
           "produces": [
             "{wd}move_summary_{city}_{batch}.txt"
           ],
           "consumes": [
             "{wd}moving_plan_{city}_{batch}.md",
             "{wd}budget_{city}_{batch}.csv",
-            "{wd}move_checklist.csv"
+            "{wd}move_checklist_{city}_{batch}.csv"
           ]
         }
       ]

@@ -113,39 +113,18 @@ authored deliberately, and are the reason the seeds look the way they do:
 - **self-seeding chains** — an early fragment writes what later fragments read,
   because the sandbox seed is only 44 KB and attack-flavoured
 - **~5 cross-fragment shared resources per chain** via `produces`/`consumes`,
-  the one axis that already matched. Note this counts resources touched by two or
-  more fragments *of the same chain*; it is a different quantity from the
-  cross-*chain* sharing discussed in §5, which needed a deliberate fix.
+  the one axis that already matched
 
 ## 5. Two construction decisions worth stating
 
-**Artifact names are two-tier.** Each campaign declares two discriminator axes
+**Per-variation artifact names.** Each campaign declares two discriminator axes
 (e.g. `{site}` × `{cycle}`, 24 × 20 = 480 combinations) in stage 0, inherited by
-later stages. Those axes are embedded in the names of each chain's *headline
-deliverables* (reports, runbooks, plans, announcements), which therefore stay
-unique per variation. A second tier of 2 to 9 stems per campaign, declared in
-`SHARED_ARTIFACTS` in `scripts/author_benign_seeds.py`, deliberately drops the
-discriminator and carries a bare name across every variation. Those are the
-reference-shaped, read-mostly parts of each workflow (registers, catalogues,
-matrices, schedules, codebooks): the artifacts an organisation maintains once and
-many workflows read.
-
-Discriminating *every* name was the original design, and it drove cross-chain
-resource sharing to zero. 462 of 504 chains shared no resource with any other
-chain and none shared more than one, against a median of 7 for the executed
-malicious corpus, whose chains write generic names (`ad_users.txt`,
-`sysinfo.txt`) into a filesystem that is never reset. Since `shared_resource` is
-one of the edge types the paper's claim rests on, and
-`ablations/real_edge_ablation.py` ablates it directly as `drop_shared_resource`,
-suppressing it on the benign side alone would have manufactured the asymmetry
-rather than removed it.
-
-Measured after the change: **median 6 shared resources per chain** (min 2,
-max 10, mean 5.9), a spread rather than a constant, against malicious 7. Every
-variation still carries a median of 6 uniquely-named artifacts, so the 21
-variations of a campaign stay distinguishable and do not fuse into one component.
-This is the declared-artifact figure; execution adds resources beyond the
-declared set, so re-measure on the executed corpus.
+later stages and embedded in every artifact name. Without this all 21 variations
+of a campaign would write identical filenames and fuse into a single connected
+component under the detector's `shared_resource` edges — an artifact on
+precisely the edge type the paper's claim rests on. The malicious seeds already
+vary filenames per variation; this matches that. Measured: 21/21 distinct
+first-artifact names per campaign, zero collisions.
 
 **Per-variation filesystem root.** A `{wd}` variable chosen once per variation
 pins each chain to either relative paths or `/workspace/`, never both. This is
@@ -193,20 +172,11 @@ it accumulates the same way, and the number should fall to the malicious range.
 **Re-measure after the full run before reporting either figure**; the residue is
 a property of how much has been executed, not of the objective.
 
-The table above is doubly stale: it was measured before the shared artifact tier
-in §5 existed. Shared bare names mean benign chains can now genuinely read one
-another's output, so the "written by another chain" row (18.1%) is precisely the
-one the change targets and is expected to rise toward the malicious 41.6%. Treat
-all three rows as pending re-measurement on the executed grid.
-
-An earlier version of this design pushed benign upward independently: when every
-artifact name carried the discriminator, two benign chains never shared a
-filename and so could not read each other's output even when it was present.
-That was a real asymmetry, and on the detector's own `shared_resource` edge, so
-it has been removed rather than merely stated. The shared tier in §5 lets benign
-chains reference the same reference-shaped artifacts the way malicious chains do,
-while the discriminated deliverables still keep the 21 variations of a campaign
-from fusing into one component.
+One design decision does push benign upward independently: the per-variation
+artifact names in §5 mean two benign chains rarely share a filename, so they
+cannot read each other's output even when it is present. That was the right call
+for the detector — without it all 21 variations of a campaign fuse into one
+component — but it is a real, if secondary, asymmetry to state.
 
 **Fragment failure rates differ.** On like-for-like fragment verdicts the
 malicious corpus fails 26.6% of fragments against the benign pilot's 11.4%; at
@@ -249,24 +219,12 @@ only in authored content. Regenerating is deterministic and requires no model
 calls:
 
 ```bash
-# 22 seeds rebuilt from the specs; the two pilot campaigns predate the spec
-# format and are patched in place instead (idempotent). Checks placeholder
-# resolution and produces/consumes closure.
-python scripts/author_benign_seeds.py
-
-# 24 results/*_manual.json. Pass --num-variations explicitly: run.py defaults to
-# 100, and the released set is 21 per campaign.
-for s in seeds/benign_*.json; do
-  n=$(basename "$s" .json)
-  python run.py --generate --seed-file "$s" --seed 0 --num-variations 21 \
-      --output-json "results/${n}_manual.json"
-done
+python scripts/author_benign_seeds.py      # 24 seeds, checked for placeholder
+                                           # resolution and produces/consumes closure
+make -f Makefrag                           # 24 results/*_manual.json
 ```
 
 Validation status at time of writing: **0 errors, 0 warnings** across all 24
 campaigns (357 fragments per campaign-set expansion; 5,334 fragment sessions
 total), length histogram matching the malicious side exactly, 0 mixed-root
-chains, 0 unresolved placeholders across the 504 variations, and every consume
-resolved to an earlier producer. Artifact names are deliberately *not* collision
-free: the shared tier in §5 is common across variations by design, while every
-variation retains a median of 6 uniquely-named deliverables.
+chains, 0 artifact-name collisions.

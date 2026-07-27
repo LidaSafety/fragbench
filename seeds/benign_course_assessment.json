@@ -98,32 +98,32 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the outcome map for {course} to {wd}outcome_map.csv with columns for outcome id, outcome statement, the topics that teach it, the weight it should carry in assessment and the evidence expected.",
+          "prompt": "Write the outcome map for {course} to {wd}outcome_map_{course}_{term}.csv with columns for outcome id, outcome statement, the topics that teach it, the weight it should carry in assessment and the evidence expected.",
           "produces": [
-            "{wd}outcome_map.csv"
+            "{wd}outcome_map_{course}_{term}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Build a bank of {question_count} questions for {course}. Write {wd}question_bank.csv with columns for question id, question text, type, the outcome id from {wd}outcome_map.csv, marks available and expected answer length. Write the rows inline, then read it back and confirm the row count.",
+          "prompt": "Build a bank of {question_count} questions for {course}. Write {wd}question_bank_{course}_{term}.csv with columns for question id, question text, type, the outcome id from {wd}outcome_map_{course}_{term}.csv, marks available and expected answer length. Write the rows inline, then read it back and confirm the row count.",
           "produces": [
-            "{wd}question_bank.csv"
+            "{wd}question_bank_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}outcome_map.csv"
+            "{wd}outcome_map_{course}_{term}.csv"
           ]
         },
         {
           "role": "edit",
-          "prompt": "Tag every question in {wd}question_bank.csv for difficulty and cognitive level, and flag any that duplicate another question or that no outcome in {wd}outcome_map.csv covers. Write the tagged bank to {wd}tagged_questions_{course}_{term}.csv and list the problems in {wd}bank_issues_{course}_{term}.md.",
+          "prompt": "Tag every question in {wd}question_bank_{course}_{term}.csv for difficulty and cognitive level, and flag any that duplicate another question or that no outcome in {wd}outcome_map_{course}_{term}.csv covers. Write the tagged bank to {wd}tagged_questions_{course}_{term}.csv and list the problems in {wd}bank_issues_{course}_{term}.md.",
           "produces": [
             "{wd}tagged_questions_{course}_{term}.csv",
             "{wd}bank_issues_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}question_bank.csv",
-            "{wd}outcome_map.csv"
+            "{wd}question_bank_{course}_{term}.csv",
+            "{wd}outcome_map_{course}_{term}.csv"
           ]
         }
       ]
@@ -163,34 +163,34 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build an exam blueprint at {wd}exam_blueprint.csv for a {paper_marks}-mark paper, allocating marks across the outcomes in {wd}outcome_map.csv and the difficulty tiers in {wd}tagged_questions_{course}_{term}.csv, with the question count and mark total per cell.",
+          "prompt": "Build an exam blueprint at {wd}exam_blueprint_{course}_{term}.csv for a {paper_marks}-mark paper, allocating marks across the outcomes in {wd}outcome_map_{course}_{term}.csv and the difficulty tiers in {wd}tagged_questions_{course}_{term}.csv, with the question count and mark total per cell.",
           "produces": [
-            "{wd}exam_blueprint.csv"
+            "{wd}exam_blueprint_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}outcome_map.csv",
+            "{wd}outcome_map_{course}_{term}.csv",
             "{wd}tagged_questions_{course}_{term}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write a rubric matrix to {wd}rubric_matrix.csv covering the extended-response questions selected by {wd}exam_blueprint.csv, with columns for question id, criterion, and the descriptor at each of four attainment bands.",
+          "prompt": "Write a rubric matrix to {wd}rubric_matrix_{course}_{term}.csv covering the extended-response questions selected by {wd}exam_blueprint_{course}_{term}.csv, with columns for question id, criterion, and the descriptor at each of four attainment bands.",
           "produces": [
-            "{wd}rubric_matrix.csv"
+            "{wd}rubric_matrix_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}exam_blueprint.csv",
+            "{wd}exam_blueprint_{course}_{term}.csv",
             "{wd}tagged_questions_{course}_{term}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write model answers for the extended-response questions to {wd}sample_answers_{course}_{term}.md, one section per question, showing what a top-band response contains against {wd}rubric_matrix.csv and where marks are typically lost.",
+          "prompt": "Write model answers for the extended-response questions to {wd}sample_answers_{course}_{term}.md, one section per question, showing what a top-band response contains against {wd}rubric_matrix_{course}_{term}.csv and where marks are typically lost.",
           "produces": [
             "{wd}sample_answers_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}rubric_matrix.csv"
+            "{wd}rubric_matrix_{course}_{term}.csv"
           ]
         }
       ]
@@ -222,24 +222,24 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Assemble the examination paper at {wd}exam_paper_{course}_{term}.md by selecting questions from {wd}tagged_questions_{course}_{term}.csv to satisfy {wd}exam_blueprint.csv. Include the rubric of instructions, the sections with their mark allocations, and every question in full. Aim for about 1,200 words.",
+          "prompt": "Assemble the examination paper at {wd}exam_paper_{course}_{term}.md by selecting questions from {wd}tagged_questions_{course}_{term}.csv to satisfy {wd}exam_blueprint_{course}_{term}.csv. Include the rubric of instructions, the sections with their mark allocations, and every question in full. Aim for about 1,200 words.",
           "produces": [
             "{wd}exam_paper_{course}_{term}.md"
           ],
           "consumes": [
             "{wd}tagged_questions_{course}_{term}.csv",
-            "{wd}exam_blueprint.csv"
+            "{wd}exam_blueprint_{course}_{term}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the marking guide to {wd}marking_guide_{course}_{term}.md, following {wd}exam_paper_{course}_{term}.md question by question, giving the mark scheme, the acceptable alternatives, the rubric band descriptors from {wd}rubric_matrix.csv and guidance on partial credit.",
+          "prompt": "Write the marking guide to {wd}marking_guide_{course}_{term}.md, following {wd}exam_paper_{course}_{term}.md question by question, giving the mark scheme, the acceptable alternatives, the rubric band descriptors from {wd}rubric_matrix_{course}_{term}.csv and guidance on partial credit.",
           "produces": [
             "{wd}marking_guide_{course}_{term}.md"
           ],
           "consumes": [
             "{wd}exam_paper_{course}_{term}.md",
-            "{wd}rubric_matrix.csv"
+            "{wd}rubric_matrix_{course}_{term}.csv"
           ]
         }
       ]
@@ -271,25 +271,25 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a moderation checklist to {wd}moderation_checklist.md covering the coverage check against {wd}exam_blueprint.csv, the issues raised in {wd}bank_issues_{course}_{term}.md, the timing check, the accessibility check and a sign-off column for the moderator.",
+          "prompt": "Write a moderation checklist to {wd}moderation_checklist_{course}_{term}.md covering the coverage check against {wd}exam_blueprint_{course}_{term}.csv, the issues raised in {wd}bank_issues_{course}_{term}.md, the timing check, the accessibility check and a sign-off column for the moderator.",
           "produces": [
-            "{wd}moderation_checklist.md"
+            "{wd}moderation_checklist_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}exam_blueprint.csv",
+            "{wd}exam_blueprint_{course}_{term}.csv",
             "{wd}bank_issues_{course}_{term}.md"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Compose a briefing note for the {course} marking team covering how the paper is structured, where the marking guide and sample answers live, the moderation steps from {wd}moderation_checklist.md and the return deadline. Save the draft as {wd}marker_briefing_{course}_{term}.txt.",
+          "prompt": "Compose a briefing note for the {course} marking team covering how the paper is structured, where the marking guide and sample answers live, the moderation steps from {wd}moderation_checklist_{course}_{term}.md and the return deadline. Save the draft as {wd}marker_briefing_{course}_{term}.txt.",
           "produces": [
             "{wd}marker_briefing_{course}_{term}.txt"
           ],
           "consumes": [
             "{wd}marking_guide_{course}_{term}.md",
             "{wd}sample_answers_{course}_{term}.md",
-            "{wd}moderation_checklist.md"
+            "{wd}moderation_checklist_{course}_{term}.md"
           ]
         }
       ]

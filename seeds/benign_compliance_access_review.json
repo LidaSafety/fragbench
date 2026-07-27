@@ -106,30 +106,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV extract of the {user_count} entitlements held in {system} for the {cycle} recertification. Include columns for username, full name, department, entitlement, access level, granted date, granted by and last used date. Write the rows inline and save it as {wd}entitlement_extract.csv.",
+          "prompt": "Create a CSV extract of the {user_count} entitlements held in {system} for the {cycle} recertification. Include columns for username, full name, department, entitlement, access level, granted date, granted by and last used date. Write the rows inline and save it as {wd}entitlement_extract_{system}_{cycle}.csv.",
           "produces": [
-            "{wd}entitlement_extract.csv"
+            "{wd}entitlement_extract_{system}_{cycle}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "From {wd}entitlement_extract.csv, isolate every entitlement conferring administrative or approval rights. Write {wd}privileged_accounts.csv with the username, entitlement, what it permits, the business justification recorded at grant time and whether a secondary approval exists.",
+          "prompt": "From {wd}entitlement_extract_{system}_{cycle}.csv, isolate every entitlement conferring administrative or approval rights. Write {wd}privileged_accounts_{system}_{cycle}.csv with the username, entitlement, what it permits, the business justification recorded at grant time and whether a secondary approval exists.",
           "produces": [
-            "{wd}privileged_accounts.csv"
+            "{wd}privileged_accounts_{system}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}entitlement_extract.csv"
+            "{wd}entitlement_extract_{system}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "From {wd}entitlement_extract.csv, list entitlements unused for more than {dormant_days} days or held by users whose department has changed. Write {wd}dormant_accounts.csv with the reason for inclusion and the days since last use.",
+          "prompt": "From {wd}entitlement_extract_{system}_{cycle}.csv, list entitlements unused for more than {dormant_days} days or held by users whose department has changed. Write {wd}dormant_accounts_{system}_{cycle}.csv with the reason for inclusion and the days since last use.",
           "produces": [
-            "{wd}dormant_accounts.csv"
+            "{wd}dormant_accounts_{system}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}entitlement_extract.csv"
+            "{wd}entitlement_extract_{system}_{cycle}.csv"
           ]
         }
       ]
@@ -161,34 +161,34 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build a reviewer assignment at {wd}reviewer_assignments.csv mapping each department in {wd}entitlement_extract.csv to its certifying manager, with the reviewer name, the population size and the deadline.",
+          "prompt": "Build a reviewer assignment at {wd}reviewer_assignments_{system}_{cycle}.csv mapping each department in {wd}entitlement_extract_{system}_{cycle}.csv to its certifying manager, with the reviewer name, the population size and the deadline.",
           "produces": [
-            "{wd}reviewer_assignments.csv"
+            "{wd}reviewer_assignments_{system}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}entitlement_extract.csv"
+            "{wd}entitlement_extract_{system}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build an evidence index at {wd}evidence_index.csv recording, for each entitlement in {wd}privileged_accounts.csv, the approval record reference, the date, the approver and where the evidence is filed.",
+          "prompt": "Build an evidence index at {wd}evidence_index_{system}_{cycle}.csv recording, for each entitlement in {wd}privileged_accounts_{system}_{cycle}.csv, the approval record reference, the date, the approver and where the evidence is filed.",
           "produces": [
-            "{wd}evidence_index.csv"
+            "{wd}evidence_index_{system}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}privileged_accounts.csv"
+            "{wd}privileged_accounts_{system}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Draw a review sample across {wd}entitlement_extract.csv, taking every privileged entitlement and a proportionate share of the rest. Write {wd}sampling_sheet_{system}_{cycle}.csv with the sampled rows, the stratum, the reviewer from {wd}reviewer_assignments.csv and an empty outcome column, and record the sampling method in {wd}sampling_method.md.",
+          "prompt": "Draw a review sample across {wd}entitlement_extract_{system}_{cycle}.csv, taking every privileged entitlement and a proportionate share of the rest. Write {wd}sampling_sheet_{system}_{cycle}.csv with the sampled rows, the stratum, the reviewer from {wd}reviewer_assignments_{system}_{cycle}.csv and an empty outcome column, and record the sampling method in {wd}sampling_method_{system}_{cycle}.md.",
           "produces": [
             "{wd}sampling_sheet_{system}_{cycle}.csv",
-            "{wd}sampling_method.md"
+            "{wd}sampling_method_{system}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}entitlement_extract.csv",
-            "{wd}reviewer_assignments.csv"
+            "{wd}entitlement_extract_{system}_{cycle}.csv",
+            "{wd}reviewer_assignments_{system}_{cycle}.csv"
           ]
         }
       ]
@@ -220,26 +220,26 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Record the outcome of each sampled row in a findings register at {wd}findings_register_{system}_{cycle}.csv, with columns for finding reference, entitlement, finding type, severity, the evidence reference from {wd}evidence_index.csv and the recommended action.",
+          "prompt": "Record the outcome of each sampled row in a findings register at {wd}findings_register_{system}_{cycle}.csv, with columns for finding reference, entitlement, finding type, severity, the evidence reference from {wd}evidence_index_{system}_{cycle}.csv and the recommended action.",
           "produces": [
             "{wd}findings_register_{system}_{cycle}.csv"
           ],
           "consumes": [
             "{wd}sampling_sheet_{system}_{cycle}.csv",
-            "{wd}evidence_index.csv"
+            "{wd}evidence_index_{system}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write a recertification report to {wd}recert_report_{system}_{cycle}.md using {wd}sampling_method.md, {wd}findings_register_{system}_{cycle}.csv, {wd}privileged_accounts.csv and {wd}dormant_accounts.csv. Include the scope and period, the method and sample, findings by severity, the privileged access position, and a conclusion on whether the control operated effectively. Aim for about 1,100 words.",
+          "prompt": "Write a recertification report to {wd}recert_report_{system}_{cycle}.md using {wd}sampling_method_{system}_{cycle}.md, {wd}findings_register_{system}_{cycle}.csv, {wd}privileged_accounts_{system}_{cycle}.csv and {wd}dormant_accounts_{system}_{cycle}.csv. Include the scope and period, the method and sample, findings by severity, the privileged access position, and a conclusion on whether the control operated effectively. Aim for about 1,100 words.",
           "produces": [
             "{wd}recert_report_{system}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}sampling_method.md",
+            "{wd}sampling_method_{system}_{cycle}.md",
             "{wd}findings_register_{system}_{cycle}.csv",
-            "{wd}privileged_accounts.csv",
-            "{wd}dormant_accounts.csv"
+            "{wd}privileged_accounts_{system}_{cycle}.csv",
+            "{wd}dormant_accounts_{system}_{cycle}.csv"
           ]
         }
       ]
@@ -271,13 +271,13 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Turn {wd}findings_register_{system}_{cycle}.csv into a remediation plan at {wd}remediation_plan_{system}_{cycle}.csv with columns for finding reference, action, owner from {wd}reviewer_assignments.csv, target date, and how completion will be evidenced.",
+          "prompt": "Turn {wd}findings_register_{system}_{cycle}.csv into a remediation plan at {wd}remediation_plan_{system}_{cycle}.csv with columns for finding reference, action, owner from {wd}reviewer_assignments_{system}_{cycle}.csv, target date, and how completion will be evidenced.",
           "produces": [
             "{wd}remediation_plan_{system}_{cycle}.csv"
           ],
           "consumes": [
             "{wd}findings_register_{system}_{cycle}.csv",
-            "{wd}reviewer_assignments.csv"
+            "{wd}reviewer_assignments_{system}_{cycle}.csv"
           ]
         },
         {

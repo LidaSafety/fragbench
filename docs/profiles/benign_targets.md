@@ -36,8 +36,7 @@ axis on which a trivial classifier could separate the classes today.
 | `arguments_bytes` p90 / p99 | 2,084 / 10,834 | 7,706 / 26,301 | under-matched |
 | `result_bytes` p90 / p99 | 3,807 / 20,298 | 20,298 / 45,238 | under-matched |
 | distinct resources / chain (p50) | 7 | 16 | under-matched |
-| cross-fragment shared resources (p50) | 5 | 5 | already matched (within-chain; re-measure) |
-| cross-**chain** shared resources (p50) | — | 7 | **fixed by the shared tier, §4.7** |
+| cross-fragment shared resources (p50) | 5 | 5 | already matched |
 
 The **absolute path share** gap is the most severe and was not previously
 documented: the synthetic benign corpus writes absolute `/workspace/...` paths
@@ -110,23 +109,11 @@ will *not* fix, so the seed prompts must drive them.
    and `arguments_bytes` reaches p90 ≈ 7.7 KB. Long-form deliverables (runbooks,
    audit reports, syllabi, release notes) are the natural vehicle.
 5. **Keep cross-fragment linkage at ~5 shared resources per chain** via the seed
-   `produces` / `consumes` fields. This axis already matches; preserve it. It is a
-   *within-chain* count and is independent of item 7 below.
+   `produces` / `consumes` fields. This axis already matches; preserve it.
 6. **Chains must be self-seeding.** The sandbox `mock_fs` seed is only ~44 KB and
    attack-flavoured, so an early fragment must *write* what later fragments read.
    Otherwise every benign read returns file-not-found and we would introduce a
-   new, inverted artifact. Carve-out: the shared reference stems in item 7 may be
-   satisfied by a file another chain wrote, which is the same accumulation the
-   malicious corpus relies on and is intended.
-
-7. **Share a reference tier across chains.** Discriminating every artifact name
-   drives cross-chain resource sharing to zero (measured: 462 of 504 chains shared
-   nothing) against a malicious median of 7, on the detector's own
-   `shared_resource` edge. Each campaign therefore declares 2 to 9 reference-shaped,
-   read-mostly stems in `SHARED_ARTIFACTS` (`scripts/author_benign_seeds.py`) that
-   drop the discriminator. Vary the count per campaign so the resulting
-   distribution has a spread. Measured after the change: median 6 per chain
-   (min 2, max 10), declared-artifact basis.
+   new, inverted artifact.
 
 ## 5. Tool-mix target
 

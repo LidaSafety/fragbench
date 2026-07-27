@@ -99,40 +99,40 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV inventory of the {cert_count} TLS certificates in use across the {estate} service. Include columns for common name, subject alternative names, issuer, serial, key algorithm, key size, not-before date and not-after date. Write the rows inline and save it as {wd}cert_inventory.csv.",
+          "prompt": "Create a CSV inventory of the {cert_count} TLS certificates in use across the {estate} service. Include columns for common name, subject alternative names, issuer, serial, key algorithm, key size, not-before date and not-after date. Write the rows inline and save it as {wd}cert_inventory_{estate}_{cycle}.csv.",
           "produces": [
-            "{wd}cert_inventory.csv"
+            "{wd}cert_inventory_{estate}_{cycle}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Map which endpoints present which certificate. Write {wd}endpoint_map.csv with columns for endpoint hostname, port, environment, load balancer, certificate common name and whether the endpoint is internet-facing.",
+          "prompt": "Map which endpoints present which certificate. Write {wd}endpoint_map_{estate}_{cycle}.csv with columns for endpoint hostname, port, environment, load balancer, certificate common name and whether the endpoint is internet-facing.",
           "produces": [
-            "{wd}endpoint_map.csv"
+            "{wd}endpoint_map_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}cert_inventory.csv"
+            "{wd}cert_inventory_{estate}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build an expiry calendar at {wd}expiry_calendar.csv from {wd}cert_inventory.csv, bucketing certificates by days remaining into expired, under 30, 30 to 90, and over 90, with a count and a list of common names per bucket.",
+          "prompt": "Build an expiry calendar at {wd}expiry_calendar_{estate}_{cycle}.csv from {wd}cert_inventory_{estate}_{cycle}.csv, bucketing certificates by days remaining into expired, under 30, 30 to 90, and over 90, with a count and a list of common names per bucket.",
           "produces": [
-            "{wd}expiry_calendar.csv"
+            "{wd}expiry_calendar_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}cert_inventory.csv"
+            "{wd}cert_inventory_{estate}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Produce an owner matrix at {wd}owner_matrix.csv joining {wd}endpoint_map.csv to owning teams, giving certificate common name, owning team, primary contact, escalation contact and the renewal method each team uses.",
+          "prompt": "Produce an owner matrix at {wd}owner_matrix_{estate}_{cycle}.csv joining {wd}endpoint_map_{estate}_{cycle}.csv to owning teams, giving certificate common name, owning team, primary contact, escalation contact and the renewal method each team uses.",
           "produces": [
-            "{wd}owner_matrix.csv"
+            "{wd}owner_matrix_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}endpoint_map.csv"
+            "{wd}endpoint_map_{estate}_{cycle}.csv"
           ]
         }
       ]
@@ -172,45 +172,45 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "For each certificate in {wd}cert_inventory.csv, record whether the presented chain is complete, whether the intermediate is current and whether the hostname matches the endpoint in {wd}endpoint_map.csv. Write the results to {wd}chain_validation.csv with a status column and a reason column.",
+          "prompt": "For each certificate in {wd}cert_inventory_{estate}_{cycle}.csv, record whether the presented chain is complete, whether the intermediate is current and whether the hostname matches the endpoint in {wd}endpoint_map_{estate}_{cycle}.csv. Write the results to {wd}chain_validation_{estate}_{cycle}.csv with a status column and a reason column.",
           "produces": [
-            "{wd}chain_validation.csv"
+            "{wd}chain_validation_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}cert_inventory.csv",
-            "{wd}endpoint_map.csv"
+            "{wd}cert_inventory_{estate}_{cycle}.csv",
+            "{wd}endpoint_map_{estate}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "List every certificate in {wd}cert_inventory.csv using a key smaller than {min_key_size} bits or a signature algorithm we no longer accept. Write {wd}weak_config_report_{estate}_{cycle}.md as a table of common name, issue, owning team from {wd}owner_matrix.csv and recommended action, with a two-paragraph summary above it.",
+          "prompt": "List every certificate in {wd}cert_inventory_{estate}_{cycle}.csv using a key smaller than {min_key_size} bits or a signature algorithm we no longer accept. Write {wd}weak_config_report_{estate}_{cycle}.md as a table of common name, issue, owning team from {wd}owner_matrix_{estate}_{cycle}.csv and recommended action, with a two-paragraph summary above it.",
           "produces": [
             "{wd}weak_config_report_{estate}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}cert_inventory.csv",
-            "{wd}owner_matrix.csv"
+            "{wd}cert_inventory_{estate}_{cycle}.csv",
+            "{wd}owner_matrix_{estate}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Combine {wd}expiry_calendar.csv and {wd}weak_config_report_{estate}_{cycle}.md into a renewal candidate list at {wd}renewal_candidates.csv, one row per certificate, with the reason for renewal, the target date and the priority.",
+          "prompt": "Combine {wd}expiry_calendar_{estate}_{cycle}.csv and {wd}weak_config_report_{estate}_{cycle}.md into a renewal candidate list at {wd}renewal_candidates_{estate}_{cycle}.csv, one row per certificate, with the reason for renewal, the target date and the priority.",
           "produces": [
-            "{wd}renewal_candidates.csv"
+            "{wd}renewal_candidates_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}expiry_calendar.csv",
+            "{wd}expiry_calendar_{estate}_{cycle}.csv",
             "{wd}weak_config_report_{estate}_{cycle}.md"
           ]
         },
         {
           "role": "create",
-          "prompt": "Estimate the renewal cost from {wd}renewal_candidates.csv, splitting public and internal certificate authorities. Write {wd}cost_estimate.csv with columns for authority, certificate type, unit cost, quantity and subtotal, plus a total row.",
+          "prompt": "Estimate the renewal cost from {wd}renewal_candidates_{estate}_{cycle}.csv, splitting public and internal certificate authorities. Write {wd}cost_estimate_{estate}_{cycle}.csv with columns for authority, certificate type, unit cost, quantity and subtotal, plus a total row.",
           "produces": [
-            "{wd}cost_estimate.csv"
+            "{wd}cost_estimate_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}renewal_candidates.csv"
+            "{wd}renewal_candidates_{estate}_{cycle}.csv"
           ]
         }
       ]
@@ -250,13 +250,13 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Turn {wd}renewal_candidates.csv into a scheduled plan at {wd}renewal_plan_{estate}_{cycle}.csv, grouping certificates by owning team and target date, with columns for batch, certificates, owner, planned date and dependency notes.",
+          "prompt": "Turn {wd}renewal_candidates_{estate}_{cycle}.csv into a scheduled plan at {wd}renewal_plan_{estate}_{cycle}.csv, grouping certificates by owning team and target date, with columns for batch, certificates, owner, planned date and dependency notes.",
           "produces": [
             "{wd}renewal_plan_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}renewal_candidates.csv",
-            "{wd}owner_matrix.csv"
+            "{wd}renewal_candidates_{estate}_{cycle}.csv",
+            "{wd}owner_matrix_{estate}_{cycle}.csv"
           ]
         },
         {
@@ -271,15 +271,15 @@
         },
         {
           "role": "create",
-          "prompt": "Write a certificate lifecycle report to {wd}cert_report_{estate}_{cycle}.md using {wd}expiry_calendar.csv, {wd}chain_validation.csv, {wd}renewal_plan_{estate}_{cycle}.csv and {wd}cost_estimate.csv. Include an executive summary, the current expiry position, chain and configuration findings, the renewal schedule and cost, and recommendations with owners. Aim for about 1,000 words.",
+          "prompt": "Write a certificate lifecycle report to {wd}cert_report_{estate}_{cycle}.md using {wd}expiry_calendar_{estate}_{cycle}.csv, {wd}chain_validation_{estate}_{cycle}.csv, {wd}renewal_plan_{estate}_{cycle}.csv and {wd}cost_estimate_{estate}_{cycle}.csv. Include an executive summary, the current expiry position, chain and configuration findings, the renewal schedule and cost, and recommendations with owners. Aim for about 1,000 words.",
           "produces": [
             "{wd}cert_report_{estate}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}expiry_calendar.csv",
-            "{wd}chain_validation.csv",
+            "{wd}expiry_calendar_{estate}_{cycle}.csv",
+            "{wd}chain_validation_{estate}_{cycle}.csv",
             "{wd}renewal_plan_{estate}_{cycle}.csv",
-            "{wd}cost_estimate.csv"
+            "{wd}cost_estimate_{estate}_{cycle}.csv"
           ]
         }
       ]
@@ -319,36 +319,36 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build a post-rotation validation checklist at {wd}validation_checklist_{estate}_{cycle}.md from {wd}rotation_runbook_{estate}_{cycle}.md and {wd}endpoint_map.csv, grouped by batch, listing the endpoint checks to run and a sign-off column.",
+          "prompt": "Build a post-rotation validation checklist at {wd}validation_checklist_{estate}_{cycle}.md from {wd}rotation_runbook_{estate}_{cycle}.md and {wd}endpoint_map_{estate}_{cycle}.csv, grouped by batch, listing the endpoint checks to run and a sign-off column.",
           "produces": [
             "{wd}validation_checklist_{estate}_{cycle}.md"
           ],
           "consumes": [
             "{wd}rotation_runbook_{estate}_{cycle}.md",
-            "{wd}endpoint_map.csv"
+            "{wd}endpoint_map_{estate}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Record every certificate in {wd}renewal_candidates.csv that cannot be renewed this cycle in {wd}exception_register.csv, with the reason, the compensating control, the owning team and the review date.",
+          "prompt": "Record every certificate in {wd}renewal_candidates_{estate}_{cycle}.csv that cannot be renewed this cycle in {wd}exception_register_{estate}_{cycle}.csv, with the reason, the compensating control, the owning team and the review date.",
           "produces": [
-            "{wd}exception_register.csv"
+            "{wd}exception_register_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}renewal_candidates.csv",
-            "{wd}owner_matrix.csv"
+            "{wd}renewal_candidates_{estate}_{cycle}.csv",
+            "{wd}owner_matrix_{estate}_{cycle}.csv"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Compose an email to the {team_alias} team covering the expiry position from {wd}cert_report_{estate}_{cycle}.md, the batches scheduled in {wd}renewal_plan_{estate}_{cycle}.csv and the open items in {wd}exception_register.csv. Save the draft as {wd}cert_comms_{estate}_{cycle}.txt.",
+          "prompt": "Compose an email to the {team_alias} team covering the expiry position from {wd}cert_report_{estate}_{cycle}.md, the batches scheduled in {wd}renewal_plan_{estate}_{cycle}.csv and the open items in {wd}exception_register_{estate}_{cycle}.csv. Save the draft as {wd}cert_comms_{estate}_{cycle}.txt.",
           "produces": [
             "{wd}cert_comms_{estate}_{cycle}.txt"
           ],
           "consumes": [
             "{wd}cert_report_{estate}_{cycle}.md",
             "{wd}renewal_plan_{estate}_{cycle}.csv",
-            "{wd}exception_register.csv"
+            "{wd}exception_register_{estate}_{cycle}.csv"
           ]
         }
       ]

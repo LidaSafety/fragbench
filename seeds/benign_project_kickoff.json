@@ -98,30 +98,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a stakeholder register for {project}. Write {wd}stakeholder_register.csv with columns for name, role, function, interest, influence, what they need from the project and how often they should be updated. Include {stakeholder_count} rows.",
+          "prompt": "Create a stakeholder register for {project}. Write {wd}stakeholder_register_{project}_{sprint}.csv with columns for name, role, function, interest, influence, what they need from the project and how often they should be updated. Include {stakeholder_count} rows.",
           "produces": [
-            "{wd}stakeholder_register.csv"
+            "{wd}stakeholder_register_{project}_{sprint}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Define the scope of {project}. Write {wd}scope_items.csv with columns for item, in or out of scope, the stakeholder from {wd}stakeholder_register.csv who asked for it, the acceptance criteria and the priority.",
+          "prompt": "Define the scope of {project}. Write {wd}scope_items_{project}_{sprint}.csv with columns for item, in or out of scope, the stakeholder from {wd}stakeholder_register_{project}_{sprint}.csv who asked for it, the acceptance criteria and the priority.",
           "produces": [
-            "{wd}scope_items.csv"
+            "{wd}scope_items_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}stakeholder_register.csv"
+            "{wd}stakeholder_register_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Record the constraints on {project} at {wd}constraints.csv, with columns for constraint, type, the scope items from {wd}scope_items.csv it bears on, and how it limits the approach.",
+          "prompt": "Record the constraints on {project} at {wd}constraints_{project}_{sprint}.csv, with columns for constraint, type, the scope items from {wd}scope_items_{project}_{sprint}.csv it bears on, and how it limits the approach.",
           "produces": [
-            "{wd}constraints.csv"
+            "{wd}constraints_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}scope_items.csv"
+            "{wd}scope_items_{project}_{sprint}.csv"
           ]
         }
       ]
@@ -161,23 +161,23 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build the RAID log for {project} at {wd}raid_log.csv with columns for reference, type (risk, assumption, issue or dependency), description, the scope item or constraint it relates to, likelihood, impact, owner and mitigation.",
+          "prompt": "Build the RAID log for {project} at {wd}raid_log_{project}_{sprint}.csv with columns for reference, type (risk, assumption, issue or dependency), description, the scope item or constraint it relates to, likelihood, impact, owner and mitigation.",
           "produces": [
-            "{wd}raid_log.csv"
+            "{wd}raid_log_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}scope_items.csv",
-            "{wd}constraints.csv"
+            "{wd}scope_items_{project}_{sprint}.csv",
+            "{wd}constraints_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Lay out a {duration_weeks}-week milestone plan for {project} at {wd}milestone_plan_{project}_{sprint}.csv, with columns for milestone, target week, the scope items from {wd}scope_items.csv it completes, the predecessor milestone and the acceptance evidence.",
+          "prompt": "Lay out a {duration_weeks}-week milestone plan for {project} at {wd}milestone_plan_{project}_{sprint}.csv, with columns for milestone, target week, the scope items from {wd}scope_items_{project}_{sprint}.csv it completes, the predecessor milestone and the acceptance evidence.",
           "produces": [
             "{wd}milestone_plan_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}scope_items.csv"
+            "{wd}scope_items_{project}_{sprint}.csv"
           ]
         },
         {
@@ -219,25 +219,25 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the project charter to {wd}project_charter_{project}_{sprint}.md using {wd}scope_items.csv, {wd}constraints.csv, {wd}milestone_plan_{project}_{sprint}.csv and {wd}raid_log.csv. Include the background and objective, what is in and out of scope, the milestone schedule, the resource ask, the principal risks and the governance. Aim for about 1,200 words.",
+          "prompt": "Write the project charter to {wd}project_charter_{project}_{sprint}.md using {wd}scope_items_{project}_{sprint}.csv, {wd}constraints_{project}_{sprint}.csv, {wd}milestone_plan_{project}_{sprint}.csv and {wd}raid_log_{project}_{sprint}.csv. Include the background and objective, what is in and out of scope, the milestone schedule, the resource ask, the principal risks and the governance. Aim for about 1,200 words.",
           "produces": [
             "{wd}project_charter_{project}_{sprint}.md"
           ],
           "consumes": [
-            "{wd}scope_items.csv",
-            "{wd}constraints.csv",
+            "{wd}scope_items_{project}_{sprint}.csv",
+            "{wd}constraints_{project}_{sprint}.csv",
             "{wd}milestone_plan_{project}_{sprint}.csv",
-            "{wd}raid_log.csv"
+            "{wd}raid_log_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the communications plan to {wd}comms_plan.md, giving per stakeholder group in {wd}stakeholder_register.csv the message, the channel, the frequency, the owner and how success will be judged.",
+          "prompt": "Write the communications plan to {wd}comms_plan_{project}_{sprint}.md, giving per stakeholder group in {wd}stakeholder_register_{project}_{sprint}.csv the message, the channel, the frequency, the owner and how success will be judged.",
           "produces": [
-            "{wd}comms_plan.md"
+            "{wd}comms_plan_{project}_{sprint}.md"
           ],
           "consumes": [
-            "{wd}stakeholder_register.csv"
+            "{wd}stakeholder_register_{project}_{sprint}.csv"
           ]
         }
       ]
@@ -269,23 +269,23 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the kickoff agenda to {wd}kickoff_agenda_{project}_{sprint}.md, timed to ninety minutes, covering the objective and scope from {wd}project_charter_{project}_{sprint}.md, the milestone walkthrough, the risks needing decisions from {wd}raid_log.csv, and the actions to leave with. Note who leads each item.",
+          "prompt": "Write the kickoff agenda to {wd}kickoff_agenda_{project}_{sprint}.md, timed to ninety minutes, covering the objective and scope from {wd}project_charter_{project}_{sprint}.md, the milestone walkthrough, the risks needing decisions from {wd}raid_log_{project}_{sprint}.csv, and the actions to leave with. Note who leads each item.",
           "produces": [
             "{wd}kickoff_agenda_{project}_{sprint}.md"
           ],
           "consumes": [
             "{wd}project_charter_{project}_{sprint}.md",
-            "{wd}raid_log.csv"
+            "{wd}raid_log_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Compose the kickoff invitation to the stakeholders in {wd}stakeholder_register.csv, covering why the meeting matters, the agenda from {wd}kickoff_agenda_{project}_{sprint}.md, what to read beforehand and what decisions are needed. Save the draft as {wd}kickoff_invite_{project}_{sprint}.txt.",
+          "prompt": "Compose the kickoff invitation to the stakeholders in {wd}stakeholder_register_{project}_{sprint}.csv, covering why the meeting matters, the agenda from {wd}kickoff_agenda_{project}_{sprint}.md, what to read beforehand and what decisions are needed. Save the draft as {wd}kickoff_invite_{project}_{sprint}.txt.",
           "produces": [
             "{wd}kickoff_invite_{project}_{sprint}.txt"
           ],
           "consumes": [
-            "{wd}stakeholder_register.csv",
+            "{wd}stakeholder_register_{project}_{sprint}.csv",
             "{wd}kickoff_agenda_{project}_{sprint}.md"
           ]
         }

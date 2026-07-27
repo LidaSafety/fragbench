@@ -98,30 +98,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Record the delivery metrics for {project} sprint {sprint}. Write {wd}sprint_metrics.csv with rows for committed points, completed points, carried over, cycle time median, review turnaround, defects found in review and defects escaping to production.",
+          "prompt": "Record the delivery metrics for {project} sprint {sprint}. Write {wd}sprint_metrics_{project}_{sprint}.csv with rows for committed points, completed points, carried over, cycle time median, review turnaround, defects found in review and defects escaping to production.",
           "produces": [
-            "{wd}sprint_metrics.csv"
+            "{wd}sprint_metrics_{project}_{sprint}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Extract the {ticket_count} tickets worked during sprint {sprint}. Write {wd}ticket_flow.csv with columns for ticket id, type, points, started date, completed date, days in progress, days blocked and the blocking reason. Write the rows inline and confirm the row count.",
+          "prompt": "Extract the {ticket_count} tickets worked during sprint {sprint}. Write {wd}ticket_flow_{project}_{sprint}.csv with columns for ticket id, type, points, started date, completed date, days in progress, days blocked and the blocking reason. Write the rows inline and confirm the row count.",
           "produces": [
-            "{wd}ticket_flow.csv"
+            "{wd}ticket_flow_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}sprint_metrics.csv"
+            "{wd}sprint_metrics_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Record the incidents that occurred during sprint {sprint} at {wd}incident_extract.csv, with columns for incident reference, date, severity, the ticket from {wd}ticket_flow.csv it relates to, minutes of impact and how it was resolved.",
+          "prompt": "Record the incidents that occurred during sprint {sprint} at {wd}incident_extract_{project}_{sprint}.csv, with columns for incident reference, date, severity, the ticket from {wd}ticket_flow_{project}_{sprint}.csv it relates to, minutes of impact and how it was resolved.",
           "produces": [
-            "{wd}incident_extract.csv"
+            "{wd}incident_extract_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}ticket_flow.csv"
+            "{wd}ticket_flow_{project}_{sprint}.csv"
           ]
         }
       ]
@@ -161,31 +161,31 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Record the {respondent_count} retrospective survey responses for sprint {sprint}. Write {wd}survey_responses.csv with columns for respondent id, role, what went well, what did not, a rating out of five for delivery confidence and one for team health, and a free-text suggestion.",
+          "prompt": "Record the {respondent_count} retrospective survey responses for sprint {sprint}. Write {wd}survey_responses_{project}_{sprint}.csv with columns for respondent id, role, what went well, what did not, a rating out of five for delivery confidence and one for team health, and a free-text suggestion.",
           "produces": [
-            "{wd}survey_responses.csv"
+            "{wd}survey_responses_{project}_{sprint}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Group the free-text answers in {wd}survey_responses.csv into themes. Write {wd}theme_analysis_{project}_{sprint}.csv with columns for theme, how many respondents raised it, representative quotes, whether it is within the team's control and the supporting evidence from {wd}ticket_flow.csv.",
+          "prompt": "Group the free-text answers in {wd}survey_responses_{project}_{sprint}.csv into themes. Write {wd}theme_analysis_{project}_{sprint}.csv with columns for theme, how many respondents raised it, representative quotes, whether it is within the team's control and the supporting evidence from {wd}ticket_flow_{project}_{sprint}.csv.",
           "produces": [
             "{wd}theme_analysis_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}survey_responses.csv",
-            "{wd}ticket_flow.csv"
+            "{wd}survey_responses_{project}_{sprint}.csv",
+            "{wd}ticket_flow_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Compare sprint {sprint} against the previous three sprints. Write {wd}trend_comparison_{project}_{sprint}.csv with one row per metric in {wd}sprint_metrics.csv, giving the values across the four sprints, the direction of travel and whether the change is material.",
+          "prompt": "Compare sprint {sprint} against the previous three sprints. Write {wd}trend_comparison_{project}_{sprint}.csv with one row per metric in {wd}sprint_metrics_{project}_{sprint}.csv, giving the values across the four sprints, the direction of travel and whether the change is material.",
           "produces": [
             "{wd}trend_comparison_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}sprint_metrics.csv"
+            "{wd}sprint_metrics_{project}_{sprint}.csv"
           ]
         }
       ]
@@ -217,22 +217,22 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the retrospective report to {wd}retro_report_{project}_{sprint}.md using {wd}sprint_metrics.csv, {wd}trend_comparison_{project}_{sprint}.csv, {wd}theme_analysis_{project}_{sprint}.csv and {wd}incident_extract.csv. Include what the numbers show, what the team said, where the two agree and disagree, the incidents and what they cost, and the changes worth making. Aim for about 1,100 words.",
+          "prompt": "Write the retrospective report to {wd}retro_report_{project}_{sprint}.md using {wd}sprint_metrics_{project}_{sprint}.csv, {wd}trend_comparison_{project}_{sprint}.csv, {wd}theme_analysis_{project}_{sprint}.csv and {wd}incident_extract_{project}_{sprint}.csv. Include what the numbers show, what the team said, where the two agree and disagree, the incidents and what they cost, and the changes worth making. Aim for about 1,100 words.",
           "produces": [
             "{wd}retro_report_{project}_{sprint}.md"
           ],
           "consumes": [
-            "{wd}sprint_metrics.csv",
+            "{wd}sprint_metrics_{project}_{sprint}.csv",
             "{wd}trend_comparison_{project}_{sprint}.csv",
             "{wd}theme_analysis_{project}_{sprint}.csv",
-            "{wd}incident_extract.csv"
+            "{wd}incident_extract_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Turn the changes proposed in {wd}retro_report_{project}_{sprint}.md into {wd}action_items.csv, with columns for action, the theme from {wd}theme_analysis_{project}_{sprint}.csv it addresses, the expected effect, effort, and how we will know it worked.",
+          "prompt": "Turn the changes proposed in {wd}retro_report_{project}_{sprint}.md into {wd}action_items_{project}_{sprint}.csv, with columns for action, the theme from {wd}theme_analysis_{project}_{sprint}.csv it addresses, the expected effect, effort, and how we will know it worked.",
           "produces": [
-            "{wd}action_items.csv"
+            "{wd}action_items_{project}_{sprint}.csv"
           ],
           "consumes": [
             "{wd}retro_report_{project}_{sprint}.md",
@@ -241,12 +241,12 @@
         },
         {
           "role": "create",
-          "prompt": "Assign owners and dates to {wd}action_items.csv. Write {wd}owner_assignments.csv with the action, the owner, the sprint it lands in, the checkpoint date and what the owner needs from others.",
+          "prompt": "Assign owners and dates to {wd}action_items_{project}_{sprint}.csv. Write {wd}owner_assignments_{project}_{sprint}.csv with the action, the owner, the sprint it lands in, the checkpoint date and what the owner needs from others.",
           "produces": [
-            "{wd}owner_assignments.csv"
+            "{wd}owner_assignments_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}action_items.csv"
+            "{wd}action_items_{project}_{sprint}.csv"
           ]
         }
       ]
@@ -278,23 +278,23 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build the action tracker at {wd}action_tracker_{project}_{sprint}.csv from {wd}owner_assignments.csv, adding columns for status, last update, blocking dependency and whether it carried over from an earlier retrospective.",
+          "prompt": "Build the action tracker at {wd}action_tracker_{project}_{sprint}.csv from {wd}owner_assignments_{project}_{sprint}.csv, adding columns for status, last update, blocking dependency and whether it carried over from an earlier retrospective.",
           "produces": [
             "{wd}action_tracker_{project}_{sprint}.csv"
           ],
           "consumes": [
-            "{wd}owner_assignments.csv"
+            "{wd}owner_assignments_{project}_{sprint}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Draft the next sprint plan at {wd}next_sprint_plan_{project}_{sprint}.md, taking the carry-over from {wd}ticket_flow.csv, the capacity implied by {wd}sprint_metrics.csv and the improvement actions in {wd}action_tracker_{project}_{sprint}.csv, and state the commitment you would make.",
+          "prompt": "Draft the next sprint plan at {wd}next_sprint_plan_{project}_{sprint}.md, taking the carry-over from {wd}ticket_flow_{project}_{sprint}.csv, the capacity implied by {wd}sprint_metrics_{project}_{sprint}.csv and the improvement actions in {wd}action_tracker_{project}_{sprint}.csv, and state the commitment you would make.",
           "produces": [
             "{wd}next_sprint_plan_{project}_{sprint}.md"
           ],
           "consumes": [
-            "{wd}ticket_flow.csv",
-            "{wd}sprint_metrics.csv",
+            "{wd}ticket_flow_{project}_{sprint}.csv",
+            "{wd}sprint_metrics_{project}_{sprint}.csv",
             "{wd}action_tracker_{project}_{sprint}.csv"
           ]
         },

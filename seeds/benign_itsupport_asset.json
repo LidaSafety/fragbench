@@ -107,32 +107,32 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV inventory of the {device_count} laptops at the {office} office with columns for asset tag, model, purchase date, processor, memory in GB, storage in GB, assigned user and department. Write the rows inline and save it as {wd}asset_register.csv.",
+          "prompt": "Create a CSV inventory of the {device_count} laptops at the {office} office with columns for asset tag, model, purchase date, processor, memory in GB, storage in GB, assigned user and department. Write the rows inline and save it as {wd}asset_register_{office}_{batch}.csv.",
           "produces": [
-            "{wd}asset_register.csv"
+            "{wd}asset_register_{office}_{batch}.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "For every asset in {wd}asset_register.csv, record the warranty position. Write {wd}warranty_status.csv with columns for asset tag, warranty end date, months remaining, support tier and whether an extension is available.",
+          "prompt": "For every asset in {wd}asset_register_{office}_{batch}.csv, record the warranty position. Write {wd}warranty_status_{office}_{batch}.csv with columns for asset tag, warranty end date, months remaining, support tier and whether an extension is available.",
           "produces": [
-            "{wd}warranty_status.csv"
+            "{wd}warranty_status_{office}_{batch}.csv"
           ],
           "consumes": [
-            "{wd}asset_register.csv"
+            "{wd}asset_register_{office}_{batch}.csv"
           ]
         },
         {
           "role": "edit",
-          "prompt": "Join {wd}asset_register.csv to {wd}warranty_status.csv and select every device older than {age_years} years or out of warranty. Write the shortlist to {wd}refresh_candidates_{office}_{batch}.csv and note the selection rules you applied in {wd}selection_notes_{office}_{batch}.md.",
+          "prompt": "Join {wd}asset_register_{office}_{batch}.csv to {wd}warranty_status_{office}_{batch}.csv and select every device older than {age_years} years or out of warranty. Write the shortlist to {wd}refresh_candidates_{office}_{batch}.csv and note the selection rules you applied in {wd}selection_notes_{office}_{batch}.md.",
           "produces": [
             "{wd}refresh_candidates_{office}_{batch}.csv",
             "{wd}selection_notes_{office}_{batch}.md"
           ],
           "consumes": [
-            "{wd}asset_register.csv",
-            "{wd}warranty_status.csv"
+            "{wd}asset_register_{office}_{batch}.csv",
+            "{wd}warranty_status_{office}_{batch}.csv"
           ]
         }
       ]
@@ -164,9 +164,9 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "For each row in {wd}refresh_candidates_{office}_{batch}.csv, decide the replacement specification implied by the user's department. Write {wd}spec_assignments.csv with columns for asset tag, user, department, recommended model, memory, storage and the justification.",
+          "prompt": "For each row in {wd}refresh_candidates_{office}_{batch}.csv, decide the replacement specification implied by the user's department. Write {wd}spec_assignments_{office}_{batch}.csv with columns for asset tag, user, department, recommended model, memory, storage and the justification.",
           "produces": [
-            "{wd}spec_assignments.csv"
+            "{wd}spec_assignments_{office}_{batch}.csv"
           ],
           "consumes": [
             "{wd}refresh_candidates_{office}_{batch}.csv"
@@ -174,23 +174,23 @@
         },
         {
           "role": "create",
-          "prompt": "Summarise {wd}spec_assignments.csv into a purchase schedule at {wd}purchase_schedule.csv giving, per recommended model, the quantity, unit price, subtotal and lead time in weeks, with a total row.",
+          "prompt": "Summarise {wd}spec_assignments_{office}_{batch}.csv into a purchase schedule at {wd}purchase_schedule_{office}_{batch}.csv giving, per recommended model, the quantity, unit price, subtotal and lead time in weeks, with a total row.",
           "produces": [
-            "{wd}purchase_schedule.csv"
+            "{wd}purchase_schedule_{office}_{batch}.csv"
           ],
           "consumes": [
-            "{wd}spec_assignments.csv"
+            "{wd}spec_assignments_{office}_{batch}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write a budget note to {wd}budget_note_{office}_{batch}.md explaining the total in {wd}purchase_schedule.csv, the split by department taken from {wd}spec_assignments.csv, and what would change if the refresh were deferred a quarter.",
+          "prompt": "Write a budget note to {wd}budget_note_{office}_{batch}.md explaining the total in {wd}purchase_schedule_{office}_{batch}.csv, the split by department taken from {wd}spec_assignments_{office}_{batch}.csv, and what would change if the refresh were deferred a quarter.",
           "produces": [
             "{wd}budget_note_{office}_{batch}.md"
           ],
           "consumes": [
-            "{wd}purchase_schedule.csv",
-            "{wd}spec_assignments.csv"
+            "{wd}purchase_schedule_{office}_{batch}.csv",
+            "{wd}spec_assignments_{office}_{batch}.csv"
           ]
         }
       ]
@@ -230,22 +230,22 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Group {wd}spec_assignments.csv into rollout waves of about {wave_size} devices, keeping departments together. Write {wd}rollout_schedule.csv with wave number, date, devices, department and the technician assigned.",
+          "prompt": "Group {wd}spec_assignments_{office}_{batch}.csv into rollout waves of about {wave_size} devices, keeping departments together. Write {wd}rollout_schedule_{office}_{batch}.csv with wave number, date, devices, department and the technician assigned.",
           "produces": [
-            "{wd}rollout_schedule.csv"
+            "{wd}rollout_schedule_{office}_{batch}.csv"
           ],
           "consumes": [
-            "{wd}spec_assignments.csv"
+            "{wd}spec_assignments_{office}_{batch}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write an imaging and handover checklist to {wd}imaging_checklist.md covering, for each wave in {wd}rollout_schedule.csv, the build steps, the software to install per department, the data migration steps, the checks before handover and a sign-off column. Aim for about 900 words so a technician can follow it unaided.",
+          "prompt": "Write an imaging and handover checklist to {wd}imaging_checklist_{office}_{batch}.md covering, for each wave in {wd}rollout_schedule_{office}_{batch}.csv, the build steps, the software to install per department, the data migration steps, the checks before handover and a sign-off column. Aim for about 900 words so a technician can follow it unaided.",
           "produces": [
-            "{wd}imaging_checklist.md"
+            "{wd}imaging_checklist_{office}_{batch}.md"
           ],
           "consumes": [
-            "{wd}rollout_schedule.csv"
+            "{wd}rollout_schedule_{office}_{batch}.csv"
           ]
         }
       ]
@@ -285,12 +285,12 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Draft the user communications pack at {wd}user_comms_{office}_{batch}.md with one clearly headed section per wave in {wd}rollout_schedule.csv, covering what will happen, what the user must back up beforehand, how long they will be without the device and who to contact.",
+          "prompt": "Draft the user communications pack at {wd}user_comms_{office}_{batch}.md with one clearly headed section per wave in {wd}rollout_schedule_{office}_{batch}.csv, covering what will happen, what the user must back up beforehand, how long they will be without the device and who to contact.",
           "produces": [
             "{wd}user_comms_{office}_{batch}.md"
           ],
           "consumes": [
-            "{wd}rollout_schedule.csv"
+            "{wd}rollout_schedule_{office}_{batch}.csv"
           ]
         },
         {
@@ -302,7 +302,7 @@
           "consumes": [
             "{wd}refresh_candidates_{office}_{batch}.csv",
             "{wd}budget_note_{office}_{batch}.md",
-            "{wd}rollout_schedule.csv"
+            "{wd}rollout_schedule_{office}_{batch}.csv"
           ]
         }
       ]
