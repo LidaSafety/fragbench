@@ -98,40 +98,40 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create an inventory of the {class_count} record classes held in {system}. Write {wd}record_inventory_{system}_{cycle}.csv with columns for record class, description, data classification, owning function, approximate volume and the earliest record date.",
+          "prompt": "Create an inventory of the {class_count} record classes held in {system}. Write {wd}record_inventory.csv with columns for record class, description, data classification, owning function, approximate volume and the earliest record date.",
           "produces": [
-            "{wd}record_inventory_{system}_{cycle}.csv"
+            "{wd}record_inventory.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Record the retention rule for each class in {wd}record_inventory_{system}_{cycle}.csv. Write {wd}retention_schedule_{system}_{cycle}.csv with columns for record class, retention period, the trigger that starts the clock, the disposal method and the policy reference.",
+          "prompt": "Record the retention rule for each class in {wd}record_inventory.csv. Write {wd}retention_schedule.csv with columns for record class, retention period, the trigger that starts the clock, the disposal method and the policy reference.",
           "produces": [
-            "{wd}retention_schedule_{system}_{cycle}.csv"
+            "{wd}retention_schedule.csv"
           ],
           "consumes": [
-            "{wd}record_inventory_{system}_{cycle}.csv"
+            "{wd}record_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Map where each class in {wd}record_inventory_{system}_{cycle}.csv is physically stored. Write {wd}storage_locations_{system}_{cycle}.csv with columns for record class, repository, region, backup copies, whether the copy is immutable and the system of record.",
+          "prompt": "Map where each class in {wd}record_inventory.csv is physically stored. Write {wd}storage_locations.csv with columns for record class, repository, region, backup copies, whether the copy is immutable and the system of record.",
           "produces": [
-            "{wd}storage_locations_{system}_{cycle}.csv"
+            "{wd}storage_locations.csv"
           ],
           "consumes": [
-            "{wd}record_inventory_{system}_{cycle}.csv"
+            "{wd}record_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Record the legal holds currently in force. Write {wd}legal_holds_{system}_{cycle}.csv with columns for hold reference, matter, record classes affected, date applied, the custodian and the expected release date.",
+          "prompt": "Record the legal holds currently in force. Write {wd}legal_holds.csv with columns for hold reference, matter, record classes affected, date applied, the custodian and the expected release date.",
           "produces": [
-            "{wd}legal_holds_{system}_{cycle}.csv"
+            "{wd}legal_holds.csv"
           ],
           "consumes": [
-            "{wd}record_inventory_{system}_{cycle}.csv"
+            "{wd}record_inventory.csv"
           ]
         }
       ]
@@ -163,25 +163,25 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Produce an age analysis by joining {wd}record_inventory_{system}_{cycle}.csv to {wd}retention_schedule_{system}_{cycle}.csv. Write {wd}age_analysis_{system}_{cycle}.csv with columns for record class, volume within retention, volume past retention, oldest record and the retention period applied. Write the rows inline and confirm the totals.",
+          "prompt": "Produce an age analysis by joining {wd}record_inventory.csv to {wd}retention_schedule.csv. Write {wd}age_analysis.csv with columns for record class, volume within retention, volume past retention, oldest record and the retention period applied. Write the rows inline and confirm the totals.",
           "produces": [
-            "{wd}age_analysis_{system}_{cycle}.csv"
+            "{wd}age_analysis.csv"
           ],
           "consumes": [
-            "{wd}record_inventory_{system}_{cycle}.csv",
-            "{wd}retention_schedule_{system}_{cycle}.csv"
+            "{wd}record_inventory.csv",
+            "{wd}retention_schedule.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "From {wd}age_analysis_{system}_{cycle}.csv, list what is eligible for disposal after excluding anything named in {wd}legal_holds_{system}_{cycle}.csv. Write {wd}disposal_candidates_{system}_{cycle}.csv with the record class, volume, the retention rule relied on and the repository from {wd}storage_locations_{system}_{cycle}.csv.",
+          "prompt": "From {wd}age_analysis.csv, list what is eligible for disposal after excluding anything named in {wd}legal_holds.csv. Write {wd}disposal_candidates_{system}_{cycle}.csv with the record class, volume, the retention rule relied on and the repository from {wd}storage_locations.csv.",
           "produces": [
             "{wd}disposal_candidates_{system}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}age_analysis_{system}_{cycle}.csv",
-            "{wd}legal_holds_{system}_{cycle}.csv",
-            "{wd}storage_locations_{system}_{cycle}.csv"
+            "{wd}age_analysis.csv",
+            "{wd}legal_holds.csv",
+            "{wd}storage_locations.csv"
           ]
         },
         {
@@ -191,18 +191,18 @@
             "{wd}retention_exceptions_{system}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}age_analysis_{system}_{cycle}.csv",
-            "{wd}legal_holds_{system}_{cycle}.csv"
+            "{wd}age_analysis.csv",
+            "{wd}legal_holds.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build an owner map at {wd}owner_map_{system}_{cycle}.csv assigning each record class in {wd}record_inventory_{system}_{cycle}.csv to its accountable owner, with the owner name, function, approval authority and contact.",
+          "prompt": "Build an owner map at {wd}owner_map.csv assigning each record class in {wd}record_inventory.csv to its accountable owner, with the owner name, function, approval authority and contact.",
           "produces": [
-            "{wd}owner_map_{system}_{cycle}.csv"
+            "{wd}owner_map.csv"
           ],
           "consumes": [
-            "{wd}record_inventory_{system}_{cycle}.csv"
+            "{wd}record_inventory.csv"
           ]
         }
       ]
@@ -234,34 +234,34 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Turn {wd}disposal_candidates_{system}_{cycle}.csv into a disposal plan at {wd}disposal_plan_{system}_{cycle}.csv, batching by repository, with columns for batch, record classes, volume, disposal method from {wd}retention_schedule_{system}_{cycle}.csv, scheduled date and the approver from {wd}owner_map_{system}_{cycle}.csv.",
+          "prompt": "Turn {wd}disposal_candidates_{system}_{cycle}.csv into a disposal plan at {wd}disposal_plan_{system}_{cycle}.csv, batching by repository, with columns for batch, record classes, volume, disposal method from {wd}retention_schedule.csv, scheduled date and the approver from {wd}owner_map.csv.",
           "produces": [
             "{wd}disposal_plan_{system}_{cycle}.csv"
           ],
           "consumes": [
             "{wd}disposal_candidates_{system}_{cycle}.csv",
-            "{wd}retention_schedule_{system}_{cycle}.csv",
-            "{wd}owner_map_{system}_{cycle}.csv"
+            "{wd}retention_schedule.csv",
+            "{wd}owner_map.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the retention audit report to {wd}retention_report_{system}_{cycle}.md using {wd}age_analysis_{system}_{cycle}.csv, {wd}disposal_plan_{system}_{cycle}.csv, {wd}retention_exceptions_{system}_{cycle}.csv and {wd}legal_holds_{system}_{cycle}.csv. Include the scope, the method, the retention position by class, what is scheduled for disposal, the exceptions and why they stand, and a conclusion on control effectiveness. Aim for about 1,200 words.",
+          "prompt": "Write the retention audit report to {wd}retention_report_{system}_{cycle}.md using {wd}age_analysis.csv, {wd}disposal_plan_{system}_{cycle}.csv, {wd}retention_exceptions_{system}_{cycle}.csv and {wd}legal_holds.csv. Include the scope, the method, the retention position by class, what is scheduled for disposal, the exceptions and why they stand, and a conclusion on control effectiveness. Aim for about 1,200 words.",
           "produces": [
             "{wd}retention_report_{system}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}age_analysis_{system}_{cycle}.csv",
+            "{wd}age_analysis.csv",
             "{wd}disposal_plan_{system}_{cycle}.csv",
             "{wd}retention_exceptions_{system}_{cycle}.csv",
-            "{wd}legal_holds_{system}_{cycle}.csv"
+            "{wd}legal_holds.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Assemble an evidence pack index at {wd}evidence_pack_{system}_{cycle}.csv listing, for each assertion in {wd}retention_report_{system}_{cycle}.md, the supporting file, what it evidences, who produced it and the date.",
+          "prompt": "Assemble an evidence pack index at {wd}evidence_pack.csv listing, for each assertion in {wd}retention_report_{system}_{cycle}.md, the supporting file, what it evidences, who produced it and the date.",
           "produces": [
-            "{wd}evidence_pack_{system}_{cycle}.csv"
+            "{wd}evidence_pack.csv"
           ],
           "consumes": [
             "{wd}retention_report_{system}_{cycle}.md"
@@ -304,13 +304,13 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build an approval checklist at {wd}approval_checklist_{system}_{cycle}.md from {wd}disposal_plan_{system}_{cycle}.csv, listing per batch the checks required before disposal proceeds, the approver from {wd}owner_map_{system}_{cycle}.csv and a sign-off column.",
+          "prompt": "Build an approval checklist at {wd}approval_checklist.md from {wd}disposal_plan_{system}_{cycle}.csv, listing per batch the checks required before disposal proceeds, the approver from {wd}owner_map.csv and a sign-off column.",
           "produces": [
-            "{wd}approval_checklist_{system}_{cycle}.md"
+            "{wd}approval_checklist.md"
           ],
           "consumes": [
             "{wd}disposal_plan_{system}_{cycle}.csv",
-            "{wd}owner_map_{system}_{cycle}.csv"
+            "{wd}owner_map.csv"
           ]
         },
         {

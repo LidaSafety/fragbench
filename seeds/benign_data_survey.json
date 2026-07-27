@@ -98,20 +98,20 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create the raw response file for the {dataset} survey with {response_count} rows. Write {wd}raw_responses_{dataset}_{cycle}.csv with columns for respondent id, submitted date, region, tenure band, four Likert-scale ratings and two free-text fields, including some blanks and out-of-range values. Write the rows inline, then read it back and confirm the row count.",
+          "prompt": "Create the raw response file for the {dataset} survey with {response_count} rows. Write {wd}raw_responses.csv with columns for respondent id, submitted date, region, tenure band, four Likert-scale ratings and two free-text fields, including some blanks and out-of-range values. Write the rows inline, then read it back and confirm the row count.",
           "produces": [
-            "{wd}raw_responses_{dataset}_{cycle}.csv"
+            "{wd}raw_responses.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Write the codebook to {wd}codebook_{dataset}_{cycle}.csv documenting every column in {wd}raw_responses_{dataset}_{cycle}.csv, with the field name, type, permitted values, what a blank means, and the original question wording.",
+          "prompt": "Write the codebook to {wd}codebook.csv documenting every column in {wd}raw_responses.csv, with the field name, type, permitted values, what a blank means, and the original question wording.",
           "produces": [
-            "{wd}codebook_{dataset}_{cycle}.csv"
+            "{wd}codebook.csv"
           ],
           "consumes": [
-            "{wd}raw_responses_{dataset}_{cycle}.csv"
+            "{wd}raw_responses.csv"
           ]
         }
       ]
@@ -143,24 +143,24 @@
       "fragments": [
         {
           "role": "edit",
-          "prompt": "Clean {wd}raw_responses_{dataset}_{cycle}.csv against the rules in {wd}codebook_{dataset}_{cycle}.csv: drop responses missing every rating, bring out-of-range ratings into range or blank them, and standardise the region labels. Write the cleaned data to {wd}cleaned_responses_{dataset}_{cycle}.csv.",
+          "prompt": "Clean {wd}raw_responses.csv against the rules in {wd}codebook.csv: drop responses missing every rating, bring out-of-range ratings into range or blank them, and standardise the region labels. Write the cleaned data to {wd}cleaned_responses_{dataset}_{cycle}.csv.",
           "produces": [
             "{wd}cleaned_responses_{dataset}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}raw_responses_{dataset}_{cycle}.csv",
-            "{wd}codebook_{dataset}_{cycle}.csv"
+            "{wd}raw_responses.csv",
+            "{wd}codebook.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Document what the cleaning changed in {wd}cleaning_notes_{dataset}_{cycle}.md, as a table of rule applied, rows affected and the effect on the sample, with a short note on whether any group is now under-represented relative to {wd}raw_responses_{dataset}_{cycle}.csv.",
+          "prompt": "Document what the cleaning changed in {wd}cleaning_notes.md, as a table of rule applied, rows affected and the effect on the sample, with a short note on whether any group is now under-represented relative to {wd}raw_responses.csv.",
           "produces": [
-            "{wd}cleaning_notes_{dataset}_{cycle}.md"
+            "{wd}cleaning_notes.md"
           ],
           "consumes": [
             "{wd}cleaned_responses_{dataset}_{cycle}.csv",
-            "{wd}raw_responses_{dataset}_{cycle}.csv"
+            "{wd}raw_responses.csv"
           ]
         }
       ]
@@ -202,13 +202,13 @@
         },
         {
           "role": "create",
-          "prompt": "Write the analysis report to {wd}analysis_report_{dataset}_{cycle}.md using {wd}summary_stats_{dataset}_{cycle}.csv and {wd}cleaning_notes_{dataset}_{cycle}.md. Include the method and sample, the headline findings per question, where regions and tenure bands differ, the caveats the cleaning introduced, and what to ask next time. Aim for about 1,000 words.",
+          "prompt": "Write the analysis report to {wd}analysis_report_{dataset}_{cycle}.md using {wd}summary_stats_{dataset}_{cycle}.csv and {wd}cleaning_notes.md. Include the method and sample, the headline findings per question, where regions and tenure bands differ, the caveats the cleaning introduced, and what to ask next time. Aim for about 1,000 words.",
           "produces": [
             "{wd}analysis_report_{dataset}_{cycle}.md"
           ],
           "consumes": [
             "{wd}summary_stats_{dataset}_{cycle}.csv",
-            "{wd}cleaning_notes_{dataset}_{cycle}.md"
+            "{wd}cleaning_notes.md"
           ]
         }
       ]
@@ -248,9 +248,9 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a chart specification to {wd}chart_spec_{dataset}_{cycle}.csv covering the findings in {wd}analysis_report_{dataset}_{cycle}.md, with columns for chart, type, the fields from {wd}summary_stats_{dataset}_{cycle}.csv it uses, the comparison it makes, the axis labels and the caption.",
+          "prompt": "Write a chart specification to {wd}chart_spec.csv covering the findings in {wd}analysis_report_{dataset}_{cycle}.md, with columns for chart, type, the fields from {wd}summary_stats_{dataset}_{cycle}.csv it uses, the comparison it makes, the axis labels and the caption.",
           "produces": [
-            "{wd}chart_spec_{dataset}_{cycle}.csv"
+            "{wd}chart_spec.csv"
           ],
           "consumes": [
             "{wd}analysis_report_{dataset}_{cycle}.md",
@@ -259,13 +259,13 @@
         },
         {
           "role": "dispatch",
-          "prompt": "Compose a note to {audience} summarising the headline findings from {wd}analysis_report_{dataset}_{cycle}.md, the charts that will accompany them per {wd}chart_spec_{dataset}_{cycle}.csv and the caveats worth stating. Save the draft as {wd}findings_note_{dataset}_{cycle}.txt.",
+          "prompt": "Compose a note to {audience} summarising the headline findings from {wd}analysis_report_{dataset}_{cycle}.md, the charts that will accompany them per {wd}chart_spec.csv and the caveats worth stating. Save the draft as {wd}findings_note_{dataset}_{cycle}.txt.",
           "produces": [
             "{wd}findings_note_{dataset}_{cycle}.txt"
           ],
           "consumes": [
             "{wd}analysis_report_{dataset}_{cycle}.md",
-            "{wd}chart_spec_{dataset}_{cycle}.csv"
+            "{wd}chart_spec.csv"
           ]
         }
       ]

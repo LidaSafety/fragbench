@@ -107,41 +107,41 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV inventory of the {volume_count} storage volumes in the {estate} estate with columns for volume id, array, capacity in TB, used in TB, filesystem, tier, snapshot policy and owning team. Write the rows inline and save it as {wd}volume_inventory_{estate}_{cycle}.csv.",
+          "prompt": "Create a CSV inventory of the {volume_count} storage volumes in the {estate} estate with columns for volume id, array, capacity in TB, used in TB, filesystem, tier, snapshot policy and owning team. Write the rows inline and save it as {wd}volume_inventory.csv.",
           "produces": [
-            "{wd}volume_inventory_{estate}_{cycle}.csv"
+            "{wd}volume_inventory.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Record where each volume in {wd}volume_inventory_{estate}_{cycle}.csv is mounted. Write {wd}mount_map_{estate}_{cycle}.csv with columns for volume id, hostname, mount point, access mode, application and environment.",
+          "prompt": "Record where each volume in {wd}volume_inventory.csv is mounted. Write {wd}mount_map.csv with columns for volume id, hostname, mount point, access mode, application and environment.",
           "produces": [
-            "{wd}mount_map_{estate}_{cycle}.csv"
+            "{wd}mount_map.csv"
           ],
           "consumes": [
-            "{wd}volume_inventory_{estate}_{cycle}.csv"
+            "{wd}volume_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Produce {window_months} months of used-capacity history for every volume in {wd}volume_inventory_{estate}_{cycle}.csv, aggregated to one row per volume per quarter. Write the long-format table inline to {wd}growth_history_{estate}_{cycle}.csv with columns for volume id, month, used TB and snapshot TB, then read it back and confirm the row count.",
+          "prompt": "Produce {window_months} months of used-capacity history for every volume in {wd}volume_inventory.csv, aggregated to one row per volume per quarter. Write the long-format table inline to {wd}growth_history.csv with columns for volume id, month, used TB and snapshot TB, then read it back and confirm the row count.",
           "produces": [
-            "{wd}growth_history_{estate}_{cycle}.csv"
+            "{wd}growth_history.csv"
           ],
           "consumes": [
-            "{wd}volume_inventory_{estate}_{cycle}.csv"
+            "{wd}volume_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build a quota register at {wd}quota_register_{estate}_{cycle}.csv from {wd}mount_map_{estate}_{cycle}.csv, giving per owning team the allocated capacity, the used capacity, the configured quota and the headroom remaining.",
+          "prompt": "Build a quota register at {wd}quota_register.csv from {wd}mount_map.csv, giving per owning team the allocated capacity, the used capacity, the configured quota and the headroom remaining.",
           "produces": [
-            "{wd}quota_register_{estate}_{cycle}.csv"
+            "{wd}quota_register.csv"
           ],
           "consumes": [
-            "{wd}mount_map_{estate}_{cycle}.csv",
-            "{wd}volume_inventory_{estate}_{cycle}.csv"
+            "{wd}mount_map.csv",
+            "{wd}volume_inventory.csv"
           ]
         }
       ]
@@ -181,46 +181,46 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "From {wd}growth_history_{estate}_{cycle}.csv, fit a simple monthly growth rate per volume and project usage {horizon_months} months out. Write {wd}growth_forecast_{estate}_{cycle}.csv with columns for volume id, current used TB, monthly growth rate, projected used TB and the month capacity is exhausted.",
+          "prompt": "From {wd}growth_history.csv, fit a simple monthly growth rate per volume and project usage {horizon_months} months out. Write {wd}growth_forecast.csv with columns for volume id, current used TB, monthly growth rate, projected used TB and the month capacity is exhausted.",
           "produces": [
-            "{wd}growth_forecast_{estate}_{cycle}.csv"
+            "{wd}growth_forecast.csv"
           ],
           "consumes": [
-            "{wd}growth_history_{estate}_{cycle}.csv"
+            "{wd}growth_history.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Classify each volume in {wd}volume_inventory_{estate}_{cycle}.csv as hot, warm or cold based on its access mode in {wd}mount_map_{estate}_{cycle}.csv and its snapshot growth in {wd}growth_history_{estate}_{cycle}.csv. Write {wd}access_classification_{estate}_{cycle}.csv with the classification and the evidence behind it.",
+          "prompt": "Classify each volume in {wd}volume_inventory.csv as hot, warm or cold based on its access mode in {wd}mount_map.csv and its snapshot growth in {wd}growth_history.csv. Write {wd}access_classification.csv with the classification and the evidence behind it.",
           "produces": [
-            "{wd}access_classification_{estate}_{cycle}.csv"
+            "{wd}access_classification.csv"
           ],
           "consumes": [
-            "{wd}volume_inventory_{estate}_{cycle}.csv",
-            "{wd}mount_map_{estate}_{cycle}.csv",
-            "{wd}growth_history_{estate}_{cycle}.csv"
+            "{wd}volume_inventory.csv",
+            "{wd}mount_map.csv",
+            "{wd}growth_history.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "List the volumes worth moving tier by combining {wd}access_classification_{estate}_{cycle}.csv with the current tier in {wd}volume_inventory_{estate}_{cycle}.csv. Write {wd}tiering_candidates_{estate}_{cycle}.csv with current tier, proposed tier, capacity to move and the reason.",
+          "prompt": "List the volumes worth moving tier by combining {wd}access_classification.csv with the current tier in {wd}volume_inventory.csv. Write {wd}tiering_candidates.csv with current tier, proposed tier, capacity to move and the reason.",
           "produces": [
-            "{wd}tiering_candidates_{estate}_{cycle}.csv"
+            "{wd}tiering_candidates.csv"
           ],
           "consumes": [
-            "{wd}access_classification_{estate}_{cycle}.csv",
-            "{wd}volume_inventory_{estate}_{cycle}.csv"
+            "{wd}access_classification.csv",
+            "{wd}volume_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build a cost model at {wd}cost_model_{estate}_{cycle}.csv from {wd}tiering_candidates_{estate}_{cycle}.csv and {wd}growth_forecast_{estate}_{cycle}.csv, showing per tier the current monthly cost, the projected cost with no change, and the projected cost after the proposed moves.",
+          "prompt": "Build a cost model at {wd}cost_model.csv from {wd}tiering_candidates.csv and {wd}growth_forecast.csv, showing per tier the current monthly cost, the projected cost with no change, and the projected cost after the proposed moves.",
           "produces": [
-            "{wd}cost_model_{estate}_{cycle}.csv"
+            "{wd}cost_model.csv"
           ],
           "consumes": [
-            "{wd}tiering_candidates_{estate}_{cycle}.csv",
-            "{wd}growth_forecast_{estate}_{cycle}.csv"
+            "{wd}tiering_candidates.csv",
+            "{wd}growth_forecast.csv"
           ]
         }
       ]
@@ -260,24 +260,24 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a tiering policy to {wd}tiering_policy_{estate}_{cycle}.md setting out the rules that decide which tier a volume belongs on, derived from the classifications in {wd}access_classification_{estate}_{cycle}.csv and the economics in {wd}cost_model_{estate}_{cycle}.csv. Include the thresholds, the review cadence and the exemption process.",
+          "prompt": "Write a tiering policy to {wd}tiering_policy_{estate}_{cycle}.md setting out the rules that decide which tier a volume belongs on, derived from the classifications in {wd}access_classification.csv and the economics in {wd}cost_model.csv. Include the thresholds, the review cadence and the exemption process.",
           "produces": [
             "{wd}tiering_policy_{estate}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}access_classification_{estate}_{cycle}.csv",
-            "{wd}cost_model_{estate}_{cycle}.csv"
+            "{wd}access_classification.csv",
+            "{wd}cost_model.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Group the moves in {wd}tiering_candidates_{estate}_{cycle}.csv into migration waves that respect the application groupings in {wd}mount_map_{estate}_{cycle}.csv. Write {wd}migration_waves_{estate}_{cycle}.csv with wave number, volumes, capacity moved, expected duration and the applications affected.",
+          "prompt": "Group the moves in {wd}tiering_candidates.csv into migration waves that respect the application groupings in {wd}mount_map.csv. Write {wd}migration_waves_{estate}_{cycle}.csv with wave number, volumes, capacity moved, expected duration and the applications affected.",
           "produces": [
             "{wd}migration_waves_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}tiering_candidates_{estate}_{cycle}.csv",
-            "{wd}mount_map_{estate}_{cycle}.csv"
+            "{wd}tiering_candidates.csv",
+            "{wd}mount_map.csv"
           ]
         },
         {
@@ -292,14 +292,14 @@
         },
         {
           "role": "create",
-          "prompt": "Write a storage capacity report to {wd}storage_report_{estate}_{cycle}.md using {wd}growth_forecast_{estate}_{cycle}.csv, {wd}quota_register_{estate}_{cycle}.csv, {wd}cost_model_{estate}_{cycle}.csv and {wd}migration_waves_{estate}_{cycle}.csv. Include an executive summary, the capacity position by team, the forecast and exhaustion dates, the proposed tiering with its cost effect, and prioritised recommendations. Aim for about 1,200 words.",
+          "prompt": "Write a storage capacity report to {wd}storage_report_{estate}_{cycle}.md using {wd}growth_forecast.csv, {wd}quota_register.csv, {wd}cost_model.csv and {wd}migration_waves_{estate}_{cycle}.csv. Include an executive summary, the capacity position by team, the forecast and exhaustion dates, the proposed tiering with its cost effect, and prioritised recommendations. Aim for about 1,200 words.",
           "produces": [
             "{wd}storage_report_{estate}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}growth_forecast_{estate}_{cycle}.csv",
-            "{wd}quota_register_{estate}_{cycle}.csv",
-            "{wd}cost_model_{estate}_{cycle}.csv",
+            "{wd}growth_forecast.csv",
+            "{wd}quota_register.csv",
+            "{wd}cost_model.csv",
             "{wd}migration_waves_{estate}_{cycle}.csv"
           ]
         }
@@ -350,24 +350,24 @@
         },
         {
           "role": "create",
-          "prompt": "Build a post-migration validation checklist at {wd}validation_checklist_{estate}_{cycle}.md from {wd}migration_runbook_{estate}_{cycle}.md and {wd}mount_map_{estate}_{cycle}.csv, grouped by wave, listing the mount and application checks and a sign-off column.",
+          "prompt": "Build a post-migration validation checklist at {wd}validation_checklist.md from {wd}migration_runbook_{estate}_{cycle}.md and {wd}mount_map.csv, grouped by wave, listing the mount and application checks and a sign-off column.",
           "produces": [
-            "{wd}validation_checklist_{estate}_{cycle}.md"
+            "{wd}validation_checklist.md"
           ],
           "consumes": [
             "{wd}migration_runbook_{estate}_{cycle}.md",
-            "{wd}mount_map_{estate}_{cycle}.csv"
+            "{wd}mount_map.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Record every volume in {wd}tiering_candidates_{estate}_{cycle}.csv that will not move this cycle in {wd}exception_log_{estate}_{cycle}.csv, with the reason, the owning team, the compensating action and the review date.",
+          "prompt": "Record every volume in {wd}tiering_candidates.csv that will not move this cycle in {wd}exception_log_{estate}_{cycle}.csv, with the reason, the owning team, the compensating action and the review date.",
           "produces": [
             "{wd}exception_log_{estate}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}tiering_candidates_{estate}_{cycle}.csv",
-            "{wd}quota_register_{estate}_{cycle}.csv"
+            "{wd}tiering_candidates.csv",
+            "{wd}quota_register.csv"
           ]
         },
         {

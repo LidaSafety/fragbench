@@ -45,7 +45,19 @@ opposite direction are stale — the seed trims fixed them.
 
 ## B. Open blockers
 
-### B1. Artifact filenames are identical across variations *(must fix before authoring the remaining seeds)*
+### B1. Artifact filenames are identical across variations *(resolved, then partly reversed by decision)*
+
+> **Update.** The discriminator described below was applied to *every* artifact
+> name, which overcorrected: it drove cross-chain resource sharing to zero (462 of
+> 504 chains shared nothing with any other chain) against a malicious median of 7,
+> on the same `shared_resource` edge this blocker was worried about. Artifact names
+> are now two-tier: headline deliverables keep the discriminator, while 2 to 9
+> reference-shaped stems per campaign (`SHARED_ARTIFACTS` in
+> `scripts/author_benign_seeds.py`) carry a bare shared name. Measured after the
+> change: median 6 shared resources per chain, and a median of 6 uniquely-named
+> deliverables per variation, so variations still do not fuse. Read the rest of
+> this blocker as the reasoning that led to the discriminator, not as the current
+> design.
 
 ```
 benign    seed 0/1/2 → server_inventory.csv  server_inventory.csv  server_inventory.csv
@@ -136,7 +148,20 @@ tidy sandbox.
   shared and cumulative across both classes, so the environment is a constant
   rather than a class marker.
 
-### B2. No detector evaluation code for real data *(deferred by decision; resolve before Step 6)*
+### B2. No detector evaluation code for real data *(RESOLVED)*
+
+> **Update.** This blocker is closed. The evaluation half now exists:
+> `fragbench-structural-graph-main/dataset/build_real_graph.py` builds the five
+> edge types from executed traces, `training/` holds the model panel,
+> `ablations/real_edge_ablation.py` ablates edge types (including
+> `drop_shared_resource`), and `scripts/` gained `build_executed_benign_json.py`,
+> `train_on_traces.py`, `run_loco.py`, `run_original_harness.py` and
+> `quarantine_dead_chains.py`. `run_original_harness.py` is the closest thing to a
+> Table 3 reproduction; there is still no single wrapper command, and no
+> macro-F1, FPR-at-fixed-TPR, or persisted per-event probabilities anywhere in the
+> pipeline. Note the two entrypoints disagree on the split:
+> `run_original_harness.py` uses `test_size=0.2` to match the published run while
+> `train_on_traces.py` defaults to `0.3`. The original text follows.
 
 `fragbench-structural-graph-main/` contains `PrecomputedMLPGNN/`,
 `GradientBoostedTree/` and `dataset/normalize_dataset.py`, but every `main()` there
@@ -167,11 +192,18 @@ Each step is run by hand. Commands are given verbatim; run from the repo root wi
    - `benign_it_onboarding`: `{office}` (24) × `{intake}` (20) = 480
 
    480 combinations puts the expected number of colliding pairs across 21
-   variations at ≈0.44, so parallel execution is safe in practice.
-3. ✅ Regenerated and verified: 21/21 distinct artifact names per campaign, zero
-   collisions, zero unresolved placeholders, zero absolute paths, validator clean
-   (210 and 147 fragments), and `attack_runner --dry-run` resolves the full
-   dependency ordering.
+   variations at ≈0.44 *for the discriminated tier*. The shared reference stems
+   collide across variations by design, so parallel execution is no longer safe
+   on that basis alone: concurrent variations can write the same bare name. Per
+   decision, this is measured in the smoke pass (style=direct across all 24
+   campaigns) via `scripts/summarize_benign_run.py` rather than pre-emptively
+   throttled; drop `PAR` only if the tool-result failure rate actually degrades.
+3. ✅ Regenerated and verified: zero unresolved placeholders, zero absolute paths,
+   validator clean (210 and 147 fragments), and `attack_runner --dry-run` resolves
+   the full dependency ordering. Artifact-name uniqueness now applies to the
+   discriminated tier only: each variation carries a median of 6 uniquely-named
+   deliverables, while the shared reference stems are common across variations on
+   purpose (see the update at the top of B1).
 
    Canonical regeneration command (`--output-json` is **required**; `make -f
    Makefrag` wraps it and rebuilds every seed whose result file is stale):
@@ -190,7 +222,8 @@ Each step is run by hand. Commands are given verbatim; run from the repo root wi
    ```
    Expect all fragments `PASS` and distinct filenames in `tools_executed`.
 
-**Exit criterion:** two seeds of the same campaign write disjoint artifact sets.
+**Exit criterion:** two seeds of the same campaign write disjoint *deliverable*
+sets, while sharing the reference tier.
 The generation half is met. First execution check: seed 0 of
 `BENIGN_SYSADMIN_CAPACITY` ran 8/10 PASS, with fragments 3 and 4 failing to
 root-mixing (blocker B1a), not to the discriminator.
@@ -249,10 +282,16 @@ Per-seed requirements (`benign_targets.md` §4, plus §7a which the pilot added)
 - seed-authoring model: `claude-sonnet-4.5` (§8), matching the released benign corpus
 - benign-only toolkits; no `scan_subnet` / `summarize_exposure` / `upload_archive`
 - **a per-variation filename discriminator, per Step 1** — two `filename`
-  variables in stage 0, `inherit`ed by every later stage, embedded in every
-  artifact name in the prompts *and* in `produces` / `consumes`. Aim for ≥400
-  combinations. Pick campaign-appropriate axes (site/cycle, office/intake,
-  course/term, client/sprint …) rather than reusing one pair everywhere.
+  variables in stage 0, `inherit`ed by every later stage, embedded in the
+  *deliverable* artifact names in the prompts *and* in `produces` / `consumes`.
+  Aim for ≥400 combinations. Pick campaign-appropriate axes (site/cycle,
+  office/intake, course/term, client/sprint …) rather than reusing one pair
+  everywhere.
+- **a shared reference tier** — 2 to 9 reference-shaped, read-mostly stems per
+  campaign (registers, catalogues, matrices, schedules, codebooks) listed in
+  `SHARED_ARTIFACTS`, which drop the discriminator so chains share resources the
+  way malicious chains do. Vary the count per campaign; a constant would be a tell
+  in its own right.
 
 Validate each as authored:
 ```bash
@@ -289,8 +328,11 @@ Step 1 lands) ≈ 13 h.
 
 Run **one campaign at a time** — the `server-filesystem` restart at the top of
 `docker-attack-graph-run` resets `/workspace`, so concurrent campaigns clobber each
-other. `.pilot_onboarding.sh` is the no-restart variant if campaigns must overlap;
-cross-campaign filename collisions are unlikely but `/workspace` accumulates.
+other. `.pilot_onboarding.sh` is the no-restart variant if campaigns must overlap.
+Cross-campaign filename collisions are now *expected*, not unlikely: four shared
+reference stems (`exception_register.csv`, `topic_inventory.csv`,
+`validation_checklist.md`, `ticket_extract.csv`) recur across two campaigns each
+by design, and `/workspace` accumulates on top of that.
 
 ```bash
 for f in results/benign_*_manual.json; do

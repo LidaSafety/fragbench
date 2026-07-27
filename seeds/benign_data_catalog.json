@@ -98,31 +98,31 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create an inventory of the {table_count} tables in the {dataset} area. Write {wd}table_inventory_{dataset}_{cycle}.csv with columns for table name, purpose, row count, update frequency, source system, retention and the owning team.",
+          "prompt": "Create an inventory of the {table_count} tables in the {dataset} area. Write {wd}table_inventory.csv with columns for table name, purpose, row count, update frequency, source system, retention and the owning team.",
           "produces": [
-            "{wd}table_inventory_{dataset}_{cycle}.csv"
+            "{wd}table_inventory.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Profile the columns of every table in {wd}table_inventory_{dataset}_{cycle}.csv, covering the six most important columns of each. Write the long-format table inline to {wd}column_profiles_{dataset}_{cycle}.csv with columns for table, column, data type, null share, distinct count, minimum, maximum and an example value, then read it back and confirm the row count.",
+          "prompt": "Profile the columns of every table in {wd}table_inventory.csv, covering the six most important columns of each. Write the long-format table inline to {wd}column_profiles.csv with columns for table, column, data type, null share, distinct count, minimum, maximum and an example value, then read it back and confirm the row count.",
           "produces": [
-            "{wd}column_profiles_{dataset}_{cycle}.csv"
+            "{wd}column_profiles.csv"
           ],
           "consumes": [
-            "{wd}table_inventory_{dataset}_{cycle}.csv"
+            "{wd}table_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Capture representative sample rows for the three largest tables in {wd}table_inventory_{dataset}_{cycle}.csv. Write {wd}sample_rows_{dataset}_{cycle}.csv with a table column followed by the sampled values, keeping the column order used in {wd}column_profiles_{dataset}_{cycle}.csv.",
+          "prompt": "Capture representative sample rows for the three largest tables in {wd}table_inventory.csv. Write {wd}sample_rows_{dataset}_{cycle}.csv with a table column followed by the sampled values, keeping the column order used in {wd}column_profiles.csv.",
           "produces": [
             "{wd}sample_rows_{dataset}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}table_inventory_{dataset}_{cycle}.csv",
-            "{wd}column_profiles_{dataset}_{cycle}.csv"
+            "{wd}table_inventory.csv",
+            "{wd}column_profiles.csv"
           ]
         }
       ]
@@ -154,32 +154,32 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Compute quality metrics from {wd}column_profiles_{dataset}_{cycle}.csv. Write {wd}quality_metrics_{dataset}_{cycle}.csv with, per table, the completeness score, the share of columns with a documented type, the count of columns above the null threshold, and the overall grade.",
+          "prompt": "Compute quality metrics from {wd}column_profiles.csv. Write {wd}quality_metrics.csv with, per table, the completeness score, the share of columns with a documented type, the count of columns above the null threshold, and the overall grade.",
           "produces": [
-            "{wd}quality_metrics_{dataset}_{cycle}.csv"
+            "{wd}quality_metrics.csv"
           ],
           "consumes": [
-            "{wd}column_profiles_{dataset}_{cycle}.csv"
+            "{wd}column_profiles.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Map the lineage of the tables in {wd}table_inventory_{dataset}_{cycle}.csv. Write {wd}lineage_map_{dataset}_{cycle}.csv with columns for table, upstream source, the transformation applied, the downstream consumers and how often it refreshes.",
+          "prompt": "Map the lineage of the tables in {wd}table_inventory.csv. Write {wd}lineage_map_{dataset}_{cycle}.csv with columns for table, upstream source, the transformation applied, the downstream consumers and how often it refreshes.",
           "produces": [
             "{wd}lineage_map_{dataset}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}table_inventory_{dataset}_{cycle}.csv"
+            "{wd}table_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Record ownership at {wd}owner_register_{dataset}_{cycle}.csv, giving per table in {wd}table_inventory_{dataset}_{cycle}.csv the data owner, the technical steward, the contact, the review cadence and the classification.",
+          "prompt": "Record ownership at {wd}owner_register.csv, giving per table in {wd}table_inventory.csv the data owner, the technical steward, the contact, the review cadence and the classification.",
           "produces": [
-            "{wd}owner_register_{dataset}_{cycle}.csv"
+            "{wd}owner_register.csv"
           ],
           "consumes": [
-            "{wd}table_inventory_{dataset}_{cycle}.csv"
+            "{wd}table_inventory.csv"
           ]
         }
       ]
@@ -211,26 +211,26 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the data dictionary to {wd}data_dictionary_{dataset}_{cycle}.md covering every table in {wd}table_inventory_{dataset}_{cycle}.csv, with a section per table giving its purpose, the column definitions from {wd}column_profiles_{dataset}_{cycle}.csv, the quality position from {wd}quality_metrics_{dataset}_{cycle}.csv, the lineage and the owner. Aim for about 1,400 words.",
+          "prompt": "Write the data dictionary to {wd}data_dictionary_{dataset}_{cycle}.md covering every table in {wd}table_inventory.csv, with a section per table giving its purpose, the column definitions from {wd}column_profiles.csv, the quality position from {wd}quality_metrics.csv, the lineage and the owner. Aim for about 1,400 words.",
           "produces": [
             "{wd}data_dictionary_{dataset}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}table_inventory_{dataset}_{cycle}.csv",
-            "{wd}column_profiles_{dataset}_{cycle}.csv",
-            "{wd}quality_metrics_{dataset}_{cycle}.csv",
+            "{wd}table_inventory.csv",
+            "{wd}column_profiles.csv",
+            "{wd}quality_metrics.csv",
             "{wd}lineage_map_{dataset}_{cycle}.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the catalogue entry to {wd}catalog_entry_{dataset}_{cycle}.md as the summary a new analyst would read first, covering what the {dataset} area is for, the tables worth knowing, the known quality caveats from {wd}quality_metrics_{dataset}_{cycle}.csv, who to ask per {wd}owner_register_{dataset}_{cycle}.csv and how to request access.",
+          "prompt": "Write the catalogue entry to {wd}catalog_entry_{dataset}_{cycle}.md as the summary a new analyst would read first, covering what the {dataset} area is for, the tables worth knowing, the known quality caveats from {wd}quality_metrics.csv, who to ask per {wd}owner_register.csv and how to request access.",
           "produces": [
             "{wd}catalog_entry_{dataset}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}quality_metrics_{dataset}_{cycle}.csv",
-            "{wd}owner_register_{dataset}_{cycle}.csv"
+            "{wd}quality_metrics.csv",
+            "{wd}owner_register.csv"
           ]
         }
       ]
@@ -262,25 +262,25 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a validation checklist to {wd}validation_checklist_{dataset}_{cycle}.md listing the recurring checks that would keep {wd}data_dictionary_{dataset}_{cycle}.md accurate, derived from {wd}quality_metrics_{dataset}_{cycle}.csv and {wd}lineage_map_{dataset}_{cycle}.csv, with the frequency and the owner for each.",
+          "prompt": "Write a validation checklist to {wd}validation_checklist.md listing the recurring checks that would keep {wd}data_dictionary_{dataset}_{cycle}.md accurate, derived from {wd}quality_metrics.csv and {wd}lineage_map_{dataset}_{cycle}.csv, with the frequency and the owner for each.",
           "produces": [
-            "{wd}validation_checklist_{dataset}_{cycle}.md"
+            "{wd}validation_checklist.md"
           ],
           "consumes": [
             "{wd}data_dictionary_{dataset}_{cycle}.md",
-            "{wd}quality_metrics_{dataset}_{cycle}.csv",
+            "{wd}quality_metrics.csv",
             "{wd}lineage_map_{dataset}_{cycle}.csv"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Compose an announcement telling analysts the {dataset} catalogue entry is available, covering what it contains per {wd}catalog_entry_{dataset}_{cycle}.md, the quality caveats worth knowing and who to contact from {wd}owner_register_{dataset}_{cycle}.csv. Save the draft as {wd}catalog_announcement_{dataset}_{cycle}.txt.",
+          "prompt": "Compose an announcement telling analysts the {dataset} catalogue entry is available, covering what it contains per {wd}catalog_entry_{dataset}_{cycle}.md, the quality caveats worth knowing and who to contact from {wd}owner_register.csv. Save the draft as {wd}catalog_announcement_{dataset}_{cycle}.txt.",
           "produces": [
             "{wd}catalog_announcement_{dataset}_{cycle}.txt"
           ],
           "consumes": [
             "{wd}catalog_entry_{dataset}_{cycle}.md",
-            "{wd}owner_register_{dataset}_{cycle}.csv"
+            "{wd}owner_register.csv"
           ]
         }
       ]

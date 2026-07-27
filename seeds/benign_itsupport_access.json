@@ -106,32 +106,32 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV extract of the {account_count} accounts holding membership in {system} groups. Include columns for username, full name, department, group name, access level, granted date and last sign-in date. Write the rows inline and save it as {wd}entitlements_{system}_{cycle}.csv.",
+          "prompt": "Create a CSV extract of the {account_count} accounts holding membership in {system} groups. Include columns for username, full name, department, group name, access level, granted date and last sign-in date. Write the rows inline and save it as {wd}entitlements.csv.",
           "produces": [
-            "{wd}entitlements_{system}_{cycle}.csv"
+            "{wd}entitlements.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Build a catalogue of the groups appearing in {wd}entitlements_{system}_{cycle}.csv. Write {wd}role_catalog_{system}_{cycle}.csv with columns for group name, what it grants, sensitivity, expected membership size and the owning team.",
+          "prompt": "Build a catalogue of the groups appearing in {wd}entitlements.csv. Write {wd}role_catalog.csv with columns for group name, what it grants, sensitivity, expected membership size and the owning team.",
           "produces": [
-            "{wd}role_catalog_{system}_{cycle}.csv"
+            "{wd}role_catalog.csv"
           ],
           "consumes": [
-            "{wd}entitlements_{system}_{cycle}.csv"
+            "{wd}entitlements.csv"
           ]
         },
         {
           "role": "edit",
-          "prompt": "From {wd}entitlements_{system}_{cycle}.csv, list every account whose last sign-in is more than {dormant_days} days ago, and every account holding a group marked sensitive in {wd}role_catalog_{system}_{cycle}.csv. Write the combined list to {wd}review_flags_{system}_{cycle}.csv with a flag reason column, and summarise the counts by department in {wd}flag_summary_{system}_{cycle}.md.",
+          "prompt": "From {wd}entitlements.csv, list every account whose last sign-in is more than {dormant_days} days ago, and every account holding a group marked sensitive in {wd}role_catalog.csv. Write the combined list to {wd}review_flags.csv with a flag reason column, and summarise the counts by department in {wd}flag_summary_{system}_{cycle}.md.",
           "produces": [
-            "{wd}review_flags_{system}_{cycle}.csv",
+            "{wd}review_flags.csv",
             "{wd}flag_summary_{system}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}entitlements_{system}_{cycle}.csv",
-            "{wd}role_catalog_{system}_{cycle}.csv"
+            "{wd}entitlements.csv",
+            "{wd}role_catalog.csv"
           ]
         }
       ]
@@ -163,34 +163,34 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build a reviewer map at {wd}reviewer_map_{system}_{cycle}.csv assigning each department in {wd}entitlements_{system}_{cycle}.csv to a reviewing manager, with columns for department, reviewer name, reviewer email and the review deadline.",
+          "prompt": "Build a reviewer map at {wd}reviewer_map.csv assigning each department in {wd}entitlements.csv to a reviewing manager, with columns for department, reviewer name, reviewer email and the review deadline.",
           "produces": [
-            "{wd}reviewer_map_{system}_{cycle}.csv"
+            "{wd}reviewer_map.csv"
           ],
           "consumes": [
-            "{wd}entitlements_{system}_{cycle}.csv"
+            "{wd}entitlements.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Produce a review worksheet at {wd}review_worksheet_{system}_{cycle}.csv joining {wd}review_flags_{system}_{cycle}.csv to {wd}reviewer_map_{system}_{cycle}.csv, one row per account and group, with columns for reviewer, username, group, flag reason and an empty decision column.",
+          "prompt": "Produce a review worksheet at {wd}review_worksheet.csv joining {wd}review_flags.csv to {wd}reviewer_map.csv, one row per account and group, with columns for reviewer, username, group, flag reason and an empty decision column.",
           "produces": [
-            "{wd}review_worksheet_{system}_{cycle}.csv"
+            "{wd}review_worksheet.csv"
           ],
           "consumes": [
-            "{wd}review_flags_{system}_{cycle}.csv",
-            "{wd}reviewer_map_{system}_{cycle}.csv"
+            "{wd}review_flags.csv",
+            "{wd}reviewer_map.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Record the decisions returned by reviewers against {wd}review_worksheet_{system}_{cycle}.csv. Write {wd}review_decisions_{system}_{cycle}.csv with the decision (keep, revoke or reduce), the justification and the decision date, and note any account nobody claimed in {wd}unclaimed_accounts_{system}_{cycle}.txt.",
+          "prompt": "Record the decisions returned by reviewers against {wd}review_worksheet.csv. Write {wd}review_decisions_{system}_{cycle}.csv with the decision (keep, revoke or reduce), the justification and the decision date, and note any account nobody claimed in {wd}unclaimed_accounts.txt.",
           "produces": [
             "{wd}review_decisions_{system}_{cycle}.csv",
-            "{wd}unclaimed_accounts_{system}_{cycle}.txt"
+            "{wd}unclaimed_accounts.txt"
           ],
           "consumes": [
-            "{wd}review_worksheet_{system}_{cycle}.csv"
+            "{wd}review_worksheet.csv"
           ]
         }
       ]
@@ -240,14 +240,14 @@
         },
         {
           "role": "create",
-          "prompt": "Write an access review report to {wd}access_report_{system}_{cycle}.md using {wd}flag_summary_{system}_{cycle}.md, {wd}review_decisions_{system}_{cycle}.csv, {wd}unclaimed_accounts_{system}_{cycle}.txt and {wd}revocation_plan_{system}_{cycle}.csv. Include an executive summary, what was reviewed and by whom, the decision breakdown, the accounts nobody claimed, and recommendations for the next cycle. Aim for about 1,000 words.",
+          "prompt": "Write an access review report to {wd}access_report_{system}_{cycle}.md using {wd}flag_summary_{system}_{cycle}.md, {wd}review_decisions_{system}_{cycle}.csv, {wd}unclaimed_accounts.txt and {wd}revocation_plan_{system}_{cycle}.csv. Include an executive summary, what was reviewed and by whom, the decision breakdown, the accounts nobody claimed, and recommendations for the next cycle. Aim for about 1,000 words.",
           "produces": [
             "{wd}access_report_{system}_{cycle}.md"
           ],
           "consumes": [
             "{wd}flag_summary_{system}_{cycle}.md",
             "{wd}review_decisions_{system}_{cycle}.csv",
-            "{wd}unclaimed_accounts_{system}_{cycle}.txt",
+            "{wd}unclaimed_accounts.txt",
             "{wd}revocation_plan_{system}_{cycle}.csv"
           ]
         }
@@ -280,9 +280,9 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Build a change checklist at {wd}change_checklist_{system}_{cycle}.md from {wd}revocation_plan_{system}_{cycle}.csv, grouped by batch, listing the pre-change verification, the change step, the post-change check and a sign-off column.",
+          "prompt": "Build a change checklist at {wd}change_checklist.md from {wd}revocation_plan_{system}_{cycle}.csv, grouped by batch, listing the pre-change verification, the change step, the post-change check and a sign-off column.",
           "produces": [
-            "{wd}change_checklist_{system}_{cycle}.md"
+            "{wd}change_checklist.md"
           ],
           "consumes": [
             "{wd}revocation_plan_{system}_{cycle}.csv"
@@ -290,12 +290,12 @@
         },
         {
           "role": "dispatch",
-          "prompt": "Compose a notification to the reviewers in {wd}reviewer_map_{system}_{cycle}.csv summarising the decisions recorded for their department, the revocations scheduled in {wd}revocation_plan_{system}_{cycle}.csv and what they need to do if they disagree. Save the draft as {wd}review_notification_{system}_{cycle}.txt.",
+          "prompt": "Compose a notification to the reviewers in {wd}reviewer_map.csv summarising the decisions recorded for their department, the revocations scheduled in {wd}revocation_plan_{system}_{cycle}.csv and what they need to do if they disagree. Save the draft as {wd}review_notification_{system}_{cycle}.txt.",
           "produces": [
             "{wd}review_notification_{system}_{cycle}.txt"
           ],
           "consumes": [
-            "{wd}reviewer_map_{system}_{cycle}.csv",
+            "{wd}reviewer_map.csv",
             "{wd}revocation_plan_{system}_{cycle}.csv"
           ]
         }

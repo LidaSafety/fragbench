@@ -99,30 +99,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV inventory of the {host_count} hosts in the {fleet} fleet with columns for hostname, operating system, kernel version, environment, owning team, last reboot date and maintenance window. Write the rows inline and save it as {wd}host_inventory_{fleet}_{cycle}.csv.",
+          "prompt": "Create a CSV inventory of the {host_count} hosts in the {fleet} fleet with columns for hostname, operating system, kernel version, environment, owning team, last reboot date and maintenance window. Write the rows inline and save it as {wd}host_inventory.csv.",
           "produces": [
-            "{wd}host_inventory_{fleet}_{cycle}.csv"
+            "{wd}host_inventory.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "For every host in {wd}host_inventory_{fleet}_{cycle}.csv, record the installed versions of the four packages we track. Write a long-format table with columns for hostname, package, installed version and install date to {wd}package_versions_{fleet}_{cycle}.csv, then read it back and confirm the row count.",
+          "prompt": "For every host in {wd}host_inventory.csv, record the installed versions of the four packages we track. Write a long-format table with columns for hostname, package, installed version and install date to {wd}package_versions.csv, then read it back and confirm the row count.",
           "produces": [
-            "{wd}package_versions_{fleet}_{cycle}.csv"
+            "{wd}package_versions.csv"
           ],
           "consumes": [
-            "{wd}host_inventory_{fleet}_{cycle}.csv"
+            "{wd}host_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Summarise {wd}package_versions_{fleet}_{cycle}.csv into a baseline at {wd}patch_baseline_{fleet}_{cycle}.csv giving, per package, the most common installed version, the oldest version present and the number of hosts on each.",
+          "prompt": "Summarise {wd}package_versions.csv into a baseline at {wd}patch_baseline.csv giving, per package, the most common installed version, the oldest version present and the number of hosts on each.",
           "produces": [
-            "{wd}patch_baseline_{fleet}_{cycle}.csv"
+            "{wd}patch_baseline.csv"
           ],
           "consumes": [
-            "{wd}package_versions_{fleet}_{cycle}.csv"
+            "{wd}package_versions.csv"
           ]
         }
       ]
@@ -162,33 +162,33 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Record the {advisory_count} vendor advisories published this cycle in {wd}advisories_{fleet}_{cycle}.csv with columns for advisory id, affected package, fixed version, severity rating, published date and a one-line summary.",
+          "prompt": "Record the {advisory_count} vendor advisories published this cycle in {wd}advisories.csv with columns for advisory id, affected package, fixed version, severity rating, published date and a one-line summary.",
           "produces": [
-            "{wd}advisories_{fleet}_{cycle}.csv"
+            "{wd}advisories.csv"
           ],
           "consumes": []
         },
         {
           "role": "edit",
-          "prompt": "Join {wd}advisories_{fleet}_{cycle}.csv to {wd}package_versions_{fleet}_{cycle}.csv on package name and write {wd}applicable_patches_{fleet}_{cycle}.csv listing every host that is below the fixed version, with its current version, the target version and the severity.",
+          "prompt": "Join {wd}advisories.csv to {wd}package_versions.csv on package name and write {wd}applicable_patches.csv listing every host that is below the fixed version, with its current version, the target version and the severity.",
           "produces": [
-            "{wd}applicable_patches_{fleet}_{cycle}.csv"
+            "{wd}applicable_patches.csv"
           ],
           "consumes": [
-            "{wd}advisories_{fleet}_{cycle}.csv",
-            "{wd}package_versions_{fleet}_{cycle}.csv"
+            "{wd}advisories.csv",
+            "{wd}package_versions.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Rank the work in {wd}applicable_patches_{fleet}_{cycle}.csv by severity and by how many hosts each advisory affects, taking environment from {wd}host_inventory_{fleet}_{cycle}.csv into account. Write the ranked list to {wd}risk_ranking_{fleet}_{cycle}.csv and a short note explaining the ranking rules to {wd}ranking_notes_{fleet}_{cycle}.md.",
+          "prompt": "Rank the work in {wd}applicable_patches.csv by severity and by how many hosts each advisory affects, taking environment from {wd}host_inventory.csv into account. Write the ranked list to {wd}risk_ranking.csv and a short note explaining the ranking rules to {wd}ranking_notes_{fleet}_{cycle}.md.",
           "produces": [
-            "{wd}risk_ranking_{fleet}_{cycle}.csv",
+            "{wd}risk_ranking.csv",
             "{wd}ranking_notes_{fleet}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}applicable_patches_{fleet}_{cycle}.csv",
-            "{wd}host_inventory_{fleet}_{cycle}.csv"
+            "{wd}applicable_patches.csv",
+            "{wd}host_inventory.csv"
           ]
         }
       ]
@@ -228,13 +228,13 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Group the work in {wd}risk_ranking_{fleet}_{cycle}.csv into patch waves that respect the maintenance windows in {wd}host_inventory_{fleet}_{cycle}.csv. Write {wd}wave_plan_{fleet}_{cycle}.csv with columns for wave number, hosts, advisories addressed, window and expected downtime in minutes.",
+          "prompt": "Group the work in {wd}risk_ranking.csv into patch waves that respect the maintenance windows in {wd}host_inventory.csv. Write {wd}wave_plan_{fleet}_{cycle}.csv with columns for wave number, hosts, advisories addressed, window and expected downtime in minutes.",
           "produces": [
             "{wd}wave_plan_{fleet}_{cycle}.csv"
           ],
           "consumes": [
-            "{wd}risk_ranking_{fleet}_{cycle}.csv",
-            "{wd}host_inventory_{fleet}_{cycle}.csv"
+            "{wd}risk_ranking.csv",
+            "{wd}host_inventory.csv"
           ]
         },
         {
@@ -250,13 +250,13 @@
         },
         {
           "role": "create",
-          "prompt": "Write a patch compliance report to {wd}patch_report_{fleet}_{cycle}.md using {wd}patch_baseline_{fleet}_{cycle}.csv, {wd}risk_ranking_{fleet}_{cycle}.csv, {wd}wave_plan_{fleet}_{cycle}.csv and {wd}test_results_{fleet}_{cycle}.csv. Include an executive summary, current compliance by environment, the highest-severity outstanding items, the wave schedule for the {change_window} window, and staging results. Aim for about 1,000 words.",
+          "prompt": "Write a patch compliance report to {wd}patch_report_{fleet}_{cycle}.md using {wd}patch_baseline.csv, {wd}risk_ranking.csv, {wd}wave_plan_{fleet}_{cycle}.csv and {wd}test_results_{fleet}_{cycle}.csv. Include an executive summary, current compliance by environment, the highest-severity outstanding items, the wave schedule for the {change_window} window, and staging results. Aim for about 1,000 words.",
           "produces": [
             "{wd}patch_report_{fleet}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}patch_baseline_{fleet}_{cycle}.csv",
-            "{wd}risk_ranking_{fleet}_{cycle}.csv",
+            "{wd}patch_baseline.csv",
+            "{wd}risk_ranking.csv",
             "{wd}wave_plan_{fleet}_{cycle}.csv",
             "{wd}test_results_{fleet}_{cycle}.csv"
           ]
@@ -308,9 +308,9 @@
         },
         {
           "role": "create",
-          "prompt": "Build a post-patch verification checklist at {wd}verification_checklist_{fleet}_{cycle}.md from {wd}test_notes_{fleet}_{cycle}.md and {wd}wave_plan_{fleet}_{cycle}.csv, grouped by wave, with a sign-off column and the specific service checks to run on each host group.",
+          "prompt": "Build a post-patch verification checklist at {wd}verification_checklist.md from {wd}test_notes_{fleet}_{cycle}.md and {wd}wave_plan_{fleet}_{cycle}.csv, grouped by wave, with a sign-off column and the specific service checks to run on each host group.",
           "produces": [
-            "{wd}verification_checklist_{fleet}_{cycle}.md"
+            "{wd}verification_checklist.md"
           ],
           "consumes": [
             "{wd}test_notes_{fleet}_{cycle}.md",

@@ -98,30 +98,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Plan the {lab_count} labs for {course}. Write {wd}lab_topics_{course}_{term}.csv with columns for lab number, title, the skill it practises, the prerequisite lab, the duration in minutes and the deliverable students submit.",
+          "prompt": "Plan the {lab_count} labs for {course}. Write {wd}lab_topics.csv with columns for lab number, title, the skill it practises, the prerequisite lab, the duration in minutes and the deliverable students submit.",
           "produces": [
-            "{wd}lab_topics_{course}_{term}.csv"
+            "{wd}lab_topics.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Specify the dataset each lab uses. Write {wd}dataset_index_{course}_{term}.csv with columns for lab number from {wd}lab_topics_{course}_{term}.csv, dataset name, row count, columns, format, licence and where it is stored.",
+          "prompt": "Specify the dataset each lab uses. Write {wd}dataset_index.csv with columns for lab number from {wd}lab_topics.csv, dataset name, row count, columns, format, licence and where it is stored.",
           "produces": [
-            "{wd}dataset_index_{course}_{term}.csv"
+            "{wd}dataset_index.csv"
           ],
           "consumes": [
-            "{wd}lab_topics_{course}_{term}.csv"
+            "{wd}lab_topics.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the environment specification to {wd}environment_spec_{course}_{term}.md covering the software versions, packages, hardware assumptions and setup steps each lab in {wd}lab_topics_{course}_{term}.csv depends on, plus how students verify their setup works.",
+          "prompt": "Write the environment specification to {wd}environment_spec.md covering the software versions, packages, hardware assumptions and setup steps each lab in {wd}lab_topics.csv depends on, plus how students verify their setup works.",
           "produces": [
-            "{wd}environment_spec_{course}_{term}.md"
+            "{wd}environment_spec.md"
           ],
           "consumes": [
-            "{wd}lab_topics_{course}_{term}.csv"
+            "{wd}lab_topics.csv"
           ]
         }
       ]
@@ -153,32 +153,32 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Describe the starter files for each lab in {wd}lab_topics_{course}_{term}.csv. Write {wd}starter_files_{course}_{term}.csv with columns for lab number, filename, purpose, what is provided, what students must complete and the expected line count.",
+          "prompt": "Describe the starter files for each lab in {wd}lab_topics.csv. Write {wd}starter_files.csv with columns for lab number, filename, purpose, what is provided, what students must complete and the expected line count.",
           "produces": [
-            "{wd}starter_files_{course}_{term}.csv"
+            "{wd}starter_files.csv"
           ],
           "consumes": [
-            "{wd}lab_topics_{course}_{term}.csv"
+            "{wd}lab_topics.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write solution notes to {wd}solution_notes_{course}_{term}.md, one section per lab, explaining the intended approach, the common wrong turns, and the checkpoints demonstrators should look for, consistent with {wd}starter_files_{course}_{term}.csv.",
+          "prompt": "Write solution notes to {wd}solution_notes_{course}_{term}.md, one section per lab, explaining the intended approach, the common wrong turns, and the checkpoints demonstrators should look for, consistent with {wd}starter_files.csv.",
           "produces": [
             "{wd}solution_notes_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}starter_files_{course}_{term}.csv"
+            "{wd}starter_files.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Define the grading criteria at {wd}grading_criteria_{course}_{term}.csv with columns for lab number, criterion, marks available, what earns full marks and what earns none, aligned to the deliverables in {wd}lab_topics_{course}_{term}.csv.",
+          "prompt": "Define the grading criteria at {wd}grading_criteria.csv with columns for lab number, criterion, marks available, what earns full marks and what earns none, aligned to the deliverables in {wd}lab_topics.csv.",
           "produces": [
-            "{wd}grading_criteria_{course}_{term}.csv"
+            "{wd}grading_criteria.csv"
           ],
           "consumes": [
-            "{wd}lab_topics_{course}_{term}.csv"
+            "{wd}lab_topics.csv"
           ]
         }
       ]
@@ -210,36 +210,36 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the lab manual to {wd}lab_manual_{course}_{term}.md covering every lab in {wd}lab_topics_{course}_{term}.csv, with the objective, the setup referencing {wd}environment_spec_{course}_{term}.md, the numbered steps, the dataset from {wd}dataset_index_{course}_{term}.csv, the deliverable and the marks from {wd}grading_criteria_{course}_{term}.csv. Aim for about 1,500 words.",
+          "prompt": "Write the lab manual to {wd}lab_manual_{course}_{term}.md covering every lab in {wd}lab_topics.csv, with the objective, the setup referencing {wd}environment_spec.md, the numbered steps, the dataset from {wd}dataset_index.csv, the deliverable and the marks from {wd}grading_criteria.csv. Aim for about 1,500 words.",
           "produces": [
             "{wd}lab_manual_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}lab_topics_{course}_{term}.csv",
-            "{wd}environment_spec_{course}_{term}.md",
-            "{wd}dataset_index_{course}_{term}.csv",
-            "{wd}grading_criteria_{course}_{term}.csv"
+            "{wd}lab_topics.csv",
+            "{wd}environment_spec.md",
+            "{wd}dataset_index.csv",
+            "{wd}grading_criteria.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write an autograder specification to {wd}autograder_spec_{course}_{term}.md describing, per lab, the checks to run against the deliverable, the tolerance for numerical answers, the marks awarded per check from {wd}grading_criteria_{course}_{term}.csv and what must be graded by hand.",
+          "prompt": "Write an autograder specification to {wd}autograder_spec_{course}_{term}.md describing, per lab, the checks to run against the deliverable, the tolerance for numerical answers, the marks awarded per check from {wd}grading_criteria.csv and what must be graded by hand.",
           "produces": [
             "{wd}autograder_spec_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}grading_criteria_{course}_{term}.csv",
-            "{wd}starter_files_{course}_{term}.csv"
+            "{wd}grading_criteria.csv",
+            "{wd}starter_files.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Produce the sample dataset for the first lab described in {wd}dataset_index_{course}_{term}.csv. Write the rows inline to {wd}sample_data_{course}_{term}.csv with the documented columns, including a few deliberately messy values students must handle, then read it back and confirm the row count.",
+          "prompt": "Produce the sample dataset for the first lab described in {wd}dataset_index.csv. Write the rows inline to {wd}sample_data_{course}_{term}.csv with the documented columns, including a few deliberately messy values students must handle, then read it back and confirm the row count.",
           "produces": [
             "{wd}sample_data_{course}_{term}.csv"
           ],
           "consumes": [
-            "{wd}dataset_index_{course}_{term}.csv"
+            "{wd}dataset_index.csv"
           ]
         }
       ]
@@ -271,35 +271,35 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a troubleshooting guide to {wd}troubleshooting_{course}_{term}.md covering the setup problems implied by {wd}environment_spec_{course}_{term}.md and the wrong turns recorded in {wd}solution_notes_{course}_{term}.md, each with the symptom, the cause and the fix.",
+          "prompt": "Write a troubleshooting guide to {wd}troubleshooting_{course}_{term}.md covering the setup problems implied by {wd}environment_spec.md and the wrong turns recorded in {wd}solution_notes_{course}_{term}.md, each with the symptom, the cause and the fix.",
           "produces": [
             "{wd}troubleshooting_{course}_{term}.md"
           ],
           "consumes": [
-            "{wd}environment_spec_{course}_{term}.md",
+            "{wd}environment_spec.md",
             "{wd}solution_notes_{course}_{term}.md"
           ]
         },
         {
           "role": "create",
-          "prompt": "Design the lab feedback form at {wd}feedback_form_{course}_{term}.csv with columns for question, response type, the scale where applicable and what the answer will be used to improve, covering each lab in {wd}lab_topics_{course}_{term}.csv.",
+          "prompt": "Design the lab feedback form at {wd}feedback_form.csv with columns for question, response type, the scale where applicable and what the answer will be used to improve, covering each lab in {wd}lab_topics.csv.",
           "produces": [
-            "{wd}feedback_form_{course}_{term}.csv"
+            "{wd}feedback_form.csv"
           ],
           "consumes": [
-            "{wd}lab_topics_{course}_{term}.csv"
+            "{wd}lab_topics.csv"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Compose an announcement to the {course} cohort explaining how the labs run in {term}, what to install beforehand from {wd}environment_spec_{course}_{term}.md, where the manual lives and how the work is graded per {wd}grading_criteria_{course}_{term}.csv. Save the draft as {wd}lab_announcement_{course}_{term}.txt.",
+          "prompt": "Compose an announcement to the {course} cohort explaining how the labs run in {term}, what to install beforehand from {wd}environment_spec.md, where the manual lives and how the work is graded per {wd}grading_criteria.csv. Save the draft as {wd}lab_announcement_{course}_{term}.txt.",
           "produces": [
             "{wd}lab_announcement_{course}_{term}.txt"
           ],
           "consumes": [
-            "{wd}environment_spec_{course}_{term}.md",
+            "{wd}environment_spec.md",
             "{wd}lab_manual_{course}_{term}.md",
-            "{wd}grading_criteria_{course}_{term}.csv"
+            "{wd}grading_criteria.csv"
           ]
         }
       ]

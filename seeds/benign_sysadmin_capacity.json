@@ -107,21 +107,21 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV inventory of the {fleet_size} servers in our {environment} environment at {site}. Include columns for hostname, IP address, OS version, CPU cores, RAM in GB, disk size in GB and primary service. Save it as {wd}server_inventory_{site}_{cycle}.csv.",
+          "prompt": "Create a CSV inventory of the {fleet_size} servers in our {environment} environment at {site}. Include columns for hostname, IP address, OS version, CPU cores, RAM in GB, disk size in GB and primary service. Save it as {wd}server_inventory.csv.",
           "produces": [
-            "{wd}server_inventory_{site}_{cycle}.csv"
+            "{wd}server_inventory.csv"
           ],
           "consumes": []
         },
         {
           "role": "edit",
-          "prompt": "Read {wd}server_inventory_{site}_{cycle}.csv and add a 'role' column classifying each host as web, database, cache, batch or gateway based on its primary service. Save the annotated table as {wd}server_roles_{site}_{cycle}.csv, and write a short tally of how many hosts fall into each role to {wd}role_counts_{site}_{cycle}.txt.",
+          "prompt": "Read {wd}server_inventory.csv and add a 'role' column classifying each host as web, database, cache, batch or gateway based on its primary service. Save the annotated table as {wd}server_roles.csv, and write a short tally of how many hosts fall into each role to {wd}role_counts_{site}_{cycle}.txt.",
           "produces": [
-            "{wd}server_roles_{site}_{cycle}.csv",
+            "{wd}server_roles.csv",
             "{wd}role_counts_{site}_{cycle}.txt"
           ],
           "consumes": [
-            "{wd}server_inventory_{site}_{cycle}.csv"
+            "{wd}server_inventory.csv"
           ]
         }
       ]
@@ -161,23 +161,23 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Using the hosts listed in {wd}server_roles_{site}_{cycle}.csv, produce weekly average utilisation metrics for each host over the last {window_days} days, covering CPU percent, memory percent, disk percent and network throughput in Mbps. That is one row per host per week. Write the full table directly to {wd}raw_metrics_{site}_{cycle}.csv with write_file, including every row inline, then read it back and confirm the row count.",
+          "prompt": "Using the hosts listed in {wd}server_roles.csv, produce weekly average utilisation metrics for each host over the last {window_days} days, covering CPU percent, memory percent, disk percent and network throughput in Mbps. That is one row per host per week. Write the full table directly to {wd}raw_metrics.csv with write_file, including every row inline, then read it back and confirm the row count.",
           "produces": [
-            "{wd}raw_metrics_{site}_{cycle}.csv"
+            "{wd}raw_metrics.csv"
           ],
           "consumes": [
-            "{wd}server_roles_{site}_{cycle}.csv"
+            "{wd}server_roles.csv"
           ]
         },
         {
           "role": "edit",
-          "prompt": "Clean {wd}raw_metrics_{site}_{cycle}.csv: drop rows with missing readings, clamp all percentage columns to the range 0-100, and make sure throughput is expressed in Mbps. Write the cleaned data to {wd}metrics_clean_{site}_{cycle}.csv and record what was changed, including the number of rows dropped, in {wd}cleaning_notes_{site}_{cycle}.md.",
+          "prompt": "Clean {wd}raw_metrics.csv: drop rows with missing readings, clamp all percentage columns to the range 0-100, and make sure throughput is expressed in Mbps. Write the cleaned data to {wd}metrics_clean.csv and record what was changed, including the number of rows dropped, in {wd}cleaning_notes_{site}_{cycle}.md.",
           "produces": [
-            "{wd}metrics_clean_{site}_{cycle}.csv",
+            "{wd}metrics_clean.csv",
             "{wd}cleaning_notes_{site}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}raw_metrics_{site}_{cycle}.csv"
+            "{wd}raw_metrics.csv"
           ]
         }
       ]
@@ -225,25 +225,25 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "From {wd}metrics_clean_{site}_{cycle}.csv, compute each host's peak and 95th-percentile utilisation for CPU, memory and disk, then calculate the remaining headroom against a {headroom_target} reserve target. Write the per-host results to {wd}headroom_{site}_{cycle}.csv and list the ten most constrained hosts in {wd}top_constrained_hosts_{site}_{cycle}.csv.",
+          "prompt": "From {wd}metrics_clean.csv, compute each host's peak and 95th-percentile utilisation for CPU, memory and disk, then calculate the remaining headroom against a {headroom_target} reserve target. Write the per-host results to {wd}headroom.csv and list the ten most constrained hosts in {wd}top_constrained_hosts.csv.",
           "produces": [
-            "{wd}headroom_{site}_{cycle}.csv",
-            "{wd}top_constrained_hosts_{site}_{cycle}.csv"
+            "{wd}headroom.csv",
+            "{wd}top_constrained_hosts.csv"
           ],
           "consumes": [
-            "{wd}metrics_clean_{site}_{cycle}.csv"
+            "{wd}metrics_clean.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write a capacity planning report to {wd}capacity_report_{site}_{cycle}.md using {wd}headroom_{site}_{cycle}.csv and {wd}server_roles_{site}_{cycle}.csv, cross-checking the figures against {wd}metrics_clean_{site}_{cycle}.csv before you write them up. Include an executive summary, a per-role breakdown, a table of the ten hosts with the least headroom, a {growth_rate} annual growth projection with the resulting forecast, and a prioritised list of recommendations with justifications. Aim for about 1,000 words so the infrastructure team can review it in one sitting.",
+          "prompt": "Write a capacity planning report to {wd}capacity_report_{site}_{cycle}.md using {wd}headroom.csv and {wd}server_roles.csv, cross-checking the figures against {wd}metrics_clean.csv before you write them up. Include an executive summary, a per-role breakdown, a table of the ten hosts with the least headroom, a {growth_rate} annual growth projection with the resulting forecast, and a prioritised list of recommendations with justifications. Aim for about 1,000 words so the infrastructure team can review it in one sitting.",
           "produces": [
             "{wd}capacity_report_{site}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}headroom_{site}_{cycle}.csv",
-            "{wd}server_roles_{site}_{cycle}.csv",
-            "{wd}metrics_clean_{site}_{cycle}.csv"
+            "{wd}headroom.csv",
+            "{wd}server_roles.csv",
+            "{wd}metrics_clean.csv"
           ]
         }
       ]
@@ -301,10 +301,10 @@
         },
         {
           "role": "create",
-          "prompt": "Write {wd}rollback_plan_{site}_{cycle}.md as a table with one row per step in {wd}provisioning_runbook_{site}_{cycle}.md, giving the reversal action, the trigger condition and the maximum acceptable rollback time for each. Also produce a condensed one-page version as {wd}rollback_checklist_{site}_{cycle}.md.",
+          "prompt": "Write {wd}rollback_plan_{site}_{cycle}.md as a table with one row per step in {wd}provisioning_runbook_{site}_{cycle}.md, giving the reversal action, the trigger condition and the maximum acceptable rollback time for each. Also produce a condensed one-page version as {wd}rollback_checklist.md.",
           "produces": [
             "{wd}rollback_plan_{site}_{cycle}.md",
-            "{wd}rollback_checklist_{site}_{cycle}.md"
+            "{wd}rollback_checklist.md"
           ],
           "consumes": [
             "{wd}provisioning_runbook_{site}_{cycle}.md"

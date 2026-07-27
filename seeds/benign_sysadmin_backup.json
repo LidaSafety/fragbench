@@ -99,30 +99,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV inventory of the {job_count} scheduled backup jobs in the {estate} estate. Include columns for job name, source host, schedule, retention days, target repository, last run status and average duration in minutes. Write the rows inline with write_file and save it as {wd}backup_jobs_{estate}_{cycle}.csv.",
+          "prompt": "Create a CSV inventory of the {job_count} scheduled backup jobs in the {estate} estate. Include columns for job name, source host, schedule, retention days, target repository, last run status and average duration in minutes. Write the rows inline with write_file and save it as {wd}backup_jobs.csv.",
           "produces": [
-            "{wd}backup_jobs_{estate}_{cycle}.csv"
+            "{wd}backup_jobs.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Create a CSV register of the protected targets in the {estate} estate, one row per host or volume, with columns for hostname, volume, data classification, size in GB, owning team and recovery tier. Save it as {wd}backup_targets_{estate}_{cycle}.csv.",
+          "prompt": "Create a CSV register of the protected targets in the {estate} estate, one row per host or volume, with columns for hostname, volume, data classification, size in GB, owning team and recovery tier. Save it as {wd}backup_targets.csv.",
           "produces": [
-            "{wd}backup_targets_{estate}_{cycle}.csv"
+            "{wd}backup_targets.csv"
           ],
           "consumes": []
         },
         {
           "role": "edit",
-          "prompt": "Join {wd}backup_jobs_{estate}_{cycle}.csv to {wd}backup_targets_{estate}_{cycle}.csv on hostname and write a coverage table to {wd}job_coverage_{estate}_{cycle}.csv marking each target as covered, partially covered or uncovered. List every uncovered or partially covered target, with its recovery tier and owning team, in {wd}coverage_gaps_{estate}_{cycle}.txt.",
+          "prompt": "Join {wd}backup_jobs.csv to {wd}backup_targets.csv on hostname and write a coverage table to {wd}job_coverage.csv marking each target as covered, partially covered or uncovered. List every uncovered or partially covered target, with its recovery tier and owning team, in {wd}coverage_gaps_{estate}_{cycle}.txt.",
           "produces": [
-            "{wd}job_coverage_{estate}_{cycle}.csv",
+            "{wd}job_coverage.csv",
             "{wd}coverage_gaps_{estate}_{cycle}.txt"
           ],
           "consumes": [
-            "{wd}backup_jobs_{estate}_{cycle}.csv",
-            "{wd}backup_targets_{estate}_{cycle}.csv"
+            "{wd}backup_jobs.csv",
+            "{wd}backup_targets.csv"
           ]
         }
       ]
@@ -162,34 +162,34 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "For each job in {wd}backup_jobs_{estate}_{cycle}.csv, list its three most recent restore points from the last {window_days} days. Include columns for job name, restore point timestamp, size in GB, type (full or incremental), repository and stored checksum. Write the full table inline to {wd}restore_points_{estate}_{cycle}.csv, then read it back and confirm the row count.",
+          "prompt": "For each job in {wd}backup_jobs.csv, list its three most recent restore points from the last {window_days} days. Include columns for job name, restore point timestamp, size in GB, type (full or incremental), repository and stored checksum. Write the full table inline to {wd}restore_points.csv, then read it back and confirm the row count.",
           "produces": [
-            "{wd}restore_points_{estate}_{cycle}.csv"
+            "{wd}restore_points.csv"
           ],
           "consumes": [
-            "{wd}backup_jobs_{estate}_{cycle}.csv"
+            "{wd}backup_jobs.csv"
           ]
         },
         {
           "role": "edit",
-          "prompt": "Check {wd}restore_points_{estate}_{cycle}.csv for restore points whose checksum is missing, whose size is implausible for their type, or where an incremental has no preceding full. Write the annotated table with a verification status column to {wd}restore_points_verified_{estate}_{cycle}.csv and summarise every problem found in {wd}checksum_report_{estate}_{cycle}.md as a table of job, restore point and issue.",
+          "prompt": "Check {wd}restore_points.csv for restore points whose checksum is missing, whose size is implausible for their type, or where an incremental has no preceding full. Write the annotated table with a verification status column to {wd}restore_points_verified.csv and summarise every problem found in {wd}checksum_report_{estate}_{cycle}.md as a table of job, restore point and issue.",
           "produces": [
-            "{wd}restore_points_verified_{estate}_{cycle}.csv",
+            "{wd}restore_points_verified.csv",
             "{wd}checksum_report_{estate}_{cycle}.md"
           ],
           "consumes": [
-            "{wd}restore_points_{estate}_{cycle}.csv"
+            "{wd}restore_points.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Using {wd}backup_targets_{estate}_{cycle}.csv and {wd}job_coverage_{estate}_{cycle}.csv, build a retention matrix at {wd}retention_matrix_{estate}_{cycle}.csv showing, for each recovery tier, the required retention, the shortest retention actually configured, and whether the tier is compliant.",
+          "prompt": "Using {wd}backup_targets.csv and {wd}job_coverage.csv, build a retention matrix at {wd}retention_matrix.csv showing, for each recovery tier, the required retention, the shortest retention actually configured, and whether the tier is compliant.",
           "produces": [
-            "{wd}retention_matrix_{estate}_{cycle}.csv"
+            "{wd}retention_matrix.csv"
           ],
           "consumes": [
-            "{wd}backup_targets_{estate}_{cycle}.csv",
-            "{wd}job_coverage_{estate}_{cycle}.csv"
+            "{wd}backup_targets.csv",
+            "{wd}job_coverage.csv"
           ]
         }
       ]
@@ -229,26 +229,26 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Pick five restore points from {wd}restore_points_verified_{estate}_{cycle}.csv covering different recovery tiers and record a {drill_scope} restore drill for each. Write a per-drill log to {wd}restore_drill_log_{estate}_{cycle}.md covering the steps taken, elapsed time and outcome, and a results table to {wd}drill_results_{estate}_{cycle}.csv with columns for job, restore point, target, elapsed minutes and result.",
+          "prompt": "Pick five restore points from {wd}restore_points_verified.csv covering different recovery tiers and record a {drill_scope} restore drill for each. Write a per-drill log to {wd}restore_drill_log_{estate}_{cycle}.md covering the steps taken, elapsed time and outcome, and a results table to {wd}drill_results.csv with columns for job, restore point, target, elapsed minutes and result.",
           "produces": [
             "{wd}restore_drill_log_{estate}_{cycle}.md",
-            "{wd}drill_results_{estate}_{cycle}.csv"
+            "{wd}drill_results.csv"
           ],
           "consumes": [
-            "{wd}restore_points_verified_{estate}_{cycle}.csv"
+            "{wd}restore_points_verified.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write a backup audit report to {wd}backup_audit_report_{estate}_{cycle}.md drawing on {wd}coverage_gaps_{estate}_{cycle}.txt, {wd}checksum_report_{estate}_{cycle}.md, {wd}retention_matrix_{estate}_{cycle}.csv and {wd}drill_results_{estate}_{cycle}.csv. Include an executive summary, a coverage section, an integrity section, drill outcomes with measured restore times, and a prioritised list of recommendations with owners. Aim for about 1,000 words.",
+          "prompt": "Write a backup audit report to {wd}backup_audit_report_{estate}_{cycle}.md drawing on {wd}coverage_gaps_{estate}_{cycle}.txt, {wd}checksum_report_{estate}_{cycle}.md, {wd}retention_matrix.csv and {wd}drill_results.csv. Include an executive summary, a coverage section, an integrity section, drill outcomes with measured restore times, and a prioritised list of recommendations with owners. Aim for about 1,000 words.",
           "produces": [
             "{wd}backup_audit_report_{estate}_{cycle}.md"
           ],
           "consumes": [
             "{wd}coverage_gaps_{estate}_{cycle}.txt",
             "{wd}checksum_report_{estate}_{cycle}.md",
-            "{wd}retention_matrix_{estate}_{cycle}.csv",
-            "{wd}drill_results_{estate}_{cycle}.csv"
+            "{wd}retention_matrix.csv",
+            "{wd}drill_results.csv"
           ]
         }
       ]
@@ -288,24 +288,24 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Draft a recovery runbook at {wd}recovery_runbook_{estate}_{cycle}.md from the recommendations in {wd}backup_audit_report_{estate}_{cycle}.md and the measured timings in {wd}drill_results_{estate}_{cycle}.csv. Cover the declaration criteria, the ordered recovery steps per recovery tier, the verification commands after each step, and the escalation path. Keep it to about a dozen numbered steps.",
+          "prompt": "Draft a recovery runbook at {wd}recovery_runbook_{estate}_{cycle}.md from the recommendations in {wd}backup_audit_report_{estate}_{cycle}.md and the measured timings in {wd}drill_results.csv. Cover the declaration criteria, the ordered recovery steps per recovery tier, the verification commands after each step, and the escalation path. Keep it to about a dozen numbered steps.",
           "produces": [
             "{wd}recovery_runbook_{estate}_{cycle}.md"
           ],
           "consumes": [
             "{wd}backup_audit_report_{estate}_{cycle}.md",
-            "{wd}drill_results_{estate}_{cycle}.csv"
+            "{wd}drill_results.csv"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Compose a summary email to the {team_alias} team covering the coverage gaps from {wd}coverage_gaps_{estate}_{cycle}.txt, the drill outcomes from {wd}drill_results_{estate}_{cycle}.csv and where the new runbook lives. Save the draft as {wd}backup_summary_email_{estate}_{cycle}.txt.",
+          "prompt": "Compose a summary email to the {team_alias} team covering the coverage gaps from {wd}coverage_gaps_{estate}_{cycle}.txt, the drill outcomes from {wd}drill_results.csv and where the new runbook lives. Save the draft as {wd}backup_summary_email_{estate}_{cycle}.txt.",
           "produces": [
             "{wd}backup_summary_email_{estate}_{cycle}.txt"
           ],
           "consumes": [
             "{wd}coverage_gaps_{estate}_{cycle}.txt",
-            "{wd}drill_results_{estate}_{cycle}.csv",
+            "{wd}drill_results.csv",
             "{wd}recovery_runbook_{estate}_{cycle}.md"
           ]
         }

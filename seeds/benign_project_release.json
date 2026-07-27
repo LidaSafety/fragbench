@@ -98,30 +98,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create an inventory of the {change_count} changes merged for {project} {release}. Write {wd}change_inventory_{project}_{release}.csv with columns for change id, title, component, author, merge date, change type and risk rating. Write the rows inline and confirm the row count.",
+          "prompt": "Create an inventory of the {change_count} changes merged for {project} {release}. Write {wd}change_inventory.csv with columns for change id, title, component, author, merge date, change type and risk rating. Write the rows inline and confirm the row count.",
           "produces": [
-            "{wd}change_inventory_{project}_{release}.csv"
+            "{wd}change_inventory.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "Extract the tickets behind the changes. Write {wd}ticket_extract_{project}_{release}.csv with columns for ticket id, the change ids from {wd}change_inventory_{project}_{release}.csv, ticket type, requester, priority and the user-visible effect.",
+          "prompt": "Extract the tickets behind the changes. Write {wd}ticket_extract.csv with columns for ticket id, the change ids from {wd}change_inventory.csv, ticket type, requester, priority and the user-visible effect.",
           "produces": [
-            "{wd}ticket_extract_{project}_{release}.csv"
+            "{wd}ticket_extract.csv"
           ],
           "consumes": [
-            "{wd}change_inventory_{project}_{release}.csv"
+            "{wd}change_inventory.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Map the dependencies between components touched in {wd}change_inventory_{project}_{release}.csv. Write {wd}dependency_map_{project}_{release}.csv with columns for component, depends on, the nature of the dependency, whether the change is backward compatible and the required deployment order.",
+          "prompt": "Map the dependencies between components touched in {wd}change_inventory.csv. Write {wd}dependency_map.csv with columns for component, depends on, the nature of the dependency, whether the change is backward compatible and the required deployment order.",
           "produces": [
-            "{wd}dependency_map_{project}_{release}.csv"
+            "{wd}dependency_map.csv"
           ],
           "consumes": [
-            "{wd}change_inventory_{project}_{release}.csv"
+            "{wd}change_inventory.csv"
           ]
         }
       ]
@@ -153,20 +153,20 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Decide the release scope at {wd}release_scope_{project}_{release}.csv, marking each change in {wd}change_inventory_{project}_{release}.csv as included or deferred, with the reason, the deployment order from {wd}dependency_map_{project}_{release}.csv and the feature flag where one applies.",
+          "prompt": "Decide the release scope at {wd}release_scope_{project}_{release}.csv, marking each change in {wd}change_inventory.csv as included or deferred, with the reason, the deployment order from {wd}dependency_map.csv and the feature flag where one applies.",
           "produces": [
             "{wd}release_scope_{project}_{release}.csv"
           ],
           "consumes": [
-            "{wd}change_inventory_{project}_{release}.csv",
-            "{wd}dependency_map_{project}_{release}.csv"
+            "{wd}change_inventory.csv",
+            "{wd}dependency_map.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Build the risk register at {wd}risk_register_{project}_{release}.csv for the included changes in {wd}release_scope_{project}_{release}.csv, with columns for risk, the change it arises from, likelihood, impact, mitigation, owner and the signal that would tell us it is happening.",
+          "prompt": "Build the risk register at {wd}risk_register.csv for the included changes in {wd}release_scope_{project}_{release}.csv, with columns for risk, the change it arises from, likelihood, impact, mitigation, owner and the signal that would tell us it is happening.",
           "produces": [
-            "{wd}risk_register_{project}_{release}.csv"
+            "{wd}risk_register.csv"
           ],
           "consumes": [
             "{wd}release_scope_{project}_{release}.csv"
@@ -174,13 +174,13 @@
         },
         {
           "role": "create",
-          "prompt": "Build the test matrix at {wd}test_matrix_{project}_{release}.csv covering every included change in {wd}release_scope_{project}_{release}.csv, with columns for change id, test case, type, environment, the ticket from {wd}ticket_extract_{project}_{release}.csv it verifies and the expected result.",
+          "prompt": "Build the test matrix at {wd}test_matrix.csv covering every included change in {wd}release_scope_{project}_{release}.csv, with columns for change id, test case, type, environment, the ticket from {wd}ticket_extract.csv it verifies and the expected result.",
           "produces": [
-            "{wd}test_matrix_{project}_{release}.csv"
+            "{wd}test_matrix.csv"
           ],
           "consumes": [
             "{wd}release_scope_{project}_{release}.csv",
-            "{wd}ticket_extract_{project}_{release}.csv"
+            "{wd}ticket_extract.csv"
           ]
         }
       ]
@@ -212,35 +212,35 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write the release notes to {wd}release_notes_{project}_{release}.md from {wd}release_scope_{project}_{release}.csv and {wd}ticket_extract_{project}_{release}.csv. Group by user-visible change, fix and internal change; describe each in terms of what it means for users; list breaking changes and required actions; and note what was deferred. Aim for about 1,100 words.",
+          "prompt": "Write the release notes to {wd}release_notes_{project}_{release}.md from {wd}release_scope_{project}_{release}.csv and {wd}ticket_extract.csv. Group by user-visible change, fix and internal change; describe each in terms of what it means for users; list breaking changes and required actions; and note what was deferred. Aim for about 1,100 words.",
           "produces": [
             "{wd}release_notes_{project}_{release}.md"
           ],
           "consumes": [
             "{wd}release_scope_{project}_{release}.csv",
-            "{wd}ticket_extract_{project}_{release}.csv"
+            "{wd}ticket_extract.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write the go-live checklist to {wd}go_live_checklist_{project}_{release}.md, ordered by the deployment sequence in {wd}dependency_map_{project}_{release}.csv, covering the pre-flight checks, each deployment step, the verification from {wd}test_matrix_{project}_{release}.csv to run after it, and the sign-off.",
+          "prompt": "Write the go-live checklist to {wd}go_live_checklist.md, ordered by the deployment sequence in {wd}dependency_map.csv, covering the pre-flight checks, each deployment step, the verification from {wd}test_matrix.csv to run after it, and the sign-off.",
           "produces": [
-            "{wd}go_live_checklist_{project}_{release}.md"
+            "{wd}go_live_checklist.md"
           ],
           "consumes": [
-            "{wd}dependency_map_{project}_{release}.csv",
-            "{wd}test_matrix_{project}_{release}.csv"
+            "{wd}dependency_map.csv",
+            "{wd}test_matrix.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write {wd}rollback_plan_{project}_{release}.md as a table with one row per step in {wd}go_live_checklist_{project}_{release}.md, giving the reversal action, the trigger drawn from {wd}risk_register_{project}_{release}.csv, the maximum acceptable rollback time and the owner.",
+          "prompt": "Write {wd}rollback_plan_{project}_{release}.md as a table with one row per step in {wd}go_live_checklist.md, giving the reversal action, the trigger drawn from {wd}risk_register.csv, the maximum acceptable rollback time and the owner.",
           "produces": [
             "{wd}rollback_plan_{project}_{release}.md"
           ],
           "consumes": [
-            "{wd}go_live_checklist_{project}_{release}.md",
-            "{wd}risk_register_{project}_{release}.csv"
+            "{wd}go_live_checklist.md",
+            "{wd}risk_register.csv"
           ]
         }
       ]

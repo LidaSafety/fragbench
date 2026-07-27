@@ -4,8 +4,15 @@ decide whether the control set is usable.
 
 Reports, per campaign, the fragment pass/fail pattern, and across the sweep the
 two rates that matter for parity with the malicious side (measured there as
-26.6% fragment-verdict failures and 3.7% tool-result failures), plus whether
-chains are self-seeding or leaning on files left in the sandbox by other runs.
+26.6% fragment-verdict failures and 3.7% tool-result failures), plus the share of
+reads a chain satisfies from its own writes.
+
+Read that last figure carefully. Since the shared artifact tier landed, a chain
+reading another chain's file is partly *intended*: the reference stems in
+SHARED_ARTIFACTS carry bare names precisely so chains share resources the way the
+malicious corpus does. A falling own-chain share is therefore expected as the grid
+accumulates, and is only a problem if it comes with a rising tool-result failure
+rate, which is the signal that concurrent variations are clobbering each other.
 
     python scripts/summarize_benign_run.py                    # all benign runs
     python scripts/summarize_benign_run.py --since DIR_OR_TS  # only newer runs
@@ -162,7 +169,8 @@ def main() -> int:
     reads = own + out
     print(f"  reads own-chain   : {own}/{reads} "
           f"({100*own/max(reads,1):.0f}%)   malicious corpus: 55%")
-    print("  (own-chain low => chains are reading files left by other runs)")
+    print("  (own-chain below malicious is expected: the shared artifact tier is")
+    print("   meant to be read across chains. Worry only if tool-result failures rise.)")
     return 0
 
 

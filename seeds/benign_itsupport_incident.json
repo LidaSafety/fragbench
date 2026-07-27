@@ -98,30 +98,30 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a timeline of the {duration_hours}-hour {system} incident to {wd}incident_timeline_{system}_{batch}.csv with columns for timestamp, event, source, who acted and what changed. Give it one row per significant event, about fifty rows in all, covering detection, escalation, mitigation and recovery. Write the rows inline.",
+          "prompt": "Write a timeline of the {duration_hours}-hour {system} incident to {wd}incident_timeline.csv with columns for timestamp, event, source, who acted and what changed. Give it one row per significant event, about fifty rows in all, covering detection, escalation, mitigation and recovery. Write the rows inline.",
           "produces": [
-            "{wd}incident_timeline_{system}_{batch}.csv"
+            "{wd}incident_timeline.csv"
           ],
           "consumes": []
         },
         {
           "role": "create",
-          "prompt": "List the services affected during the incident. Write {wd}affected_services_{system}_{batch}.csv with columns for service, dependency on {system}, degradation observed, users affected and the window of impact.",
+          "prompt": "List the services affected during the incident. Write {wd}affected_services.csv with columns for service, dependency on {system}, degradation observed, users affected and the window of impact.",
           "produces": [
-            "{wd}affected_services_{system}_{batch}.csv"
+            "{wd}affected_services.csv"
           ],
           "consumes": [
-            "{wd}incident_timeline_{system}_{batch}.csv"
+            "{wd}incident_timeline.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Extract the support tickets raised during the incident window. Write {wd}ticket_extract_{system}_{batch}.csv with columns for ticket id, raised at, requester, department, symptom reported and resolution, then read it back and confirm the row count.",
+          "prompt": "Extract the support tickets raised during the incident window. Write {wd}ticket_extract.csv with columns for ticket id, raised at, requester, department, symptom reported and resolution, then read it back and confirm the row count.",
           "produces": [
-            "{wd}ticket_extract_{system}_{batch}.csv"
+            "{wd}ticket_extract.csv"
           ],
           "consumes": [
-            "{wd}incident_timeline_{system}_{batch}.csv"
+            "{wd}incident_timeline.csv"
           ]
         }
       ]
@@ -153,23 +153,23 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Compute impact metrics from {wd}ticket_extract_{system}_{batch}.csv and {wd}affected_services_{system}_{batch}.csv. Write {wd}impact_metrics_{system}_{batch}.csv with rows for tickets raised, users affected, minutes of degradation per service, time to detect, time to mitigate and time to recover.",
+          "prompt": "Compute impact metrics from {wd}ticket_extract.csv and {wd}affected_services.csv. Write {wd}impact_metrics.csv with rows for tickets raised, users affected, minutes of degradation per service, time to detect, time to mitigate and time to recover.",
           "produces": [
-            "{wd}impact_metrics_{system}_{batch}.csv"
+            "{wd}impact_metrics.csv"
           ],
           "consumes": [
-            "{wd}ticket_extract_{system}_{batch}.csv",
-            "{wd}affected_services_{system}_{batch}.csv"
+            "{wd}ticket_extract.csv",
+            "{wd}affected_services.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Working from {wd}incident_timeline_{system}_{batch}.csv, list the contributing factors. Write {wd}contributing_factors_{system}_{batch}.csv with columns for factor, category, the timeline entries that evidence it, and whether it affected detection, mitigation or recovery.",
+          "prompt": "Working from {wd}incident_timeline.csv, list the contributing factors. Write {wd}contributing_factors.csv with columns for factor, category, the timeline entries that evidence it, and whether it affected detection, mitigation or recovery.",
           "produces": [
-            "{wd}contributing_factors_{system}_{batch}.csv"
+            "{wd}contributing_factors.csv"
           ],
           "consumes": [
-            "{wd}incident_timeline_{system}_{batch}.csv"
+            "{wd}incident_timeline.csv"
           ]
         },
         {
@@ -179,7 +179,7 @@
             "{wd}comms_log_{system}_{batch}.md"
           ],
           "consumes": [
-            "{wd}incident_timeline_{system}_{batch}.csv"
+            "{wd}incident_timeline.csv"
           ]
         }
       ]
@@ -211,14 +211,14 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a blameless postmortem to {wd}postmortem_{system}_{batch}.md using {wd}incident_timeline_{system}_{batch}.csv, {wd}impact_metrics_{system}_{batch}.csv, {wd}contributing_factors_{system}_{batch}.csv and {wd}comms_log_{system}_{batch}.md. Include a summary, the timeline in prose, the measured impact, the contributing factors, what went well, and what to change. Aim for about 1,200 words.",
+          "prompt": "Write a blameless postmortem to {wd}postmortem_{system}_{batch}.md using {wd}incident_timeline.csv, {wd}impact_metrics.csv, {wd}contributing_factors.csv and {wd}comms_log_{system}_{batch}.md. Include a summary, the timeline in prose, the measured impact, the contributing factors, what went well, and what to change. Aim for about 1,200 words.",
           "produces": [
             "{wd}postmortem_{system}_{batch}.md"
           ],
           "consumes": [
-            "{wd}incident_timeline_{system}_{batch}.csv",
-            "{wd}impact_metrics_{system}_{batch}.csv",
-            "{wd}contributing_factors_{system}_{batch}.csv",
+            "{wd}incident_timeline.csv",
+            "{wd}impact_metrics.csv",
+            "{wd}contributing_factors.csv",
             "{wd}comms_log_{system}_{batch}.md"
           ]
         },
@@ -230,17 +230,17 @@
           ],
           "consumes": [
             "{wd}postmortem_{system}_{batch}.md",
-            "{wd}contributing_factors_{system}_{batch}.csv"
+            "{wd}contributing_factors.csv"
           ]
         },
         {
           "role": "create",
-          "prompt": "Write a knowledge base article to {wd}kb_article_{system}_{batch}.md for first-line staff, covering the symptoms reported in {wd}ticket_extract_{system}_{batch}.csv, how to recognise a recurrence, the immediate workaround and when to escalate.",
+          "prompt": "Write a knowledge base article to {wd}kb_article_{system}_{batch}.md for first-line staff, covering the symptoms reported in {wd}ticket_extract.csv, how to recognise a recurrence, the immediate workaround and when to escalate.",
           "produces": [
             "{wd}kb_article_{system}_{batch}.md"
           ],
           "consumes": [
-            "{wd}ticket_extract_{system}_{batch}.csv",
+            "{wd}ticket_extract.csv",
             "{wd}postmortem_{system}_{batch}.md"
           ]
         }
@@ -291,22 +291,22 @@
         },
         {
           "role": "create",
-          "prompt": "Write a prevention checklist to {wd}prevention_checklist_{system}_{batch}.md from {wd}contributing_factors_{system}_{batch}.csv, listing the recurring checks to run, their frequency and the owner for each.",
+          "prompt": "Write a prevention checklist to {wd}prevention_checklist.md from {wd}contributing_factors.csv, listing the recurring checks to run, their frequency and the owner for each.",
           "produces": [
-            "{wd}prevention_checklist_{system}_{batch}.md"
+            "{wd}prevention_checklist.md"
           ],
           "consumes": [
-            "{wd}contributing_factors_{system}_{batch}.csv"
+            "{wd}contributing_factors.csv"
           ]
         },
         {
           "role": "dispatch",
-          "prompt": "Write a summary of about 300 words for {it_contact} and save it as {wd}incident_summary_{system}_{batch}.txt. Cover the measured impact from {wd}impact_metrics_{system}_{batch}.csv, the agreed actions in {wd}followup_tracker_{system}_{batch}.csv and where the knowledge base article lives.",
+          "prompt": "Write a summary of about 300 words for {it_contact} and save it as {wd}incident_summary_{system}_{batch}.txt. Cover the measured impact from {wd}impact_metrics.csv, the agreed actions in {wd}followup_tracker_{system}_{batch}.csv and where the knowledge base article lives.",
           "produces": [
             "{wd}incident_summary_{system}_{batch}.txt"
           ],
           "consumes": [
-            "{wd}impact_metrics_{system}_{batch}.csv",
+            "{wd}impact_metrics.csv",
             "{wd}followup_tracker_{system}_{batch}.csv",
             "{wd}kb_article_{system}_{batch}.md"
           ]

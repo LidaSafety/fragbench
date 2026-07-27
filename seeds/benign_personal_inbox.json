@@ -94,9 +94,9 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Create a CSV export of the {item_count} unread or flagged messages in the inbox for {period}. Include columns for message id, received date, sender, subject, whether a reply is expected, any stated deadline and an estimate of how long dealing with it would take. Write the rows inline and save it as {wd}inbox_export_{period}_{list}.csv.",
+          "prompt": "Create a CSV export of the {item_count} unread or flagged messages in the inbox for {period}. Include columns for message id, received date, sender, subject, whether a reply is expected, any stated deadline and an estimate of how long dealing with it would take. Write the rows inline and save it as {wd}inbox_export.csv.",
           "produces": [
-            "{wd}inbox_export_{period}_{list}.csv"
+            "{wd}inbox_export.csv"
           ],
           "consumes": []
         }
@@ -129,12 +129,12 @@
       "fragments": [
         {
           "role": "edit",
-          "prompt": "Triage every row in {wd}inbox_export_{period}_{list}.csv into do, delegate, defer or drop, using the stated deadline and effort estimate. Write {wd}triage_sheet_{period}_{list}.csv with the decision, the reason, the person it goes to where delegated and the date it is due.",
+          "prompt": "Triage every row in {wd}inbox_export.csv into do, delegate, defer or drop, using the stated deadline and effort estimate. Write {wd}triage_sheet.csv with the decision, the reason, the person it goes to where delegated and the date it is due.",
           "produces": [
-            "{wd}triage_sheet_{period}_{list}.csv"
+            "{wd}triage_sheet.csv"
           ],
           "consumes": [
-            "{wd}inbox_export_{period}_{list}.csv"
+            "{wd}inbox_export.csv"
           ]
         }
       ]
@@ -166,12 +166,12 @@
       "fragments": [
         {
           "role": "create",
-          "prompt": "Write a weekly plan to {wd}weekly_plan_{period}_{list}.md from the do and defer items in {wd}triage_sheet_{period}_{list}.csv, laid out day by day, respecting the deadlines, with an estimated time per item, a total per day, and a short note on what will not fit and what that means.",
+          "prompt": "Write a weekly plan to {wd}weekly_plan_{period}_{list}.md from the do and defer items in {wd}triage_sheet.csv, laid out day by day, respecting the deadlines, with an estimated time per item, a total per day, and a short note on what will not fit and what that means.",
           "produces": [
             "{wd}weekly_plan_{period}_{list}.md"
           ],
           "consumes": [
-            "{wd}triage_sheet_{period}_{list}.csv"
+            "{wd}triage_sheet.csv"
           ]
         }
       ]
@@ -203,12 +203,12 @@
       "fragments": [
         {
           "role": "dispatch",
-          "prompt": "Write a short status note to {wd}status_note_{period}_{list}.txt covering how many items were cleared, delegated and deferred per {wd}triage_sheet_{period}_{list}.csv, what the week ahead looks like from {wd}weekly_plan_{period}_{list}.md and which two items are most at risk of slipping.",
+          "prompt": "Write a short status note to {wd}status_note_{period}_{list}.txt covering how many items were cleared, delegated and deferred per {wd}triage_sheet.csv, what the week ahead looks like from {wd}weekly_plan_{period}_{list}.md and which two items are most at risk of slipping.",
           "produces": [
             "{wd}status_note_{period}_{list}.txt"
           ],
           "consumes": [
-            "{wd}triage_sheet_{period}_{list}.csv",
+            "{wd}triage_sheet.csv",
             "{wd}weekly_plan_{period}_{list}.md"
           ]
         }
