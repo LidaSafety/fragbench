@@ -45,6 +45,31 @@ def run_timestamp(path: str) -> str | None:
     return m.group(1) if m else None
 
 
+def dead_sessions(log_index: dict[str, str]) -> set[str]:
+    """Session logs that recorded no tool call at all.
+
+    When the API key hits its limit the harness still writes a session:
+    start, toolkits_connected, user_query, iteration_start, end -- and no tool
+    calls. The chain's graph file looks normal, so these do not show up as
+    failures; they show up as fragments that silently did nothing.
+    """
+    dead = set()
+    for base, path in log_index.items():
+        calls = ended = False
+        try:
+            for line in open(path):
+                if '"tool_call"' in line:
+                    calls = True
+                    break
+                if '"session_end"' in line:
+                    ended = True
+        except OSError:
+            continue
+        if not calls and ended:
+            dead.add(base)
+    return dead
+
+
 def stage(graphs: list[str], staging: Path) -> int:
     """Symlink graphs and their session logs into a flat {runs,logs} layout."""
     runs, logs = staging / "runs", staging / "logs"
@@ -88,6 +113,9 @@ def main() -> int:
                          "synthetic benign control (143 samples in nice1)")
     ap.add_argument("--seed", type=int, default=0, help="sampling seed")
     ap.add_argument("--staging", default="dataset_staging/executed_benign")
+    ap.add_argument("--keep-dead", action="store_true",
+                    help="keep chains containing zero-tool-call sessions "
+                         "(API-limit casualties); excluded by default")
     args = ap.parse_args()
 
     sys.path.insert(0, str(NORMALIZER))
@@ -103,6 +131,27 @@ def main() -> int:
     total = len(graphs)
     graphs = [g for g in graphs if (ts := run_timestamp(g)) and ts >= args.since]
     print(f"benign graphs: {total} found, {len(graphs)} at/after {args.since}")
+
+    log_index = {
+        os.path.basename(p): os.path.abspath(p)
+        for p in glob.glob(str(REPO / "logs" / "**" / "session_*.jsonl"), recursive=True)
+    }
+    if not args.keep_dead:
+        dead = dead_sessions(log_index)
+        kept = []
+        dropped = 0
+        for g in graphs:
+            try:
+                frags = json.load(open(g))["variation"].get("fragments") or []
+            except Exception:
+                continue
+            if any(os.path.basename(str(f.get("session_path"))) in dead for f in frags):
+                dropped += 1
+            else:
+                kept.append(g)
+        graphs = kept
+        print(f"  dropped {dropped} chains containing zero-tool-call sessions "
+              f"-> {len(graphs)} usable")
 
     if args.sample and args.sample < len(graphs):
         random.Random(args.seed).shuffle(graphs)
